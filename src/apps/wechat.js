@@ -815,6 +815,11 @@
         try { pwin().addEventListener('resize', placeLinesPop); } catch (e) {}
       }
       this.renderLinesPop();
+      // 打开菜单时重读一次世界书开关实况（玩家可能手动翻过条目），回来刷新徽标
+      try {
+        var self = this;
+        window.LZJM.Engine.refreshStates().then(function () { self.renderLinesPop(); });
+      } catch (e) {}
     },
 
     closeLines: function () {
@@ -851,8 +856,8 @@
       try {
         await W.Worldbook.setEntriesEnabled(eng.lineIfOps(line, ifEntry || null));
         W.Store.setLine(line);
-        eng.noteLineEntries(line);
-        eng.locateLine(); // 记录与快照已一致，只归位内部状态，不会二次写条目，也不会打开手机
+        await eng.refreshStates(); // 重读真实开关（含IF条目）——快照不含IF翻动的乐观更新，菜单高亮靠它
+        eng.locateLine(); // 记录与开关已一致，只归位内部状态，不会二次写条目，也不会打开手机
         try {
           var meta = (eng.LINE_META || {})[line] || {};
           var msg = '已切换到【' + (meta.label || line) + '】' + (ifEntry ? ' · ' + ifEntry : ' · 空白');

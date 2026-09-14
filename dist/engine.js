@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T15:00:22.032Z
+//  构建时间：2026-09-14T15:07:30.614Z
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 15:00';
+var __LZJM_BUILD__ = '2026-09-14 15:07';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2600,6 +2600,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         try { pwin().addEventListener('resize', placeLinesPop); } catch (e) {}
       }
       this.renderLinesPop();
+      // 打开菜单时重读一次世界书开关实况（玩家可能手动翻过条目），回来刷新徽标
+      try {
+        var self = this;
+        window.LZJM.Engine.refreshStates().then(function () { self.renderLinesPop(); });
+      } catch (e) {}
     },
 
     closeLines: function () {
@@ -2636,8 +2641,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       try {
         await W.Worldbook.setEntriesEnabled(eng.lineIfOps(line, ifEntry || null));
         W.Store.setLine(line);
-        eng.noteLineEntries(line);
-        eng.locateLine(); // 记录与快照已一致，只归位内部状态，不会二次写条目，也不会打开手机
+        await eng.refreshStates(); // 重读真实开关（含IF条目）——快照不含IF翻动的乐观更新，菜单高亮靠它
+        eng.locateLine(); // 记录与开关已一致，只归位内部状态，不会二次写条目，也不会打开手机
         try {
           var meta = (eng.LINE_META || {})[line] || {};
           var msg = '已切换到【' + (meta.label || line) + '】' + (ifEntry ? ' · ' + ifEntry : ' · 空白');
@@ -4195,9 +4200,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return (pb.y * 372 + pb.mo * 31 + pb.d) - (pa.y * 372 + pa.mo * 31 + pa.d);
   }
 
-  // 三个主条目名（与卡组世界书一致）。DLC·高中挂名放最后：正常游玩恰好开一条；
-  // 顺序只影响「开关读不出」时兜底遍历与多开警告的优先级——DLC 线优先于挂名的高中。
-  var LINES = ['DLC·大学', 'DLC·成人', 'DLC·高中'];
+  // 三个主条目名（与卡组世界书一致）。数组顺序 = 选线菜单显示顺序（高中默认线排最前）。
+  // 「开关读不出」时兜底也按此顺序遍历——高中兜底优先，符合默认线语义。
+  var LINES = ['DLC·高中', 'DLC·大学', 'DLC·成人'];
 
   // 选线菜单用：各线的显示名 + 挂的 IF 条目（世界书备注名 + 菜单显示名）。
   // 二级结构：DLC 大项 → 各 IF 小项 + 空白项（不开任何 IF）。成人线暂无 IF。
