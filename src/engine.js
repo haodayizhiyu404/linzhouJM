@@ -106,17 +106,31 @@
       return null;
     },
 
-    // 目标线对应的条目开关操作表：开目标、关其余四条
+    // 目标线对应的条目开关操作表：开目标线的命中词、关其余线的命中词。
+    // DLC 条目标题是长名（如「DLC扩展：大学篇·青野与负途」），这里给的是关键词，
+    // worldbook.setEntriesEnabled 按「标题包含」匹配。DLC·高中是默认线、无条目，不产生操作。
     lineOps: function (target) {
-      return LINES.map(function (l) { return { match: l, enable: l === target }; });
+      var KEYS = {
+        'DLC·大学': ['DLC·大学', '大学篇'],
+        'DLC·成人': ['DLC·成人', '成人篇'],
+        'DLC·高中': ['DLC·高中', '高中篇']
+      };
+      var ops = [];
+      for (var ln in KEYS) {
+        for (var ki = 0; ki < KEYS[ln].length; ki++) {
+          ops.push({ match: KEYS[ln][ki], enable: ln === target });
+        }
+      }
+      return ops;
     },
 
-    // 世界书里是否存在某条线的条目（选线界面禁用缺失项用）
+    // 世界书里是否存在某条线的条目（选线界面禁用缺失项用）。
+    // DLC·高中是默认线，无条目也永远可用；DLC 线按条目标题关键词命中。
     entryKnown: function (line) {
-      var want = line.replace(/[【】\s]/g, '');
+      if (line === 'DLC·高中') return true;
       var states = state.entryStates;
       for (var k in states) {
-        if (k.replace(/[【】\s]/g, '') === want) return true;
+        if (window.LZJM.Worldbook.matchDlcLine(k) === line) return true;
       }
       return false;
     },
@@ -304,6 +318,26 @@
           }
         }
       }
+      // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档。
+      // 与 npcLine/evolLine 同一套两层机制，只是来源从 [NPC·]/[MAIN·] 块换成自由 Markdown 段落。
+      var dlcRaw = data.dlcLineRaw || [];
+      for (var di = 0; di < dlcRaw.length; di++) {
+        var dline = dlcRaw[di].line;
+        var d = dlcRaw[di].parsed || {};
+        if (!dline) continue;
+        if (d.mainName && d.main) {
+          state.evolLine[dline] = state.evolLine[dline] || {};
+          if (!(d.mainName in state.evolLine[dline])) state.evolLine[dline][d.mainName] = d.main;
+        }
+        for (var fn in (d.fresh || {})) {
+          state.npcLine[dline] = state.npcLine[dline] || {};
+          if (!(fn in state.npcLine[dline])) state.npcLine[dline][fn] = d.fresh[fn];
+        }
+        for (var en2 in (d.evol || {})) {
+          state.evolLine[dline] = state.evolLine[dline] || {};
+          if (!(en2 in state.evolLine[dline])) state.evolLine[dline][en2] = d.evol[en2];
+        }
+      }
       state.ready = true;
       console.log('[霖州引擎] 世界书装载完成：世界线 ' + Object.keys(state.rosters).join(' / ') +
         '｜表情包 ' + Object.keys(state.stickers).length + '｜人设 ' + Object.keys(state.profiles).join('、') +
@@ -400,36 +434,33 @@
               function () { self._reconciling = false; });
     },
 
-    // 写完条目后把内存里的开关快照同步成目标状态：省一次重读，也防连续误判重复写
+    // 写完条目后把内存里的开关快照同步成目标状态：省一次重读，也防连续误判重复写。
+    // DLC 条目标题是长名，按关键词反推归属线。
     noteLineEntries: function (target) {
-      for (var i = 0; i < LINES.length; i++) {
-        var want = LINES[i].replace(/[【】\s]/g, '');
-        for (var k in state.entryStates) {
-          if (k.replace(/[【】\s]/g, '') === want) state.entryStates[k] = (LINES[i] === target);
-        }
+      for (var k in state.entryStates) {
+        var ln = window.LZJM.Worldbook.matchDlcLine(k);
+        if (ln) state.entryStates[k] = (ln === target);
       }
     },
 
-    // 读五个主条目的勾选状态。返回 {known, line, note}：
-    // known=true 表示读到了明确结论（恰好一条开）；
-    // known=false 表示读不出（条目缺失 / 多条同时开 / 全部关闭——古代线是真条目，全关不等于古代）。
+    // 读 DLC 主条目的勾选状态。返回 {known, line, note}：
+    //   恰好一条 DLC 开 → 该线；
+    //   全关             → DLC·高中（默认线，高中没有也不需要有自己条目）；
+    //   多条同开         → 读不出（按聊天记录记录归位）。
     lineBySwitch: function () {
       var titles = Object.keys(state.entryStates);
       if (!titles.length) return { known: false, note: '开关字段读不到' };
       var opened = [];
-      for (var li = 0; li < LINES.length; li++) {
-        var want = LINES[li].replace(/[【】\s]/g, '');
-        for (var i = 0; i < titles.length; i++) {
-          if (titles[i].replace(/[【】\s]/g, '') === want) {
-            if (state.entryStates[titles[i]]) opened.push(LINES[li]);
-            break;
-          }
-        }
+      for (var i = 0; i < titles.length; i++) {
+        if (!state.entryStates[titles[i]]) continue;
+        var ln = window.LZJM.Worldbook.matchDlcLine(titles[i]);
+        if (ln && ln !== 'DLC·高中' && opened.indexOf(ln) === -1) opened.push(ln);
       }
-      if (opened.length === 1) return { known: true, line: opened[0], note: '主条目开关' };
-      console.warn('[霖州引擎] 主条目开关读到 ' + opened.length + ' 条线同时开着（' + (opened.join('、') || '全部关闭') +
+      if (opened.length === 1) return { known: true, line: opened[0], note: 'DLC主条目开关' };
+      if (opened.length === 0) return { known: true, line: 'DLC·高中', note: '默认线（无DLC条目开启）' };
+      console.warn('[霖州引擎] DLC 条目同时开启 ' + opened.length + ' 条（' + opened.join('、') +
         '），视为读不出，改按聊天记录记录归位');
-      return { known: false, note: opened.length === 0 ? '主条目全部关闭' : opened.length + ' 条同时开' };
+      return { known: false, note: opened.length + ' 条DLC同时开' };
     },
 
     applyLine: function (line, source) {
@@ -449,14 +480,13 @@
       var W = window.LZJM;
       var saved = W.Store.line();
       if (saved && LINES.indexOf(saved) !== -1) return;
-      for (var li = 0; li < LINES.length; li++) {
-        for (var i = 0; i < entries.length; i++) {
-          var title = String((entries[i] && (entries[i].name || entries[i].comment || entries[i].title)) || '');
-          if (title.indexOf(LINES[li]) !== -1) {
-            W.Store.setLine(LINES[li]);
-            this.applyLine(LINES[li], '世界书激活广播');
-            return;
-          }
+      for (var i = 0; i < entries.length; i++) {
+        var title = String((entries[i] && (entries[i].name || entries[i].comment || entries[i].title)) || '');
+        var ln = W.Worldbook.matchDlcLine(title);
+        if (ln) {
+          W.Store.setLine(ln);
+          this.applyLine(ln, '世界书激活广播');
+          return;
         }
       }
     },

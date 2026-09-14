@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T10:18:36.004Z
+//  构建时间：2026-09-14T10:34:46.302Z
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 10:18';
+var __LZJM_BUILD__ = '2026-09-14 10:34';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -466,6 +466,64 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return null;
   }
 
+  // ── DLC 条目识别：条目标题 → 世界线。长标题按关键词命中（编号/副标题随意）：──
+  //   「DLC扩展：大学篇·青野与负途」「DLC独立扩展资料：旧梦余温（成人篇…）」
+  //   「DLC·大学」「大学篇…」都算大学线。无任何命中 = 高中默认线（见 engine 定位逻辑）。
+  function matchDlcLine(t) {
+    var s = String(t || '').replace(/[【】\[\]\s]/g, '');
+    if (!s) return null;
+    if (s.indexOf('DLC·成人') !== -1 || s.indexOf('成人篇') !== -1) return 'DLC·成人';
+    if (s.indexOf('DLC·大学') !== -1 || s.indexOf('大学篇') !== -1) return 'DLC·大学';
+    if (s.indexOf('DLC·高中') !== -1 || s.indexOf('高中篇') !== -1) return 'DLC·高中';
+    return null;
+  }
+
+  // ── DLC 长文条目解析（设计文档 §5.1）：大学/成人篇的自由 Markdown 档案 ──
+  // 段识别靠标题关键词，不靠编号（条目编号可能重号/跳号）：
+  //   主角演化档案：蒋默（…）/ 蒋默·角色叠加演化档案（…） → 主角演化层（叠加）
+  //   既有NPC…演化                                        → 各NPC演化层（叠加）
+  //   新增…NPC                                            → 该线专属新NPC全档（重写式）
+  // 段内条目：顶格「数字. 名字（说明）：」，正文到下一个顶格条目或段尾。
+  function splitDlcItems(body, into) {
+    var itemRe = /^(\d+)[.、]\s*([^\s（(：:]{1,12})\s*[（(]/gm;
+    var marks = [], m;
+    while ((m = itemRe.exec(body))) {
+      marks.push({ name: m[2].trim(), start: m.index, headEnd: itemRe.lastIndex });
+    }
+    for (var i = 0; i < marks.length; i++) {
+      var end = (i + 1 < marks.length) ? marks[i + 1].start : body.length;
+      var text = body.slice(marks[i].headEnd, end).trim()
+        .replace(/^[：:]\s*/, '')            // 「（说明）：」尾巴上的冒号
+        .replace(/(?:\n|^)[-–—]{3,}\s*$/, '');  // 段尾分隔线
+      if (marks[i].name && text) {
+        into[marks[i].name] = into[marks[i].name] ? into[marks[i].name] + '\n' + text : text;
+      }
+    }
+  }
+
+  function parseDlcEntry(text) {
+    var src = String(text || '');
+    var out = { mainName: '', main: '', evol: {}, fresh: {} };
+    // 切段：「## 一、 xxx」或「一、 xxx」（# 可有可无）
+    var secRe = /^#{0,6}\s*([一二三四五六七八九十]+)、\s*(.+)$/gm;
+    var secs = [], sm;
+    while ((sm = secRe.exec(src))) {
+      secs.push({ title: sm[2].trim(), start: secRe.lastIndex, headStart: sm.index });
+    }
+    for (var i = 0; i < secs.length; i++) {
+      var end = (i + 1 < secs.length) ? secs[i + 1].headStart : src.length;
+      var body = src.slice(secs[i].start, end).trim();
+      var title = secs[i].title;
+      var mainM = title.match(/主角演化档案[:：]\s*([^\s（(]+)/) ||
+                  title.match(/^([^\s·（(]+)·角色叠加演化档案/);
+      if (mainM) { out.mainName = mainM[1].trim(); out.main = body; continue; }
+      if (/既有NPC/i.test(title) && /演化/.test(title)) { splitDlcItems(body, out.evol); continue; }
+      if (/新增/.test(title) && /NPC/i.test(title)) { splitDlcItems(body, out.fresh); continue; }
+      // 其余段落（时代切片/既往因果/现状格局等）不设档案，正文提示词暂不注入
+    }
+    return out;
+  }
+
   // ── 表情包解析：JSON 对象，或逐行「名字: 文件名」/「名字=文件名」/「名字 文件名」 ──
   function parseStickers(text) {
     var j = extractJson(text);
@@ -553,9 +611,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   }
 
   var Worldbook = {
-    // 返回 { rosters, stickers, profiles, states }
+    // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {} };
+    // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [] };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -611,6 +670,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             result.profiles[who] = prev ? prev + '\n' + contentOf(es[i]) : contentOf(es[i]);
           }
         } else {
+          // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
+          var dlcLn = matchDlcLine(t);
+          if (dlcLn) {
+            result.dlcLineRaw.push({ line: dlcLn, parsed: parseDlcEntry(contentOf(es[i])) });
+          }
           // 卡组既有条目直接收编：「角色设定：蒋默」→ 蒋默 的基础人设（高中原版，
           // 大学/成人线的演化层由带线作用域的条目叠加，机制见 npcLineRaw/evolLineRaw）。
           // 不强制用户为引擎单独复制一份人设条目。
@@ -684,12 +748,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var want = {};
       ops.forEach(function (o) { want[norm(o.match)] = !!o.enable; });
       var render = { render: 'immediate' };   // 翻完立即重估注入，不等界面防抖
+      // DLC 条目标题是长名（「DLC扩展：大学篇·青野与负途」），命中词允许包含匹配；
+      // 精确相等优先，避免短词误伤
       var flip = function (entries) {
         for (var j = 0; j < entries.length; j++) {
           var t = norm(titleOf(entries[j]));
-          if (t in want) {
-            entries[j].enabled = want[t];        // 酒馆助手封装字段
-            entries[j].disable = !want[t];       // ST 原生字段，双保险
+          for (var w in want) {
+            if (t === w || t.indexOf(w) !== -1) {
+              entries[j].enabled = want[w];        // 酒馆助手封装字段
+              entries[j].disable = !want[w];       // ST 原生字段，双保险
+              break;
+            }
           }
         }
         return entries;
@@ -720,7 +789,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!file) return '';
       if (/^https?:\/\//i.test(file)) return file;
       return (window.LZJM.IMG_BASE || 'https://files.catbox.moe/') + file;
-    }
+    },
+
+    matchDlcLine: matchDlcLine,
+    parseDlcEntry: parseDlcEntry
   };
 
   window.LZJM = window.LZJM || {};
@@ -4147,17 +4219,31 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return null;
     },
 
-    // 目标线对应的条目开关操作表：开目标、关其余四条
+    // 目标线对应的条目开关操作表：开目标线的命中词、关其余线的命中词。
+    // DLC 条目标题是长名（如「DLC扩展：大学篇·青野与负途」），这里给的是关键词，
+    // worldbook.setEntriesEnabled 按「标题包含」匹配。DLC·高中是默认线、无条目，不产生操作。
     lineOps: function (target) {
-      return LINES.map(function (l) { return { match: l, enable: l === target }; });
+      var KEYS = {
+        'DLC·大学': ['DLC·大学', '大学篇'],
+        'DLC·成人': ['DLC·成人', '成人篇'],
+        'DLC·高中': ['DLC·高中', '高中篇']
+      };
+      var ops = [];
+      for (var ln in KEYS) {
+        for (var ki = 0; ki < KEYS[ln].length; ki++) {
+          ops.push({ match: KEYS[ln][ki], enable: ln === target });
+        }
+      }
+      return ops;
     },
 
-    // 世界书里是否存在某条线的条目（选线界面禁用缺失项用）
+    // 世界书里是否存在某条线的条目（选线界面禁用缺失项用）。
+    // DLC·高中是默认线，无条目也永远可用；DLC 线按条目标题关键词命中。
     entryKnown: function (line) {
-      var want = line.replace(/[【】\s]/g, '');
+      if (line === 'DLC·高中') return true;
       var states = state.entryStates;
       for (var k in states) {
-        if (k.replace(/[【】\s]/g, '') === want) return true;
+        if (window.LZJM.Worldbook.matchDlcLine(k) === line) return true;
       }
       return false;
     },
@@ -4345,6 +4431,26 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
         }
       }
+      // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档。
+      // 与 npcLine/evolLine 同一套两层机制，只是来源从 [NPC·]/[MAIN·] 块换成自由 Markdown 段落。
+      var dlcRaw = data.dlcLineRaw || [];
+      for (var di = 0; di < dlcRaw.length; di++) {
+        var dline = dlcRaw[di].line;
+        var d = dlcRaw[di].parsed || {};
+        if (!dline) continue;
+        if (d.mainName && d.main) {
+          state.evolLine[dline] = state.evolLine[dline] || {};
+          if (!(d.mainName in state.evolLine[dline])) state.evolLine[dline][d.mainName] = d.main;
+        }
+        for (var fn in (d.fresh || {})) {
+          state.npcLine[dline] = state.npcLine[dline] || {};
+          if (!(fn in state.npcLine[dline])) state.npcLine[dline][fn] = d.fresh[fn];
+        }
+        for (var en2 in (d.evol || {})) {
+          state.evolLine[dline] = state.evolLine[dline] || {};
+          if (!(en2 in state.evolLine[dline])) state.evolLine[dline][en2] = d.evol[en2];
+        }
+      }
       state.ready = true;
       console.log('[霖州引擎] 世界书装载完成：世界线 ' + Object.keys(state.rosters).join(' / ') +
         '｜表情包 ' + Object.keys(state.stickers).length + '｜人设 ' + Object.keys(state.profiles).join('、') +
@@ -4441,36 +4547,33 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
               function () { self._reconciling = false; });
     },
 
-    // 写完条目后把内存里的开关快照同步成目标状态：省一次重读，也防连续误判重复写
+    // 写完条目后把内存里的开关快照同步成目标状态：省一次重读，也防连续误判重复写。
+    // DLC 条目标题是长名，按关键词反推归属线。
     noteLineEntries: function (target) {
-      for (var i = 0; i < LINES.length; i++) {
-        var want = LINES[i].replace(/[【】\s]/g, '');
-        for (var k in state.entryStates) {
-          if (k.replace(/[【】\s]/g, '') === want) state.entryStates[k] = (LINES[i] === target);
-        }
+      for (var k in state.entryStates) {
+        var ln = window.LZJM.Worldbook.matchDlcLine(k);
+        if (ln) state.entryStates[k] = (ln === target);
       }
     },
 
-    // 读五个主条目的勾选状态。返回 {known, line, note}：
-    // known=true 表示读到了明确结论（恰好一条开）；
-    // known=false 表示读不出（条目缺失 / 多条同时开 / 全部关闭——古代线是真条目，全关不等于古代）。
+    // 读 DLC 主条目的勾选状态。返回 {known, line, note}：
+    //   恰好一条 DLC 开 → 该线；
+    //   全关             → DLC·高中（默认线，高中没有也不需要有自己条目）；
+    //   多条同开         → 读不出（按聊天记录记录归位）。
     lineBySwitch: function () {
       var titles = Object.keys(state.entryStates);
       if (!titles.length) return { known: false, note: '开关字段读不到' };
       var opened = [];
-      for (var li = 0; li < LINES.length; li++) {
-        var want = LINES[li].replace(/[【】\s]/g, '');
-        for (var i = 0; i < titles.length; i++) {
-          if (titles[i].replace(/[【】\s]/g, '') === want) {
-            if (state.entryStates[titles[i]]) opened.push(LINES[li]);
-            break;
-          }
-        }
+      for (var i = 0; i < titles.length; i++) {
+        if (!state.entryStates[titles[i]]) continue;
+        var ln = window.LZJM.Worldbook.matchDlcLine(titles[i]);
+        if (ln && ln !== 'DLC·高中' && opened.indexOf(ln) === -1) opened.push(ln);
       }
-      if (opened.length === 1) return { known: true, line: opened[0], note: '主条目开关' };
-      console.warn('[霖州引擎] 主条目开关读到 ' + opened.length + ' 条线同时开着（' + (opened.join('、') || '全部关闭') +
+      if (opened.length === 1) return { known: true, line: opened[0], note: 'DLC主条目开关' };
+      if (opened.length === 0) return { known: true, line: 'DLC·高中', note: '默认线（无DLC条目开启）' };
+      console.warn('[霖州引擎] DLC 条目同时开启 ' + opened.length + ' 条（' + opened.join('、') +
         '），视为读不出，改按聊天记录记录归位');
-      return { known: false, note: opened.length === 0 ? '主条目全部关闭' : opened.length + ' 条同时开' };
+      return { known: false, note: opened.length + ' 条DLC同时开' };
     },
 
     applyLine: function (line, source) {
@@ -4490,14 +4593,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var W = window.LZJM;
       var saved = W.Store.line();
       if (saved && LINES.indexOf(saved) !== -1) return;
-      for (var li = 0; li < LINES.length; li++) {
-        for (var i = 0; i < entries.length; i++) {
-          var title = String((entries[i] && (entries[i].name || entries[i].comment || entries[i].title)) || '');
-          if (title.indexOf(LINES[li]) !== -1) {
-            W.Store.setLine(LINES[li]);
-            this.applyLine(LINES[li], '世界书激活广播');
-            return;
-          }
+      for (var i = 0; i < entries.length; i++) {
+        var title = String((entries[i] && (entries[i].name || entries[i].comment || entries[i].title)) || '');
+        var ln = W.Worldbook.matchDlcLine(title);
+        if (ln) {
+          W.Store.setLine(ln);
+          this.applyLine(ln, '世界书激活广播');
+          return;
         }
       }
     },

@@ -90,6 +90,64 @@
     return null;
   }
 
+  // ── DLC 条目识别：条目标题 → 世界线。长标题按关键词命中（编号/副标题随意）：──
+  //   「DLC扩展：大学篇·青野与负途」「DLC独立扩展资料：旧梦余温（成人篇…）」
+  //   「DLC·大学」「大学篇…」都算大学线。无任何命中 = 高中默认线（见 engine 定位逻辑）。
+  function matchDlcLine(t) {
+    var s = String(t || '').replace(/[【】\[\]\s]/g, '');
+    if (!s) return null;
+    if (s.indexOf('DLC·成人') !== -1 || s.indexOf('成人篇') !== -1) return 'DLC·成人';
+    if (s.indexOf('DLC·大学') !== -1 || s.indexOf('大学篇') !== -1) return 'DLC·大学';
+    if (s.indexOf('DLC·高中') !== -1 || s.indexOf('高中篇') !== -1) return 'DLC·高中';
+    return null;
+  }
+
+  // ── DLC 长文条目解析（设计文档 §5.1）：大学/成人篇的自由 Markdown 档案 ──
+  // 段识别靠标题关键词，不靠编号（条目编号可能重号/跳号）：
+  //   主角演化档案：蒋默（…）/ 蒋默·角色叠加演化档案（…） → 主角演化层（叠加）
+  //   既有NPC…演化                                        → 各NPC演化层（叠加）
+  //   新增…NPC                                            → 该线专属新NPC全档（重写式）
+  // 段内条目：顶格「数字. 名字（说明）：」，正文到下一个顶格条目或段尾。
+  function splitDlcItems(body, into) {
+    var itemRe = /^(\d+)[.、]\s*([^\s（(：:]{1,12})\s*[（(]/gm;
+    var marks = [], m;
+    while ((m = itemRe.exec(body))) {
+      marks.push({ name: m[2].trim(), start: m.index, headEnd: itemRe.lastIndex });
+    }
+    for (var i = 0; i < marks.length; i++) {
+      var end = (i + 1 < marks.length) ? marks[i + 1].start : body.length;
+      var text = body.slice(marks[i].headEnd, end).trim()
+        .replace(/^[：:]\s*/, '')            // 「（说明）：」尾巴上的冒号
+        .replace(/(?:\n|^)[-–—]{3,}\s*$/, '');  // 段尾分隔线
+      if (marks[i].name && text) {
+        into[marks[i].name] = into[marks[i].name] ? into[marks[i].name] + '\n' + text : text;
+      }
+    }
+  }
+
+  function parseDlcEntry(text) {
+    var src = String(text || '');
+    var out = { mainName: '', main: '', evol: {}, fresh: {} };
+    // 切段：「## 一、 xxx」或「一、 xxx」（# 可有可无）
+    var secRe = /^#{0,6}\s*([一二三四五六七八九十]+)、\s*(.+)$/gm;
+    var secs = [], sm;
+    while ((sm = secRe.exec(src))) {
+      secs.push({ title: sm[2].trim(), start: secRe.lastIndex, headStart: sm.index });
+    }
+    for (var i = 0; i < secs.length; i++) {
+      var end = (i + 1 < secs.length) ? secs[i + 1].headStart : src.length;
+      var body = src.slice(secs[i].start, end).trim();
+      var title = secs[i].title;
+      var mainM = title.match(/主角演化档案[:：]\s*([^\s（(]+)/) ||
+                  title.match(/^([^\s·（(]+)·角色叠加演化档案/);
+      if (mainM) { out.mainName = mainM[1].trim(); out.main = body; continue; }
+      if (/既有NPC/i.test(title) && /演化/.test(title)) { splitDlcItems(body, out.evol); continue; }
+      if (/新增/.test(title) && /NPC/i.test(title)) { splitDlcItems(body, out.fresh); continue; }
+      // 其余段落（时代切片/既往因果/现状格局等）不设档案，正文提示词暂不注入
+    }
+    return out;
+  }
+
   // ── 表情包解析：JSON 对象，或逐行「名字: 文件名」/「名字=文件名」/「名字 文件名」 ──
   function parseStickers(text) {
     var j = extractJson(text);
@@ -177,9 +235,10 @@
   }
 
   var Worldbook = {
-    // 返回 { rosters, stickers, profiles, states }
+    // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {} };
+    // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [] };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -235,6 +294,11 @@
             result.profiles[who] = prev ? prev + '\n' + contentOf(es[i]) : contentOf(es[i]);
           }
         } else {
+          // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
+          var dlcLn = matchDlcLine(t);
+          if (dlcLn) {
+            result.dlcLineRaw.push({ line: dlcLn, parsed: parseDlcEntry(contentOf(es[i])) });
+          }
           // 卡组既有条目直接收编：「角色设定：蒋默」→ 蒋默 的基础人设（高中原版，
           // 大学/成人线的演化层由带线作用域的条目叠加，机制见 npcLineRaw/evolLineRaw）。
           // 不强制用户为引擎单独复制一份人设条目。
@@ -308,12 +372,17 @@
       var want = {};
       ops.forEach(function (o) { want[norm(o.match)] = !!o.enable; });
       var render = { render: 'immediate' };   // 翻完立即重估注入，不等界面防抖
+      // DLC 条目标题是长名（「DLC扩展：大学篇·青野与负途」），命中词允许包含匹配；
+      // 精确相等优先，避免短词误伤
       var flip = function (entries) {
         for (var j = 0; j < entries.length; j++) {
           var t = norm(titleOf(entries[j]));
-          if (t in want) {
-            entries[j].enabled = want[t];        // 酒馆助手封装字段
-            entries[j].disable = !want[t];       // ST 原生字段，双保险
+          for (var w in want) {
+            if (t === w || t.indexOf(w) !== -1) {
+              entries[j].enabled = want[w];        // 酒馆助手封装字段
+              entries[j].disable = !want[w];       // ST 原生字段，双保险
+              break;
+            }
           }
         }
         return entries;
@@ -344,7 +413,10 @@
       if (!file) return '';
       if (/^https?:\/\//i.test(file)) return file;
       return (window.LZJM.IMG_BASE || 'https://files.catbox.moe/') + file;
-    }
+    },
+
+    matchDlcLine: matchDlcLine,
+    parseDlcEntry: parseDlcEntry
   };
 
   window.LZJM = window.LZJM || {};
