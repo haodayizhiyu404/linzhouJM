@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 02:15
+//  构建时间（本地）：2026-09-15 02:55
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 02:15';
+var __LZJM_BUILD__ = '2026-09-15 02:55';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4840,12 +4840,28 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         } catch (e) {}
         var blocks = [];
         var keys = root.historyKeys();
-        // ── 诊断：生成起点记录库实况（排查"已删消息仍被注入"）──
+        // ── 诊断：生成起点全量实况（排查"已删消息仍被注入"）──
+        // A. 注入区残留检测：我们key下的旧值（每次注前应先无）
+        // B. 聊天明文载体检测：哪条楼层的消息文本里明文含着[手机近况]（旧块若混在消息内容里，此处现形）
         try {
-          var snap = keys.map(function (k) { return k + '=' + root.history(k).length; }).join(' ');
-          var tail = getChatMessages('0-{{lastMessageId}}').slice(-2)
+          var msgsNow = getChatMessages('0-{{lastMessageId}}');
+          var tail = msgsNow.slice(-2)
             .map(function (m) { return (m && (m.role || '?')) + ':' + String((m && m.name) || '').slice(0, 10); });
-          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 记录库[' + (snap || '空') + '] | 末尾消息: ' + tail.join(' ← ') + ' | 命中检查 recent=' + injCfg().injRecent + ' mention=' + injCfg().injMention);
+          var carriers = [];
+          for (var mi = 0; mi < msgsNow.length; mi++) {
+            var mt = String((msgsNow[mi] && msgsNow[mi].message) || '');
+            if (mt.indexOf('手机近况') !== -1) {
+              carriers.push('#' + mi + '(' + (msgsNow[mi].role || '?') + ',swipe' + (msgsNow[mi].swipe_id || 0) + ')');
+            }
+          }
+          if (carriers.length) {
+            console.log('[霖州引擎] ⚠载体检测：聊天记录中明文含[手机近况]的楼层 → ' + carriers.join(' '));
+          }
+          var st0 = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
+          var oldV = st0 && st0.extensionPrompts && st0.extensionPrompts['lzjm-phone-digest'];
+          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 记录库[' +
+            keys.map(function (k) { return k + '=' + root.history(k).length; }).join(' ') + '] | 末尾: ' +
+            tail.join(' ← ') + ' | 注入区残留: ' + (oldV ? ('⚠有 ' + JSON.stringify(oldV).slice(0, 120)) : '无'));
         } catch (e) {}
         var cands = [];
         for (var i = 0; i < keys.length; i++) {
@@ -4904,10 +4920,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           var ctx = st && st.getContext && st.getContext();
           if (ctx && typeof ctx.setExtensionPrompt === 'function') {
             if (ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
-            ctx.setExtensionPrompt('lzjm-phone-digest',
-              '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n'),
+            var fullContent = '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n');
+            ctx.setExtensionPrompt('lzjm-phone-digest', fullContent,
               0 /* IN_PROMPT */, 0, false, 0 /* role: system */);
             injected = true;
+            // 全文留痕：注入的确切值，一个字不少——与prompt里出现的块逐字比对
+            console.log('[霖州引擎] 注入全文 nonce=' + nonce + ' >>>\n' + fullContent + '\n<<< 注入全文结束');
           }
         } catch (e) { console.warn('[霖州引擎] prompt区注入失败', e); }
         console.log('[霖州引擎] 注入诊断@' + now + '楼 | ' + (injected ? '★注册注入 nonce=' + nonce : '★注入失败（无setExtensionPrompt）') + ' | ' + blocks.length + ' 块：' +
