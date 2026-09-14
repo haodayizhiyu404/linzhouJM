@@ -135,7 +135,9 @@
       var end = (i + 1 < marks.length) ? marks[i + 1].start : src.length;
       var hm = topRe.exec(src.slice(start, end));
       if (hm) end = start + hm.index;
-      var body = src.slice(start, end).trim();
+      var body = src.slice(start, end).trim()
+        // 条目内常用 --- 分隔档案块，尾巴上的分隔线不属于档案内容
+        .replace(/(?:\n|^)[-–—]{3,}\s*$/, '');
       if (marks[i].name && body) {
         out[marks[i].name] = out[marks[i].name] ? out[marks[i].name] + '\n' + body : body;
       }
@@ -231,6 +233,18 @@
           if (who) {
             var prev = result.profiles[who];
             result.profiles[who] = prev ? prev + '\n' + contentOf(es[i]) : contentOf(es[i]);
+          }
+        } else {
+          // 卡组既有条目直接收编：「角色设定：蒋默」→ 蒋默 的基础人设（高中原版，
+          // 大学/成人线的演化层由带线作用域的条目叠加，机制见 npcLineRaw/evolLineRaw）。
+          // 不强制用户为引擎单独复制一份人设条目。
+          var roleM = t.match(/^角色设定[:：]\s*(.+)$/);
+          if (roleM) {
+            var rn = roleM[1].trim();
+            if (rn) {
+              var prevR = result.profiles[rn];
+              result.profiles[rn] = prevR ? prevR + '\n' + contentOf(es[i]) : contentOf(es[i]);
+            }
           }
         }
       }
