@@ -1770,8 +1770,6 @@
       var h = W.Store.history(this.chatKey);
       var m = h[idx];
       if (!m) return;
-      // 删除即否决：记下指纹，重roll生成的同内容主动消息不再入库
-      W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
       if (W.Store.removeAt(this.chatKey, idx)) {
         this.render();
         // 联动归位主聊天里的记录楼层（正文上下文同步清掉）

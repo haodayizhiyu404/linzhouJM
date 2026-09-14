@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T16:49:48.987Z
+//  构建时间：2026-09-14T16:55:05.588Z
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 16:49';
+var __LZJM_BUILD__ = '2026-09-14 16:55';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -112,25 +112,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var list = (Array.isArray(r.procIds) ? r.procIds : []).concat([String(id)]);
       r.procIds = list.slice(-200);
       writeRoot(r);
-    },
-
-    // ── 删除否决：玩家手动删掉过的消息记指纹，重roll时 AI 再生成同内容主动块 → 跳过不入库 ──
-    _hashLine: function (s) {
-      var h = 5381;
-      s = String(s || '');
-      for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-      return h.toString(36);
-    },
-    rejectLine: function (key) {
-      var r = readRoot();
-      var list = (Array.isArray(r.rejected) ? r.rejected : []).concat([this._hashLine(key)]);
-      r.rejected = list.slice(-150);
-      writeRoot(r);
-    },
-    isRejectedLine: function (key) {
-      var r = readRoot();
-      var list = r.rejected || [];
-      return list.indexOf(this._hashLine(key)) !== -1;
     },
 
     // 未读计数：消息落入时累加，打开会话即清零（「打开即已读」标准判定）。
@@ -3615,8 +3596,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var h = W.Store.history(this.chatKey);
       var m = h[idx];
       if (!m) return;
-      // 删除即否决：记下指纹，重roll生成的同内容主动消息不再入库
-      W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
       if (W.Store.removeAt(this.chatKey, idx)) {
         this.render();
         // 联动归位主聊天里的记录楼层（正文上下文同步清掉）
@@ -4861,6 +4840,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         } catch (e) {}
         var blocks = [];
         var keys = root.historyKeys();
+        // ── 诊断：生成起点记录库实况（排查"已删消息仍被注入"）──
+        try {
+          var snap = keys.map(function (k) { return k + '=' + root.history(k).length; }).join(' ');
+          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 记录库[' + (snap || '空') + '] | 命中检查 recent=' + injCfg().injRecent + ' mention=' + injCfg().injMention);
+        } catch (e) {}
         var cands = [];
         for (var i = 0; i < keys.length; i++) {
           var key = keys[i];
@@ -4904,7 +4888,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           });
           blocks.push('「' + name + '」' + (cands[ci].isGrp ? '（群聊，仅群成员知情）' : '（私聊，仅对话双方知情）') + when + '：\n' + lines.join('\n'));
         }
-        if (!blocks.length) return;
+        if (!blocks.length) {
+          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
+          return;
+        }
+        console.log('[霖州引擎] 注入诊断@' + now + '楼 | 注入 ' + blocks.length + ' 块：' +
+          cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
         injectPrompts([{
           id: 'lzjm-phone-digest',
           position: 'in_chat',
@@ -4935,16 +4924,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var parsed;
       try { parsed = W.Floor.parseNpcLines(body, null); } catch (e) { return []; }
       if (!parsed.length) return [];
-      // 删除否决：玩家手动删掉过的消息，AI 重roll再生成同内容时不再入库（防"删了又被当事实"）
-      var before = parsed.length;
-      parsed = parsed.filter(function (p) { return !W.Store.isRejectedLine(p.who + '|' + p.kind + '|' + p.text); });
-      if (!parsed.length) {
-        console.log('[霖州引擎] 主动消息已被玩家删除否决，跳过（' + before + ' 条）');
-        return [];
-      }
-      if (parsed.length < before) {
-        console.log('[霖州引擎] 主动消息部分被否决：跳过 ' + (before - parsed.length) + '/' + before + ' 条');
-      }
       var byWho = {};
       parsed.forEach(function (p) { (byWho[p.who] = byWho[p.who] || []).push(p); });
       var names = Object.keys(byWho);

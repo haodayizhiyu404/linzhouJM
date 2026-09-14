@@ -105,25 +105,6 @@
       writeRoot(r);
     },
 
-    // ── 删除否决：玩家手动删掉过的消息记指纹，重roll时 AI 再生成同内容主动块 → 跳过不入库 ──
-    _hashLine: function (s) {
-      var h = 5381;
-      s = String(s || '');
-      for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-      return h.toString(36);
-    },
-    rejectLine: function (key) {
-      var r = readRoot();
-      var list = (Array.isArray(r.rejected) ? r.rejected : []).concat([this._hashLine(key)]);
-      r.rejected = list.slice(-150);
-      writeRoot(r);
-    },
-    isRejectedLine: function (key) {
-      var r = readRoot();
-      var list = r.rejected || [];
-      return list.indexOf(this._hashLine(key)) !== -1;
-    },
-
     // 未读计数：消息落入时累加，打开会话即清零（「打开即已读」标准判定）。
     // 计数挂在会话元信息里，随聊天变量走。
     bumpUnread: function (chatKey, n) {
