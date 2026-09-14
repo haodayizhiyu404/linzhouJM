@@ -1766,7 +1766,12 @@
 
     removeAt: function (idx) {
       if (this.busy) return;
-      if (window.LZJM.Store.removeAt(this.chatKey, idx)) this.render();
+      var W = window.LZJM;
+      // 删除即否决：记下指纹，之后重roll生成的同内容主动消息不再入库
+      var h = W.Store.history(this.chatKey);
+      var m = h[idx];
+      if (m) W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
+      if (W.Store.removeAt(this.chatKey, idx)) this.render();
     },
 
     togglePeek: function (idx) {

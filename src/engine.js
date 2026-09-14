@@ -688,6 +688,16 @@
       var parsed;
       try { parsed = W.Floor.parseNpcLines(body, null); } catch (e) { return []; }
       if (!parsed.length) return [];
+      // 删除否决：玩家手动删掉过的消息，AI 重roll再生成同内容时不再入库（防"删了又被当事实"）
+      var before = parsed.length;
+      parsed = parsed.filter(function (p) { return !W.Store.isRejectedLine(p.who + '|' + p.kind + '|' + p.text); });
+      if (!parsed.length) {
+        console.log('[霖州引擎] 主动消息已被玩家删除否决，跳过（' + before + ' 条）');
+        return [];
+      }
+      if (parsed.length < before) {
+        console.log('[霖州引擎] 主动消息部分被否决：跳过 ' + (before - parsed.length) + '/' + before + ' 条');
+      }
       var byWho = {};
       parsed.forEach(function (p) { (byWho[p.who] = byWho[p.who] || []).push(p); });
       var names = Object.keys(byWho);
