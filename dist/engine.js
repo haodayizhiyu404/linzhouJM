@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 03:03
+//  构建时间（本地）：2026-09-15 03:13
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 03:03';
+var __LZJM_BUILD__ = '2026-09-15 03:13';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4919,25 +4919,40 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
           return;
         }
-        // 对账暗号 + prompt区注入：走主页面 ST 上下文的 setExtensionPrompt（IN_PROMPT），
-        // 纯临时不落库。slash-runner 的 injectPrompts 只支持 in_chat（翻页生成会把注块
-        // 拼接进消息swipe数据随聊天存档，幽灵块），故绕开之。'none'在ST枚举里是-1=不注入，勿用。
+        // 注入位置（一行可切换）：
+        //   'in_chat' = 正文记录旁（深度1，原方案；slash-runner injectPrompts）
+        //   'prompt'  = prompt区（IN_PROMPT；最保守，in_chat 若再出幽灵改这里即可）
+        // 块头无nonce（调试nonce仅进console）。
+        var INJECT_POS = 'in_chat';
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+        var fullContent = '【手机近况 · 微信】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n');
         var injected = false;
-        try {
-          var st = window.parent.SillyTavern;
-          var ctx = st && st.getContext && st.getContext();
-          if (ctx && typeof ctx.setExtensionPrompt === 'function') {
-            if (ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
-            var fullContent = '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n');
-            ctx.setExtensionPrompt('lzjm-phone-digest', fullContent,
-              0 /* IN_PROMPT */, 0, false, 0 /* role: system */);
+        if (INJECT_POS === 'in_chat') {
+          try {
+            uninjectPrompts(['lzjm-phone-digest']);
+            injectPrompts([{
+              id: 'lzjm-phone-digest',
+              position: 'in_chat',
+              depth: 1,   // 历史正文内部、最后一楼之上
+              role: 'system',
+              content: fullContent
+            }], { once: true });
             injected = true;
-            // 全文留痕：注入的确切值，一个字不少——与prompt里出现的块逐字比对
-            console.log('[霖州引擎] 注入全文 nonce=' + nonce + ' >>>\n' + fullContent + '\n<<< 注入全文结束');
-          }
-        } catch (e) { console.warn('[霖州引擎] prompt区注入失败', e); }
-        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ' + (injected ? '★注册注入 nonce=' + nonce : '★注入失败（无setExtensionPrompt）') + ' | ' + blocks.length + ' 块：' +
+          } catch (e) { console.warn('[霖州引擎] in_chat注入失败', e); }
+        } else {
+          try {
+            var st = window.parent.SillyTavern;
+            var ctx = st && st.getContext && st.getContext();
+            if (ctx && typeof ctx.setExtensionPrompt === 'function') {
+              if (ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
+              ctx.setExtensionPrompt('lzjm-phone-digest', fullContent,
+                0 /* IN_PROMPT */, 0, false, 0 /* role: system */);
+              injected = true;
+            }
+          } catch (e) { console.warn('[霖州引擎] prompt区注入失败', e); }
+        }
+        console.log('[霖州引擎] 注入全文 nonce=' + nonce + ' 位置=' + INJECT_POS + ' >>>\n' + fullContent + '\n<<< 注入全文结束');
+        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ' + (injected ? '★注册注入 nonce=' + nonce : '★注入失败') + ' | ' + blocks.length + ' 块：' +
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
       } catch (e) { console.warn('[霖州引擎] 手机动态注入失败', e); }
     },
@@ -5776,6 +5791,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 正文生成完成 → 捕捉末位 <!--phone--> 主动消息注释块（只扫最后几楼，id 查重防重）
       try {
         var clearInject = function () {
+          // 两条注入通道都清：slash-runner 注册表 + ST 上下文注入区
+          try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}
           try {
             var ctx = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
             if (ctx && ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
