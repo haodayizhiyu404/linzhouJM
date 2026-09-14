@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 02:04
+//  构建时间（本地）：2026-09-15 02:15
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 02:04';
+var __LZJM_BUILD__ = '2026-09-15 02:15';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4894,22 +4894,24 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
           return;
         }
-        // 对账暗号 + 生命周期自管：注入前主动清一次同名残留（不信任 once 的自动摘除），
-        // 生成结束/停止再清一次——任何残留都留下日志，杜绝"幽灵注入"
+        // 对账暗号 + prompt区注入：走主页面 ST 上下文的 setExtensionPrompt（IN_PROMPT），
+        // 纯临时不落库。slash-runner 的 injectPrompts 只支持 in_chat（翻页生成会把注块
+        // 拼接进消息swipe数据随聊天存档，幽灵块），故绕开之。'none'在ST枚举里是-1=不注入，勿用。
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-        try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}
-        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ★注册注入 nonce=' + nonce + ' | ' + blocks.length + ' 块：' +
+        var injected = false;
+        try {
+          var st = window.parent.SillyTavern;
+          var ctx = st && st.getContext && st.getContext();
+          if (ctx && typeof ctx.setExtensionPrompt === 'function') {
+            if (ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
+            ctx.setExtensionPrompt('lzjm-phone-digest',
+              '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n'),
+              0 /* IN_PROMPT */, 0, false, 0 /* role: system */);
+            injected = true;
+          }
+        } catch (e) { console.warn('[霖州引擎] prompt区注入失败', e); }
+        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ' + (injected ? '★注册注入 nonce=' + nonce : '★注入失败（无setExtensionPrompt）') + ' | ' + blocks.length + ' 块：' +
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
-        injectPrompts([{
-          id: 'lzjm-phone-digest',
-          // 位置从 in_chat 改为 none（prompt顶层）：in_chat 深度注入在翻页生成时会
-          // 被ST拼接进消息数据并随swipe存档（幽灵块、刷新后仍在）；none 纯临时不落库。
-          // 代价：块从"最新楼层之上"移到prompt前部，信息量不变。
-          position: 'none',
-          depth: 0,
-          role: 'system',
-          content: '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n')
-        }], { once: true });
       } catch (e) { console.warn('[霖州引擎] 手机动态注入失败', e); }
     },
 
@@ -5746,15 +5748,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
       // 正文生成完成 → 捕捉末位 <!--phone--> 主动消息注释块（只扫最后几楼，id 查重防重）
       try {
+        var clearInject = function () {
+          try {
+            var ctx = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
+            if (ctx && ctx.extensionPrompts) delete ctx.extensionPrompts['lzjm-phone-digest'];
+          } catch (e) {}
+        };
         var genDone = (typeof tavern_events !== 'undefined' && tavern_events.GENERATION_ENDED) || 'generation_ended';
         on(genDone, function () {
-          try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}  // 注入生命周期自管，留一道手动保险
+          clearInject();
           Engine.sweepPhoneBlocks(5);
         });
         var genStopped = (typeof tavern_events !== 'undefined' && tavern_events.GENERATION_STOPPED) || 'generation_stopped';
-        on(genStopped, function () {
-          try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}
-        });
+        on(genStopped, clearInject);
       } catch (e) {}
 
       // 切聊天 → 重载（聊天变量随卡切换，需重新渲染）
