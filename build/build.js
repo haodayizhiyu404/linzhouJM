@@ -14,13 +14,17 @@ const ORDER = [
   'src/engine.js',
 ];
 
+const now = new Date();
+const pad = n => String(n).padStart(2, '0');
+const localStamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
 const banner =
   '// ═══════════════════════════════════════════════════════════\n' +
   '//  霖州蒋默 · 数字世界引擎（构建产物，勿手改）\n' +
   '//  源码见 src/ · 构建：node build/build.js\n' +
-  `//  构建时间：${new Date().toISOString()}\n` +
+  `//  构建时间（本地）：${localStamp}\n` +
   '// ═══════════════════════════════════════════════════════════\n' +
-  `var __LZJM_BUILD__ = '${new Date().toISOString().slice(0, 16).replace('T', ' ')}';\n` +
+  `var __LZJM_BUILD__ = '${localStamp}';\n` +
   `try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}\n`;
 
 let out = banner;

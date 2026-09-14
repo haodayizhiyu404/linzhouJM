@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T17:12:52.718Z
+//  构建时间（本地）：2026-09-15 01:43
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 17:12';
+var __LZJM_BUILD__ = '2026-09-15 01:43';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4843,7 +4843,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // ── 诊断：生成起点记录库实况（排查"已删消息仍被注入"）──
         try {
           var snap = keys.map(function (k) { return k + '=' + root.history(k).length; }).join(' ');
-          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 记录库[' + (snap || '空') + '] | 命中检查 recent=' + injCfg().injRecent + ' mention=' + injCfg().injMention);
+          var tail = getChatMessages('0-{{lastMessageId}}').slice(-2)
+            .map(function (m) { return (m && (m.role || '?')) + ':' + String((m && m.name) || '').slice(0, 10); });
+          console.log('[霖州引擎] 注入诊断@' + now + '楼 | 记录库[' + (snap || '空') + '] | 末尾消息: ' + tail.join(' ← ') + ' | 命中检查 recent=' + injCfg().injRecent + ' mention=' + injCfg().injMention);
         } catch (e) {}
         var cands = [];
         for (var i = 0; i < keys.length; i++) {
@@ -4892,10 +4894,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
           return;
         }
-        // 对账暗号：注入块头埋 nonce（API请求里可见），console同步留痕——
-        // 出现"没注入却有块"时，凭暗号找回生产者与当时的记录库实况
+        // 对账暗号 + 生命周期自管：注入前主动清一次同名残留（不信任 once 的自动摘除），
+        // 生成结束/停止再清一次——任何残留都留下日志，杜绝"幽灵注入"
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ★注入 nonce=' + nonce + ' | ' + blocks.length + ' 块：' +
+        try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}
+        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ★注册注入 nonce=' + nonce + ' | ' + blocks.length + ' 块：' +
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
         injectPrompts([{
           id: 'lzjm-phone-digest',
@@ -5741,7 +5744,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 正文生成完成 → 捕捉末位 <!--phone--> 主动消息注释块（只扫最后几楼，id 查重防重）
       try {
         var genDone = (typeof tavern_events !== 'undefined' && tavern_events.GENERATION_ENDED) || 'generation_ended';
-        on(genDone, function () { Engine.sweepPhoneBlocks(5); });
+        on(genDone, function () {
+          try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}  // 注入生命周期自管，留一道手动保险
+          Engine.sweepPhoneBlocks(5);
+        });
+        var genStopped = (typeof tavern_events !== 'undefined' && tavern_events.GENERATION_STOPPED) || 'generation_stopped';
+        on(genStopped, function () {
+          try { uninjectPrompts(['lzjm-phone-digest']); } catch (e) {}
+        });
       } catch (e) {}
 
       // 切聊天 → 重载（聊天变量随卡切换，需重新渲染）
