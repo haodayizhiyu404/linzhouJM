@@ -1,0 +1,18 @@
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# 本地参考材料，不上库
+旧代码参考/
+
+# 本地视觉预览脚手架与截图，不上库
+test/_css.txt
+test/gen-preview.js
+test/*-preview.html
+test/sbar-test.html
+test/mini.html
+test/*.png
+test/bell.html
+
+# 用户素材，不上库
+素材/
