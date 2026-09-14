@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 01:43
+//  构建时间（本地）：2026-09-15 02:04
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 01:43';
+var __LZJM_BUILD__ = '2026-09-15 02:04';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4902,8 +4902,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
         injectPrompts([{
           id: 'lzjm-phone-digest',
-          position: 'in_chat',
-          depth: 1,   // 历史正文内部、最后一楼之上——物理上位于所有 D0 规则上方
+          // 位置从 in_chat 改为 none（prompt顶层）：in_chat 深度注入在翻页生成时会
+          // 被ST拼接进消息数据并随swipe存档（幽灵块、刷新后仍在）；none 纯临时不落库。
+          // 代价：块从"最新楼层之上"移到prompt前部，信息量不变。
+          position: 'none',
+          depth: 0,
           role: 'system',
           content: '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n')
         }], { once: true });
