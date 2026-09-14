@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T15:12:49.364Z
+//  构建时间：2026-09-14T15:18:21.508Z
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 15:12';
+var __LZJM_BUILD__ = '2026-09-14 15:18';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2618,9 +2618,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!pop) return;
       pop.innerHTML =
         '<div class="lzjm-lpop-card">' +
-        '<div class="lzjm-lpop-head"><div class="lzjm-lpop-t">世界线</div><div class="lzjm-lpop-sub">切换后世界书条目代劳开关 · 并记入本聊天</div><span class="lzjm-lpop-x" data-lpx title="关闭">×</span></div>' +
+        '<div class="lzjm-lpop-head"><div class="lzjm-lpop-t">世界线</div><div class="lzjm-lpop-sub">切换后世界书自动归位并记录绑定 · 再次进入本聊天将恢复此世界线</div><span class="lzjm-lpop-x" data-lpx title="关闭">×</span></div>' +
         '<div class="lzjm-lpop-list">' + linesRowsHtml() + '</div>' +
-        '<div class="lzjm-lpop-foot">IF 线随选线一并归位 · 手动开关世界书不再影响本聊天</div>' +
+        '<div class="lzjm-lpop-foot">世界线以此处绑定为准 · 手动开关世界书条目视为无效</div>' +
         '</div>';
       pop.querySelector('[data-lpx]').onclick = function () { UI.closeLines(); };
       pop.querySelectorAll('.lzjm-nm-item').forEach(function (el) {

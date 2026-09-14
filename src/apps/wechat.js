@@ -833,9 +833,9 @@
       if (!pop) return;
       pop.innerHTML =
         '<div class="lzjm-lpop-card">' +
-        '<div class="lzjm-lpop-head"><div class="lzjm-lpop-t">世界线</div><div class="lzjm-lpop-sub">切换后世界书条目代劳开关 · 并记入本聊天</div><span class="lzjm-lpop-x" data-lpx title="关闭">×</span></div>' +
+        '<div class="lzjm-lpop-head"><div class="lzjm-lpop-t">世界线</div><div class="lzjm-lpop-sub">切换后世界书自动归位并记录绑定 · 再次进入本聊天将恢复此世界线</div><span class="lzjm-lpop-x" data-lpx title="关闭">×</span></div>' +
         '<div class="lzjm-lpop-list">' + linesRowsHtml() + '</div>' +
-        '<div class="lzjm-lpop-foot">IF 线随选线一并归位 · 手动开关世界书不再影响本聊天</div>' +
+        '<div class="lzjm-lpop-foot">世界线以此处绑定为准 · 手动开关世界书条目视为无效</div>' +
         '</div>';
       pop.querySelector('[data-lpx]').onclick = function () { UI.closeLines(); };
       pop.querySelectorAll('.lzjm-nm-item').forEach(function (el) {
