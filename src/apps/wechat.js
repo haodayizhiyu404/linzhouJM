@@ -1767,11 +1767,16 @@
     removeAt: function (idx) {
       if (this.busy) return;
       var W = window.LZJM;
-      // 删除即否决：记下指纹，之后重roll生成的同内容主动消息不再入库
       var h = W.Store.history(this.chatKey);
       var m = h[idx];
-      if (m) W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
-      if (W.Store.removeAt(this.chatKey, idx)) this.render();
+      if (!m) return;
+      // 删除即否决：记下指纹，重roll生成的同内容主动消息不再入库
+      W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
+      if (W.Store.removeAt(this.chatKey, idx)) {
+        this.render();
+        // 联动归位主聊天里的记录楼层（正文上下文同步清掉）
+        try { W.Floor.deleteFloorsFor(this.chatKey, [m]); } catch (e) {}
+      }
     },
 
     togglePeek: function (idx) {
@@ -1806,6 +1811,8 @@
       if (!popped.length) { this.render(); return; }
       try { toastr.info('重roll中……', '📱 霖州引擎'); } catch (e) {}
       this.render();
+      // 旧楼层里的这段台词同步归位（重roll=换一段，旧的别留在正文上下文）
+      try { W.Floor.deleteFloorsFor(this.chatKey, popped); } catch (e2) {}
       await this.generate(W.Engine.userName());
     },
 

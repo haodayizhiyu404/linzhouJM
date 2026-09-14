@@ -240,6 +240,47 @@
       } catch (e) { console.warn('[霖州引擎] 全量渲染失败', e); }
     },
 
+    // 删除手机消息时联动归位主聊天的记录楼层——正文上下文同步清掉，
+    // 重roll时 AI 看不到已删内容，就不会顺着续写（防"删了又被当事实"）。
+    // 整块删除：楼层只含被删行 → 删楼层；部分命中：楼层重写为剩余行。
+    deleteFloorsFor: async function (chatKey, msgs) {
+      try {
+        var W = window.LZJM;
+        if (!msgs || !msgs.length) return;
+        var isGrp = chatKey.indexOf('group:') === 0;
+        var name = isGrp ? chatKey.slice(6) : chatKey;
+        var userName = W.Engine.userName();
+        var lines = msgs.map(function (m) { return msgToLine(m, userName); });
+        var headWant = '[📱' + (isGrp ? name + ' 群聊' : '与' + name + '的私聊');
+        var all = getChatMessages('0-{{lastMessageId}}');
+        var delIds = [], touched = false;
+        for (var i = 0; i < all.length; i++) {
+          var txt = String((all[i] && all[i].message) || '').replace(/^\s+/, '');
+          var rm = txt.match(RECORD_RE);
+          if (!rm || txt.indexOf(headWant) !== 0) continue;   // 头部精确归属该会话（前缀匹配防子串误伤）
+          var bodyLines = rm[2].split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+          var hitAny = lines.some(function (l) { return bodyLines.indexOf(l) !== -1; });
+          if (!hitAny) continue;
+          var remain = bodyLines.filter(function (l) { return lines.indexOf(l) === -1; });
+          var mid = all[i].message_id != null ? all[i].message_id : i;
+          if (!remain.length) {
+            delIds.push(mid);
+          } else {
+            await setChatMessage('[📱' + rm[1] + ']\n' + remain.join('\n') + '\n[/📱]', mid, { refresh: 'affected' });
+            touched = true;
+          }
+        }
+        if (delIds.length) {
+          await deleteChatMessages(delIds, { refresh: 'affected' });
+          touched = true;
+        }
+        if (touched) {
+          console.log('[霖州引擎] 记录楼层已随删除归位（' + name + '：删 ' + delIds.length + ' 层）');
+          try { this.renderAll(); } catch (e) {}
+        }
+      } catch (e) { console.warn('[霖州引擎] 联动归位楼层失败', e); }
+    },
+
     // NPC 原始输出 → 类型化消息数组（群聊行首带名字）
     parseNpcLines: function (rawText, defaultWho) {
       var out = [];

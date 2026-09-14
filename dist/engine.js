@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间：2026-09-14T16:38:52.919Z
+//  构建时间：2026-09-14T16:49:48.987Z
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-14 16:38';
+var __LZJM_BUILD__ = '2026-09-14 16:49';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1699,6 +1699,47 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var els = pdoc().querySelectorAll('#chat .mes .mes_text');
         for (var i = 0; i < els.length; i++) renderMesText(els[i]);
       } catch (e) { console.warn('[霖州引擎] 全量渲染失败', e); }
+    },
+
+    // 删除手机消息时联动归位主聊天的记录楼层——正文上下文同步清掉，
+    // 重roll时 AI 看不到已删内容，就不会顺着续写（防"删了又被当事实"）。
+    // 整块删除：楼层只含被删行 → 删楼层；部分命中：楼层重写为剩余行。
+    deleteFloorsFor: async function (chatKey, msgs) {
+      try {
+        var W = window.LZJM;
+        if (!msgs || !msgs.length) return;
+        var isGrp = chatKey.indexOf('group:') === 0;
+        var name = isGrp ? chatKey.slice(6) : chatKey;
+        var userName = W.Engine.userName();
+        var lines = msgs.map(function (m) { return msgToLine(m, userName); });
+        var headWant = '[📱' + (isGrp ? name + ' 群聊' : '与' + name + '的私聊');
+        var all = getChatMessages('0-{{lastMessageId}}');
+        var delIds = [], touched = false;
+        for (var i = 0; i < all.length; i++) {
+          var txt = String((all[i] && all[i].message) || '').replace(/^\s+/, '');
+          var rm = txt.match(RECORD_RE);
+          if (!rm || txt.indexOf(headWant) !== 0) continue;   // 头部精确归属该会话（前缀匹配防子串误伤）
+          var bodyLines = rm[2].split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+          var hitAny = lines.some(function (l) { return bodyLines.indexOf(l) !== -1; });
+          if (!hitAny) continue;
+          var remain = bodyLines.filter(function (l) { return lines.indexOf(l) === -1; });
+          var mid = all[i].message_id != null ? all[i].message_id : i;
+          if (!remain.length) {
+            delIds.push(mid);
+          } else {
+            await setChatMessage('[📱' + rm[1] + ']\n' + remain.join('\n') + '\n[/📱]', mid, { refresh: 'affected' });
+            touched = true;
+          }
+        }
+        if (delIds.length) {
+          await deleteChatMessages(delIds, { refresh: 'affected' });
+          touched = true;
+        }
+        if (touched) {
+          console.log('[霖州引擎] 记录楼层已随删除归位（' + name + '：删 ' + delIds.length + ' 层）');
+          try { this.renderAll(); } catch (e) {}
+        }
+      } catch (e) { console.warn('[霖州引擎] 联动归位楼层失败', e); }
     },
 
     // NPC 原始输出 → 类型化消息数组（群聊行首带名字）
@@ -3571,11 +3612,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     removeAt: function (idx) {
       if (this.busy) return;
       var W = window.LZJM;
-      // 删除即否决：记下指纹，之后重roll生成的同内容主动消息不再入库
       var h = W.Store.history(this.chatKey);
       var m = h[idx];
-      if (m) W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
-      if (W.Store.removeAt(this.chatKey, idx)) this.render();
+      if (!m) return;
+      // 删除即否决：记下指纹，重roll生成的同内容主动消息不再入库
+      W.Store.rejectLine(m.who + '|' + m.kind + '|' + m.text);
+      if (W.Store.removeAt(this.chatKey, idx)) {
+        this.render();
+        // 联动归位主聊天里的记录楼层（正文上下文同步清掉）
+        try { W.Floor.deleteFloorsFor(this.chatKey, [m]); } catch (e) {}
+      }
     },
 
     togglePeek: function (idx) {
@@ -3610,6 +3656,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!popped.length) { this.render(); return; }
       try { toastr.info('重roll中……', '📱 霖州引擎'); } catch (e) {}
       this.render();
+      // 旧楼层里的这段台词同步归位（重roll=换一段，旧的别留在正文上下文）
+      try { W.Floor.deleteFloorsFor(this.chatKey, popped); } catch (e2) {}
       await this.generate(W.Engine.userName());
     },
 
