@@ -174,8 +174,9 @@
     '.lzjm-nm-item.cur{box-shadow:inset 2px 2px 4px #c8ccd3,inset -2px -2px 4px #feffff;color:#7b6fb0}',
     '.lzjm-nm-dot{width:6px;height:6px;border-radius:50%;background:#b0a4d4;flex-shrink:0}',
     '.lzjm-nm-dot.off{background:#d0d3da}',
-    '.lzjm-nm-if{font-size:9.5px;color:#b0a4d4;letter-spacing:1px;border:1px solid #b0a4d4;border-radius:999px;padding:0 6px;line-height:1.8;flex-shrink:0}',
+    '.lzjm-nm-if{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border:1.5px solid #a394cc;border-radius:50%;font-size:9px;font-weight:700;color:#9787c2;letter-spacing:0;flex-shrink:0;line-height:1}',
     '.lzjm-nm-fill{flex:1}',
+    '.lzjm-nm-cur{font-size:10px;color:#b0b4c0;letter-spacing:1px;flex-shrink:0}',
     // 聊天
     '.lzjm-chatbg{background:#f2f2f5;min-height:100%;padding:4px 0 10px}',
     '.lzjm-chatrow{display:flex;gap:7px;margin:11px 12px;align-items:flex-start}',
@@ -2082,22 +2083,23 @@
           '<div class="lzjm-nm-items">' +
           '<div class="lzjm-nm-item' + (cur === ln ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="">' +
           '<span class="lzjm-nm-dot' + (cur === ln ? '' : ' off') + '"></span>' +
-          '<span>' + esc(m.sub || '本线') + ' · 无IF</span><span class="lzjm-nm-fill"></span>' +
-          (cur === ln ? '<span class="lzjm-nm-gsub">当前</span>' : '') +
+          '<span>无IF</span><span class="lzjm-nm-fill"></span>' +
+          (cur === ln ? '<span class="lzjm-nm-cur">当前</span>' : '') +
           '</div></div></div>';
       }
 
       var rows = '<div class="lzjm-nm-item' + (cur === ln && !anyIfOn ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="">' +
         '<span class="lzjm-nm-dot' + (cur === ln && !anyIfOn ? '' : ' off') + '"></span>' +
-        '<span>空白开场</span><span class="lzjm-nm-fill"></span>' +
-        '<span class="lzjm-nm-gsub">不开IF</span></div>';
+        '<span>无IF</span><span class="lzjm-nm-fill"></span>' +
+        (cur === ln && !anyIfOn ? '<span class="lzjm-nm-cur">当前</span>' : '') + '</div>';
       rows += list.map(function (f) {
         var on = cur === ln && ifOn(f.entry) === true;
+        var right = on ? '<span class="lzjm-nm-cur">当前</span>'
+          : (ifOn(f.entry) === true && cur !== ln ? '<span class="lzjm-nm-gsub">他线开启</span>' : '');
         return '<div class="lzjm-nm-item' + (on ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="' + esc(f.entry) + '">' +
           '<span class="lzjm-nm-dot' + (on ? '' : ' off') + '"></span>' +
           '<span class="lzjm-nm-if">IF</span>' +
-          '<span>' + esc(f.label) + '</span><span class="lzjm-nm-fill"></span>' +
-          (ifOn(f.entry) === true && cur !== ln ? '<span class="lzjm-nm-gsub">他线开启</span>' : '') +
+          '<span>' + esc(f.label) + '</span><span class="lzjm-nm-fill"></span>' + right +
           '</div>';
       }).join('');
       return '<div class="lzjm-nm-group">' + head +
