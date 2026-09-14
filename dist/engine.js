@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 02:55
+//  构建时间（本地）：2026-09-15 03:03
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 02:55';
+var __LZJM_BUILD__ = '2026-09-15 03:03';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4829,6 +4829,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var W = window.LZJM;
         var sec = this.section();
         if (!sec) return;
+        // 残留清除（无条件，最先执行）：上一轮的注入若因任何原因没被摘除，
+        // 必须在本轮prompt组装前清掉——否则会作为"上一条roll的快照"骑进本轮请求。
+        try {
+          var stc = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
+          if (stc && stc.extensionPrompts && stc.extensionPrompts['lzjm-phone-digest']) {
+            delete stc.extensionPrompts['lzjm-phone-digest'];
+            console.log('[霖州引擎] 注入诊断：已清除上一轮残留注入');
+          }
+        } catch (e) {}
         var root = W.Store;
         var myName = this.userName();
         var now = this.mainCount();

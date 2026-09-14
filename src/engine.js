@@ -603,6 +603,15 @@
         var W = window.LZJM;
         var sec = this.section();
         if (!sec) return;
+        // 残留清除（无条件，最先执行）：上一轮的注入若因任何原因没被摘除，
+        // 必须在本轮prompt组装前清掉——否则会作为"上一条roll的快照"骑进本轮请求。
+        try {
+          var stc = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
+          if (stc && stc.extensionPrompts && stc.extensionPrompts['lzjm-phone-digest']) {
+            delete stc.extensionPrompts['lzjm-phone-digest'];
+            console.log('[霖州引擎] 注入诊断：已清除上一轮残留注入');
+          }
+        } catch (e) {}
         var root = W.Store;
         var myName = this.userName();
         var now = this.mainCount();
