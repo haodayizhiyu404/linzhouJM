@@ -666,14 +666,17 @@
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
           return;
         }
-        console.log('[霖州引擎] 注入诊断@' + now + '楼 | 注入 ' + blocks.length + ' 块：' +
+        // 对账暗号：注入块头埋 nonce（API请求里可见），console同步留痕——
+        // 出现"没注入却有块"时，凭暗号找回生产者与当时的记录库实况
+        var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+        console.log('[霖州引擎] 注入诊断@' + now + '楼 | ★注入 nonce=' + nonce + ' | ' + blocks.length + ' 块：' +
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
         injectPrompts([{
           id: 'lzjm-phone-digest',
           position: 'in_chat',
           depth: 1,   // 历史正文内部、最后一楼之上——物理上位于所有 D0 规则上方
           role: 'system',
-          content: '【手机近况 · 微信】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n')
+          content: '【手机近况 · 微信 · ' + nonce + '】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n')
         }], { once: true });
       } catch (e) { console.warn('[霖州引擎] 手机动态注入失败', e); }
     },
