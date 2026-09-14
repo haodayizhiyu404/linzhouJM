@@ -148,18 +148,34 @@
     '.lzjm-linerow{cursor:pointer}',
     '.lzjm-linerow:active{filter:brightness(.97)}',
     '.lzjm-linedis{opacity:.55}',
-    // 选线弹窗（独立于手机壳的居中菜单）
-    '#lzjm-linespop{position:fixed;inset:0;z-index:99992;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-family:system-ui,"Microsoft YaHei",sans-serif}',
-    '.lzjm-lpop-card{width:min(300px,calc(100% - 24px));max-height:78%;background:linear-gradient(165deg,rgba(255,236,244,.88) 0%,rgba(245,236,255,.8) 48%,rgba(236,240,255,.88) 100%);border-radius:20px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.55),inset 0 1px 0 rgba(255,255,255,.6),0 18px 50px rgba(60,30,80,.35);display:flex;flex-direction:column;-webkit-backdrop-filter:blur(18px) saturate(1.15);backdrop-filter:blur(18px) saturate(1.15)}',
-    '.lzjm-lpop-head{position:relative;padding:16px 14px 12px;text-align:center}',
-    '.lzjm-lpop-t{font-family:"KaiTi","STKaiti","Microsoft YaHei",serif;font-weight:600;font-size:19px;color:#5a4a6a;letter-spacing:2px}',
-    '.lzjm-lpop-sub{margin-top:5px;font-size:11px;color:#a08cb8}',
-    '.lzjm-lpop-x{position:absolute;right:10px;top:10px;cursor:pointer;font-size:20px;color:#b09cc0;line-height:1;padding:0 4px}',
-    '.lzjm-lpop-x:hover{color:#7a6690}',
-    '.lzjm-lpop-list{overflow-y:auto;min-height:0;padding:2px 10px 8px}',
-    '.lzjm-lpop-list .lzjm-conv{margin:6px 2px;border:none;border-radius:14px;background:rgba(255,255,255,.66);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 10px rgba(180,140,210,.10)}',
-    '.lzjm-lpop-list .lzjm-conv:last-child{margin-bottom:2px}',
-    '.lzjm-lpop-foot{padding:2px 14px 12px;font-size:10px;color:#b0a0c4;text-align:center;line-height:1.6}',
+    // 选线弹窗（新拟态，独立于手机壳的居中菜单；DLC大项 → IF小项 二级嵌套）
+    '#lzjm-linespop{position:fixed;inset:0;z-index:99992;background:rgba(60,64,76,.35);display:flex;align-items:center;justify-content:center;font-family:"Microsoft YaHei","PingFang SC",sans-serif}',
+    '.lzjm-lpop-card{width:min(330px,calc(100% - 24px));max-height:80%;background:#e3e6ec;border-radius:24px;overflow:hidden;box-shadow:8px 8px 20px rgba(70,76,90,.4),-8px -8px 20px rgba(255,255,255,.5);display:flex;flex-direction:column;color:#5a6272}',
+    '.lzjm-lpop-head{position:relative;padding:18px 16px 12px;text-align:center}',
+    '.lzjm-lpop-t{font-weight:700;font-size:16px;color:#4a4e5e;letter-spacing:3px}',
+    '.lzjm-lpop-sub{margin-top:5px;font-size:11px;color:#9a9eb0;letter-spacing:1px}',
+    '.lzjm-lpop-x{position:absolute;right:12px;top:12px;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:15px;color:#9a9eb0;line-height:26px;text-align:center;background:#e3e6ec;box-shadow:2px 2px 5px #c8ccd3,-2px -2px 5px #feffff}',
+    '.lzjm-lpop-x:hover{color:#7b6fb0}',
+    '.lzjm-lpop-list{overflow-y:auto;min-height:0;padding:4px 12px 10px}',
+    '.lzjm-lpop-foot{padding:2px 14px 14px;font-size:10px;color:#b0b4c0;text-align:center;line-height:1.6;letter-spacing:1px}',
+    // 二级菜单（DLC大项 / IF小项）
+    '.lzjm-nm-group{margin-bottom:12px}',
+    '.lzjm-nm-ghead{display:flex;align-items:center;gap:8px;padding:2px 4px 8px}',
+    '.lzjm-nm-gicon{width:26px;height:26px;border-radius:50%;background:#e3e6ec;box-shadow:3px 3px 6px #c8ccd3,-3px -3px 6px #feffff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}',
+    '.lzjm-nm-gname{font-size:13px;font-weight:700;color:#4a4e5e;letter-spacing:2px}',
+    '.lzjm-nm-gsub{font-size:10.5px;color:#9a9eb0;letter-spacing:1px}',
+    '.lzjm-nm-gline{flex:1;height:1px;background:linear-gradient(to right,#cdd1d9,transparent)}',
+    '.lzjm-nm-gtag{font-size:9.5px;letter-spacing:1px;padding:1px 7px;border-radius:999px;background:#e3e6ec;box-shadow:2px 2px 4px #c8ccd3,-2px -2px 4px #feffff;color:#7b6fb0;flex-shrink:0}',
+    '.lzjm-nm-items{background:#e3e6ec;border-radius:14px;box-shadow:inset 3px 3px 6px #c8ccd3,inset -3px -3px 6px #feffff;padding:8px}',
+    '.lzjm-nm-item{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;border-radius:10px;background:#e3e6ec;box-shadow:3px 3px 6px #c8ccd3,-3px -3px 6px #feffff;cursor:pointer;font-size:12.5px;color:#4a4e5e;user-select:none;transition:box-shadow .15s}',
+    '.lzjm-nm-item:last-child{margin-bottom:0}',
+    '.lzjm-nm-item:hover{box-shadow:4px 4px 8px #c8ccd3,-4px -4px 8px #feffff}',
+    '.lzjm-nm-item:active{box-shadow:inset 2px 2px 4px #c8ccd3,inset -2px -2px 4px #feffff}',
+    '.lzjm-nm-item.cur{box-shadow:inset 2px 2px 4px #c8ccd3,inset -2px -2px 4px #feffff;color:#7b6fb0}',
+    '.lzjm-nm-dot{width:6px;height:6px;border-radius:50%;background:#b0a4d4;flex-shrink:0}',
+    '.lzjm-nm-dot.off{background:#d0d3da}',
+    '.lzjm-nm-if{font-size:9.5px;color:#b0a4d4;letter-spacing:1px;border:1px solid #b0a4d4;border-radius:999px;padding:0 6px;line-height:1.8;flex-shrink:0}',
+    '.lzjm-nm-fill{flex:1}',
     // 聊天
     '.lzjm-chatbg{background:#f2f2f5;min-height:100%;padding:4px 0 10px}',
     '.lzjm-chatrow{display:flex;gap:7px;margin:11px 12px;align-items:flex-start}',
@@ -813,17 +829,17 @@
         '<div class="lzjm-lpop-card">' +
         '<div class="lzjm-lpop-head"><div class="lzjm-lpop-t">世界线</div><div class="lzjm-lpop-sub">切换后世界书条目代劳开关 · 并记入本聊天</div><span class="lzjm-lpop-x" data-lpx title="关闭">×</span></div>' +
         '<div class="lzjm-lpop-list">' + linesRowsHtml() + '</div>' +
-        '<div class="lzjm-lpop-foot">手动开关世界书不再影响本聊天</div>' +
+        '<div class="lzjm-lpop-foot">IF 线随选线一并归位 · 手动开关世界书不再影响本聊天</div>' +
         '</div>';
       pop.querySelector('[data-lpx]').onclick = function () { UI.closeLines(); };
-      pop.querySelectorAll('.lzjm-linerow').forEach(function (el) {
-        el.onclick = function () { UI.switchLine(el.dataset.line); };
+      pop.querySelectorAll('.lzjm-nm-item').forEach(function (el) {
+        el.onclick = function () { UI.switchLine(el.dataset.line, el.dataset.if || null); };
       });
     },
 
     // 玩家在选线弹窗拍板：写世界书条目 + 更新记录，两边一起动（唯一合法的换线动作）。
-    // 弹窗留在原地刷新徽标，不碰手机——手机开不开由玩家自己决定。
-    switchLine: async function (line) {
+    // ifEntry 为 null = 空白项（只切线不开IF）。弹窗留在原地刷新徽标，不碰手机。
+    switchLine: async function (line, ifEntry) {
       if (this.lineBusy) return;
       var W = window.LZJM;
       var eng = W.Engine;
@@ -833,12 +849,14 @@
       }
       this.lineBusy = true;
       try {
-        await W.Worldbook.setEntriesEnabled(eng.lineOps(line));
+        await W.Worldbook.setEntriesEnabled(eng.lineIfOps(line, ifEntry || null));
         W.Store.setLine(line);
         eng.noteLineEntries(line);
         eng.locateLine(); // 记录与快照已一致，只归位内部状态，不会二次写条目，也不会打开手机
         try {
-          toastr.info(eng.section() ? ('已切换到【' + line + '】') : ('已切换到【' + line + '】（该世界线没有手机）'), '📱 霖州引擎');
+          var meta = (eng.LINE_META || {})[line] || {};
+          var msg = '已切换到【' + (meta.label || line) + '】' + (ifEntry ? ' · ' + ifEntry : ' · 空白');
+          toastr.info(msg, '📱 霖州引擎');
         } catch (e) {}
         this.renderLinesPop();
       } catch (e) {
@@ -2016,32 +2034,69 @@
     ]);
   }
 
-  // 选线列表：五条线，标出「此聊天」的记录线与开关实况——
-  // 记录和开关不一致时（带错线进聊天/中途手动翻过）两种徽标同时出现，一眼可见
+  // 选线列表（新拟态二级菜单）：DLC 大项 → IF 小项 + 空白项。
+  // 徽标：本聊天（记录线）/ 当前（引擎实况线）；IF 小项的紫点=该IF当前开启；
+  // 当前线且无IF开启时，「空白开场」行呈凹陷高亮。记录和开关不一致时双徽标并存。
   function linesRowsHtml() {
     var W = window.LZJM;
     var eng = W.Engine;
     var saved = W.Store.line();
     var states = eng.entryStates();
     var cur = eng.line();
+    var meta = eng.LINE_META || {};
+    var ifs = eng.LINE_IFS || {};
     var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
-    return eng.LINES.map(function (ln) {
-      var st = null;
+    // IF 条目开态查表（备注/标题 归一包含匹配；找不到返回 null）
+    var ifOn = function (entryName) {
+      var want = norm(entryName);
       for (var k in states) {
-        if (norm(k) === norm(ln)) { st = states[k]; break; }
+        if (norm(k) === want || norm(k).indexOf(want) !== -1) return !!states[k];
       }
+      return null;
+    };
+    return eng.LINES.map(function (ln) {
+      var m = meta[ln] || {};
       var ros = eng.roster(ln);
       var hasPhone = !!(ros && ((ros.contacts || []).length || (ros.groups || []).length));
-      var tags = '';
-      if (saved === ln) tags += '<span class="lzjm-ltag rec">绑定:本聊天</span>';
-      else if (cur === ln) tags += '<span class="lzjm-ltag cur">当前</span>';
-      if (st === null) tags += '<span class="lzjm-ltag bad">条目未找到</span>';
-      else tags += '<span class="lzjm-ltag ' + (st ? 'on' : 'off') + '">世界书:' + (st ? '开' : '关') + '</span>';
-      if (!hasPhone) tags += '<span class="lzjm-ltag bad">无手机</span>';
-      return '<div class="lzjm-conv lzjm-linerow' + (st === null ? ' lzjm-linedis' : '') + '" data-line="' + esc(ln) + '">' +
-        '<div class="lzjm-ava lzjm-lineava">' + (hasPhone ? '📱' : '🏮') + '</div>' +
-        '<div class="lzjm-conv-main"><div class="lzjm-conv-name">' + esc(ln) + '</div>' +
-        '<div class="lzjm-ltags">' + tags + '</div></div></div>';
+      var list = ifs[ln] || [];
+      // 该线当前是否有 IF 开着
+      var anyIfOn = list.some(function (f) { return ifOn(f.entry) === true; });
+
+      var head = '<div class="lzjm-nm-ghead">' +
+        '<span class="lzjm-nm-gicon">' + (hasPhone ? '📱' : '🏮') + '</span>' +
+        '<span class="lzjm-nm-gname">' + esc(m.label || ln) + '</span>';
+      if (m.sub) head += '<span class="lzjm-nm-gsub">' + esc(m.sub) + '</span>';
+      head += '<span class="lzjm-nm-gline"></span>';
+      if (saved === ln) head += '<span class="lzjm-nm-gtag">本聊天</span>';
+      if (cur === ln) head += '<span class="lzjm-nm-gtag">当前</span>';
+      head += '</div>';
+
+      // 无 IF 的线（成人）：组头即整组，单一条目可点
+      if (!list.length) {
+        return '<div class="lzjm-nm-group" data-line="' + esc(ln) + '">' + head +
+          '<div class="lzjm-nm-items">' +
+          '<div class="lzjm-nm-item' + (cur === ln ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="">' +
+          '<span class="lzjm-nm-dot' + (cur === ln ? '' : ' off') + '"></span>' +
+          '<span>' + esc(m.sub || '本线') + ' · 无IF</span><span class="lzjm-nm-fill"></span>' +
+          (cur === ln ? '<span class="lzjm-nm-gsub">当前</span>' : '') +
+          '</div></div></div>';
+      }
+
+      var rows = '<div class="lzjm-nm-item' + (cur === ln && !anyIfOn ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="">' +
+        '<span class="lzjm-nm-dot' + (cur === ln && !anyIfOn ? '' : ' off') + '"></span>' +
+        '<span>空白开场</span><span class="lzjm-nm-fill"></span>' +
+        '<span class="lzjm-nm-gsub">不开IF</span></div>';
+      rows += list.map(function (f) {
+        var on = cur === ln && ifOn(f.entry) === true;
+        return '<div class="lzjm-nm-item' + (on ? ' cur' : '') + '" data-line="' + esc(ln) + '" data-if="' + esc(f.entry) + '">' +
+          '<span class="lzjm-nm-dot' + (on ? '' : ' off') + '"></span>' +
+          '<span class="lzjm-nm-if">IF</span>' +
+          '<span>' + esc(f.label) + '</span><span class="lzjm-nm-fill"></span>' +
+          (ifOn(f.entry) === true && cur !== ln ? '<span class="lzjm-nm-gsub">他线开启</span>' : '') +
+          '</div>';
+      }).join('');
+      return '<div class="lzjm-nm-group">' + head +
+        '<div class="lzjm-nm-items">' + rows + '</div></div>';
     }).join('');
   }
 

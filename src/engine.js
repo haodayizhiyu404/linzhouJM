@@ -31,6 +31,27 @@
   // 顺序只影响「开关读不出」时兜底遍历与多开警告的优先级——DLC 线优先于挂名的高中。
   var LINES = ['DLC·大学', 'DLC·成人', 'DLC·高中'];
 
+  // 选线菜单用：各线的显示名 + 挂的 IF 条目（世界书备注名 + 菜单显示名）。
+  // 二级结构：DLC 大项 → 各 IF 小项 + 空白项（不开任何 IF）。成人线暂无 IF。
+  // ⚠ entry 必须与世界书条目备注一致（与开场白配置同源，改一边另一边同步）。
+  var LINE_META = {
+    'DLC·高中': { label: '高中', sub: '尘途逐光' },
+    'DLC·大学': { label: '大学', sub: '青野长路' },
+    'DLC·成人': { label: '成人', sub: '旧梦余温' }
+  };
+  var LINE_IFS = {
+    'DLC·高中': [
+      { entry: '高中·泥潭与飞鸟', label: '泥潭与飞鸟' },
+      { entry: '高中·新城的月亮', label: '新城的月亮' },
+      { entry: '高中·错位的资助', label: '错位的资助' },
+      { entry: '高中·共生的藤蔓', label: '共生的藤蔓' }
+    ],
+    'DLC·大学': [
+      { entry: '大学·契约之下', label: '契约之下' }
+    ],
+    'DLC·成人': []
+  };
+
   // 跨会话上下文携带条数与个数：曾经写死，现由设置 app 可调（Store.cfg()）
   function crossLines() {
     try { return window.LZJM.Store.cfg().crossLines; } catch (e) { return 18; }
@@ -94,6 +115,8 @@
     profiles: function () { return state.profiles; },
     line: function () { return state.line; },
     LINES: LINES.slice(0),
+    LINE_META: LINE_META,
+    LINE_IFS: LINE_IFS,
     entryStates: function () { return state.entryStates; },
     // 按线名取通讯录：先精确，再忽略【】与空白比对（JSON key 和条目名略有差异也能对上）
     roster: function (line) {
@@ -122,6 +145,18 @@
         }
       }
       return ops;
+    },
+
+    // 「线 + IF」双层开关操作表：开本线主条目+目标IF，关其余线主条目+全部IF。
+    // targetIf 传 null = 空白项（不开任何IF，只留本线主条目）。
+    lineIfOps: function (target, targetIf) {
+      var ops = [];
+      for (var ln in LINE_IFS) {
+        (LINE_IFS[ln] || []).forEach(function (f) {
+          ops.push({ match: f.entry, enable: ln === target && f.entry === targetIf });
+        });
+      }
+      return ops.concat(this.lineOps(target));
     },
 
     // 世界书里是否存在某条线的条目（选线界面禁用缺失项用）。
