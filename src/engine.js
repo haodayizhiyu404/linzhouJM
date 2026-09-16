@@ -1388,6 +1388,72 @@
 
 
 
+    // ── 备忘录（日记）──
+    // 存档挂在 Store key「diary:名字」：条目 = {date:'YYYY-MM-DD', title, content, day, time}
+    // 判重两层：①进 app 自动补写按状态栏故事日（meta.lastGenDay，当日不刷新）
+    //          ②选题注入 usedDates 排除已存在日期；即便撞车也不覆盖——同日多篇并列存档
+    diaryKey: function (name) { return 'diary:' + name; },
+    diaryEntries: function (name) { return window.LZJM.Store.history(this.diaryKey(name)); },
+
+    // 契约输出解析：※备忘录※|YYYY-MM-DD|标题（可空）\n正文\n※完※；分隔符容忍常见变体
+    parseDiary: function (text) {
+      var m = /※\s*备忘录\s*※\s*\|\s*(\d{4})\s*[-–—年./]\s*(\d{1,2})\s*[-–—月./]\s*(\d{1,2})\s*日?\s*\|([^\n]*)\n([\s\S]*?)※\s*完\s*※/.exec(String(text || ''));
+      if (!m) return null;
+      return {
+        date: m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2),
+        title: (m[4] || '').trim(),
+        content: m[5].trim()
+      };
+    },
+
+    // 生成一篇。force=false = 进 app 自动补写（当日已生成过则跳过返回 null）；
+    // force=true = 显式「写一篇/重roll」，无视当日判重。正文过短（<300字）带补强要求重试一次。
+    // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
+    diaryWrite: async function (name, force) {
+      var W = window.LZJM;
+      var c = this.findContact(name);
+      if (!c) throw new Error('联系人不在本线通讯录：' + name);
+      var key = this.diaryKey(name);
+      var snap = W.Status.snapshot(name);
+      var today = (snap && snap.dateText) || '';
+      if (!force && today && W.Store.meta(key).lastGenDay === today) return null;
+      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var hist = W.Store.history(name).slice(-20);
+      var profile = this.profileFor(name);
+      var self = this;
+      var attempt = async function (retry) {
+        var req = W.Prompt.diary({ name: c.name, profile: profile }, hist, snap, self.userBlock(), usedDates, retry);
+        var raw = await self.gen(req);
+        var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
+        return self.parseDiary(text);
+      };
+      var entry = await attempt(false);
+      var len = entry ? entry.content.replace(/\s/g, '').length : 0;
+      if (len && len < 300) {
+        console.warn('[霖州引擎] 备忘录正文过短（' + len + '字），带补强要求重试一次');
+        var retryEntry = await attempt(true);
+        if (retryEntry && retryEntry.content.replace(/\s/g, '').length >= len) entry = retryEntry;
+      }
+      if (!entry || !entry.content) throw new Error('备忘录生成结果无法解析（缺少 ※备忘录※/※完※ 标记）');
+      // 晚于故事当前日的日期不拦（只警告照存）——提示词已禁止，疑模型走神时宁可存不折腾用户
+      var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(today);
+      var todayKey = dm ? dm[1] + '-' + ('0' + dm[2]).slice(-2) + '-' + ('0' + dm[3]).slice(-2) : '';
+      if (todayKey && entry.date > todayKey) {
+        console.warn('[霖州引擎] 备忘录日期 ' + entry.date + ' 晚于故事当前日 ' + todayKey + '，照存（提示词已禁止，疑模型走神）');
+      }
+      var stampTime = '';
+      try { stampTime = W.Status.nowText() || ''; } catch (e) {}
+      W.Store.push(key, [{ date: entry.date, title: entry.title, content: entry.content, day: today, time: stampTime }], 100);
+      if (today) W.Store.setMeta(key, { lastGenDay: today });
+      console.log('[霖州引擎] 备忘录：' + name + ' / ' + entry.date + (entry.title ? '「' + entry.title + '」' : '') +
+        ' / 正文 ' + entry.content.length + '字' + (force ? '（显式生成）' : ''));
+      return entry;
+    },
+
+    diaryDeleteAt: function (name, index) {
+      return window.LZJM.Store.removeAt(this.diaryKey(name), index);
+    },
+
     // ── 语音/视频通话 ──
     // transcript 存 Store key「call:名字」，与聊天记录平级的一级历史：
     // 挂断时把时长写进私聊系统条目，跨场景/摘要/红点管道全部现成可用。

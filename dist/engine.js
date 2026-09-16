@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 01:41
+//  构建时间（本地）：2026-09-17 03:24
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 01:41';
+var __LZJM_BUILD__ = '2026-09-17 03:24';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1433,6 +1433,64 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         should_silence: true,
         max_chat_history: 0
       };
+    },
+
+    // ── 备忘录：替某人写一篇手机备忘录（玩家跳出角色翻阅，文本限知）──
+  // contact = {name, profile}；hist = 与机主的微信记录（选材回味用，可空数组）
+  // usedDates = 已存在的备忘录日期（注入排除，防同日撞车覆盖旧篇）
+  // shortRetry = 上一篇正文过短被驳回，带补强要求重试一轮
+  diary: function (contact, hist, snapshot, userInfo, usedDates, shortRetry) {
+    var myName = me();
+    var p = [
+      '# 虚构沙盒',
+      '',
+      FICTION,
+      '',
+      '# 数字世界 · 备忘录生成',
+      '',
+      '本次任务：以第一人称，替「' + contact.name + '」写一篇手机备忘录。它存在这个人的手机里，不打算给任何人看。读者（玩家）拥有翻阅权限——但文本必须是这个人私密的、限知的真实声音，不是全知旁白。',
+      '',
+      contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '## 人物档案 · ' + contact.name + '\n（暂无档案，依据对话上下文自然演绎）',
+      '',
+      userInfo ? '## 机主资料 · ' + myName + '（备忘录里可能以真名出现）\n' + userInfo : '',
+      '',
+      situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
+      '',
+      mainContext() ? '## 主线近况（只作背景，供选材与回味）\n' + mainContext() : '',
+      '',
+      (hist && hist.length)
+        ? '## 与' + myName + '的微信记录（近 20 条，备忘录可以回味这里的事）\n' + histText(hist, 20, true, snapshot && snapshot.dateText)
+        : '',
+      '',
+      '## 输出要求（严格遵守）',
+      '- 格式（独占标记行，一字不改）：',
+      '  第一行：※备忘录※|日期|标题',
+      '  中间：正文（可多段）',
+      '  最后一行：※完※',
+      '- 日期：从当前时间往前 1~7 天内任选一天（不必是当天），格式 YYYY-MM-DD，不得晚于当前时间。',
+      (usedDates && usedDates.length)
+        ? '- **不可使用已存在的日期**：' + usedDates.join('、') + '（这些天已各有一篇，必须避开）'
+        : '- 当前此人无已存在的备忘录日期。',
+      '- 篇幅：正文不少于 500 字。写满，严禁提纲式缩写、严禁用「……（后略）」省字。',
+      shortRetry ? '- ⚠ 上一篇正文过短被驳回：这次必须写足 500 字，宁可写多不可写少。' : '',
+      '- 这是「' + contact.name + '」写给自己看、不打算给任何人看的东西。',
+      '- 白天发生的事可以写、也值得回味——但写的是事情在 Ta 心里沉过之后的样子，不是新闻播报。主体永远是那些 Ta 没对任何人说出口的部分。',
+      '- 分层写，按这个顺序推进：Ta 清楚知道、但从不对人提的事 → Ta 感觉到但不愿细想的事 → Ta 自己都没看懂的事。第三层只呈现、不解释。',
+      '- 用具体的生活细节落地——写什么物件取决于这个人是谁（工具、账本、药盒、车库、课桌都算）。禁止空洞抒情（"生活如此艰难"这类句子一律不要）。',
+      '- 时间线锚定已发生的剧情，可以引用、回想、甚至曲解白天的事——尤其是 Ta 对 ' + myName + ' 相关事件的私人解读（若 ' + myName + ' 近期没出场，也允许完全不提）。',
+      '- 文体是备忘录：允许不完整句、允许戛然而止、允许只有一段。但整体要有小作文的完成度——读完像窥见了一页真实的人生。',
+      '- 严禁：本人不知道的任何信息（包括 ' + myName + ' 的真实想法与内心）、对未来的预言式感叹、总结中心思想、任何元叙述（"作为……""本章……"）。',
+      '- ※完※ 之后不再输出任何文字。'
+    ].filter(function (s) { return s !== ''; }).join('\n');
+
+    return {
+      ordered_prompts: [
+        { role: 'system', content: p },
+        { role: 'user', content: '（现在请严格按上方输出要求，输出一篇「' + contact.name + '」的备忘录。只输出标记行、正文与结束标记本身。）' }
+      ],
+      should_silence: true,
+      max_chat_history: 0
+    };
     }
   };
 
@@ -2307,7 +2365,28 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-mpimg:focus,.lzjm-mpimg:focus-visible{outline:none !important;box-shadow:none !important;border:none !important;border-top:1px solid rgba(0,0,0,.08) !important;border-radius:0 !important;background:transparent}',
     '.lzjm-postsend{background:#22c05e;color:#fff;border-radius:5px;font-size:14px;padding:5px 14px;cursor:pointer;font-family:inherit;border:none;white-space:nowrap}',
     '.lzjm-appbar-rw{width:auto;flex:none}',
-    '.lzjm-mptip{padding:12px 14px;font-size:12px;color:#9aa0a8}'
+    '.lzjm-mptip{padding:12px 14px;font-size:12px;color:#9aa0a8}',
+    // 备忘录：选人横条 / 存档列表 / 阅读页
+    '.lzjm-dchips{display:flex;gap:6px;padding:10px 12px 8px;overflow-x:auto;flex:none;background:#f7f7f9;border-bottom:1px solid rgba(0,0,0,.06)}',
+    '.lzjm-dchip{flex:none;border:1px solid rgba(0,0,0,.12);background:#fff;color:#333;border-radius:14px;padding:4px 12px;font-size:12.5px;cursor:pointer;font-family:inherit}',
+    '.lzjm-dchip.on{background:#576b95;border-color:#576b95;color:#fff}',
+    '.lzjm-dlist{flex:1;min-height:0;overflow-y:auto;padding:6px 0 12px}',
+    '.lzjm-drow{display:flex;align-items:center;gap:8px;padding:11px 14px;cursor:pointer}',
+    '.lzjm-drow:active{background:rgba(0,0,0,.05)}',
+    '.lzjm-drow-main{flex:1;min-width:0}',
+    '.lzjm-drow-t{font-size:14px;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.lzjm-drow-s{font-size:11.5px;color:#9aa0a8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '.lzjm-drow-date{flex:none;font-size:11px;color:#9aa0a8}',
+    '.lzjm-drow-ops{flex:none;display:flex;gap:0}',
+    '.lzjm-dop{border:none;background:none;color:#9aa0a8;font-size:11.5px;padding:4px 5px;cursor:pointer;font-family:inherit}',
+    '.lzjm-dfoot{flex:none;padding:10px 14px 12px;border-top:1px solid rgba(0,0,0,.06);background:#f7f7f9}',
+    '.lzjm-dwrite{width:100%;border:none;background:#22c05e;color:#fff;border-radius:8px;padding:10px 0;font-size:14px;cursor:pointer;font-family:inherit}',
+    '.lzjm-dwrite:disabled{background:#a8ddb9}',
+    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;padding:18px 18px 24px;background:#fffbe8}',
+    '.lzjm-dread-h{font-size:12.5px;color:#8a6d1d;margin-bottom:4px}',
+    '.lzjm-dread-t{font-size:17px;font-weight:600;color:#3d3d1f;margin-bottom:12px}',
+    '.lzjm-dread-c{font-size:14.5px;line-height:1.9;color:#2e2e18}',
+    '.lzjm-dread-c p{margin:0 0 12px}'
   ].join('\n');
 
   var ICON_VOICE = '<svg width="15" height="15" viewBox="0 0 1024 1024"><path fill="#222222" d="M501.269333 517.610667a277.333333 277.333333 0 0 1-81.664 197.546666l-5.12 4.906667-3.306666 2.858667a42.666667 42.666667 0 0 1-58.325334-61.696l3.029334-3.136 6.954666-6.954667a192.042667 192.042667 0 0 0-7.936-273.002667l-3.050666-3.136a42.666667 42.666667 0 0 1 61.248-59.264l5.12 4.906667a277.333333 277.333333 0 0 1 83.050666 196.970667z m187.648 10.197333A418.090667 418.090667 0 0 1 565.845333 814.933333l-7.68 7.466667-3.306666 2.837333a42.666667 42.666667 0 0 1-58.346667-61.674666l3.029333-3.157334 6.101334-5.952a332.928 332.928 0 0 0 97.962666-228.48l0.085334-8.533333a332.821333 332.821333 0 0 0-105.834667-242.24 42.666667 42.666667 0 0 1 58.197333-62.4 418.133333 418.133333 0 0 1 132.970667 304.32l-0.106667 10.709333zM625.877333 137.877333a42.666667 42.666667 0 0 1 58.176-62.421333l-58.176 62.421333z m250.730667 394.026667a606.208 606.208 0 0 1-48.853333 225.365333l-6.293334 14.165334a606.016 606.016 0 0 1-123.2 176.554666l-11.136 10.816-3.306666 2.837334a42.666667 42.666667 0 0 1-58.346667-61.696l3.029333-3.136 9.557334-9.28a520.661333 520.661333 0 0 0 105.856-151.722667l5.397333-12.16a520.853333 520.853333 0 0 0 41.984-193.6l0.128-13.333333a520.341333 520.341333 0 0 0-38.4-194.261334l-5.141333-12.288a520.533333 520.533333 0 0 0-122.026667-172.288l58.197333-62.421333a605.909333 605.909333 0 0 1 142.016 200.533333l6.016 14.293334a605.653333 605.653333 0 0 1 44.672 226.133333l-0.149333 15.509333zM170.666667 518.442667a64 64 0 1 1 128 0 64 64 0 0 1-128 0z"/></svg>';
@@ -2339,6 +2418,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var ICON_TAB_CONT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 4.2a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6z"/><path d="M3.8 19.4c.5-2.9 2.8-4.6 5.8-4.6s5.3 1.7 5.8 4.6"/><path d="M15.6 5.2a3 3 0 0 1 0 5.6M17.4 14.9c1.9.5 3.3 1.9 3.7 3.9"/></svg>';
   // 发现页里的朋友圈入口（彩色圆标）
   var ICON_MOMENTS = '<svg viewBox="0 0 1024 1024"><path fill="#fff" d="M512 954.24A442.24 442.24 0 1 0 69.76 512 442.08 442.08 0 0 0 512 954.24z m0-30.88a401.12 401.12 0 0 1-137.12-21.92V621.6l274.24 276.64A356 356 0 0 1 512 923.36z m285.28-119.68a400 400 0 0 1-112 81.28L487.2 687.04l389.44 1.92a359.52 359.52 0 0 1-79.2 114.72z m118.24-289.28a400 400 0 0 1-21.92 136.96H613.76l276.8-273.92a355.04 355.04 0 0 1 25.12 136.96z m-232.8-368a355.68 355.68 0 0 1 114.56 79.04 402.88 402.88 0 0 1 81.44 112L680.96 535.52zM512 653.6A141.6 141.6 0 1 1 653.6 512 141.6 141.6 0 0 1 512 653.6z m0-548.32A400 400 0 0 1 649.12 128v280L375.04 130.4A356.32 356.32 0 0 1 512 105.28z m-285.28 119.84a405.44 405.44 0 0 1 112-81.44l198.4 198.08-389.44-2.08a355.68 355.68 0 0 1 79.04-114.56zM108.64 514.4a400 400 0 0 1 21.92-136.96h279.84L133.6 651.36a357.92 357.92 0 0 1-24.96-136.96z m234.72-21.12l-1.92 389.44a357.12 357.12 0 0 1-114.72-79.04 401.76 401.76 0 0 1-81.28-112z"/><path fill="#FC6B4F" d="M649.12 128A400 400 0 0 0 512 105.28a356.32 356.32 0 0 0-137.12 25.12l274.08 276.8z"/><path fill="#7838F2" d="M797.44 225.12a355.68 355.68 0 0 0-114.56-79.04l-1.92 389.44 197.92-198.08a402.88 402.88 0 0 0-81.44-112.32z"/><path fill="#5698F3" d="M893.76 651.36a400 400 0 0 0 21.92-136.96 355.04 355.04 0 0 0-25.12-136.96l-276.8 273.92z"/><path fill="#20E9F4" d="M685.12 884.96a400 400 0 0 0 112-81.28 359.52 359.52 0 0 0 79.2-114.72l-389.44-1.92z"/><path fill="#00FD60" d="M375.04 901.44A401.12 401.12 0 0 0 512 923.36a356 356 0 0 0 136.96-25.12L375.04 621.6z"/><path fill="#ABFB5B" d="M341.44 882.72l1.92-389.44L145.44 691.2a401.76 401.76 0 0 0 81.28 112 357.12 357.12 0 0 0 114.72 79.52z"/><path fill="#F0E254" d="M130.56 377.44a400 400 0 0 0-21.92 136.96 357.92 357.92 0 0 0 24.96 136.96l276.8-273.92z"/><path fill="#F6B351" d="M339.04 144a405.44 405.44 0 0 0-112 81.44 355.68 355.68 0 0 0-79.04 114.56l389.44 2.08z"/></svg>';
+  var ICON_MEMO = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></svg>';
   var ICON_CHEV = '<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#c3c7cd" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>';
   var ICON_CAM = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#454545" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h2.2l1.6-2.4A1.5 1.5 0 0 1 9 5h6a1.5 1.5 0 0 1 1.2.6L17.8 8H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="12.5" r="3.2"/></svg>';
   // ⋯菜单里的爱心/对话线条图标（仿微信，深底上用白色描边）
@@ -2508,6 +2588,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     feedScr: null,       // 当前 DOM 里 .lzjm-mfeed 属于哪个屏（跨屏不还原滚动）
     mMenu: -1,           // 展开「赞/评论」小菜单的动态下标
     mCmt: -1,            // 展开评论输入框的动态下标
+    diaryNpc: null,      // 备忘录当前选中的人（默认通讯录第一位）
+    dBusy: false,        // 备忘录生成中（自动补写与显式写一篇共用一把锁）
+    dConfirm: -1,        // 待确认删除的备忘录下标（-1=无）
+    dRead: -1,           // dread 阅读页展示的条目下标
     panel: null,         // null | 'actions' | 'sticker' | 'image' | 'voice' | 'location' | 'transferto' | 'transfer'
     chatKey: null,
     isGroup: false,
@@ -2647,6 +2731,57 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
     },
 
+    // ── 备忘录 ──
+    openDiary: function (npc) {
+      var W = window.LZJM;
+      if (npc) this.diaryNpc = npc;
+      if (!this.diaryNpc) {
+        var secD0 = W.Engine.section();
+        if (secD0 && secD0.contacts && secD0.contacts.length) this.diaryNpc = secD0.contacts[0].name;
+      }
+      this.dConfirm = -1;
+      this.dRead = -1;
+      this.screen = 'diary';
+      this.render();
+      this.diaryEnsure();
+    },
+    // 进 app 自动补写一篇：引擎按状态栏故事日判重（当日已生成过则跳过不刷新）
+    diaryEnsure: function () {
+      if (this.dBusy || !this.diaryNpc) return;
+      this.dBusy = true;
+      this.render();
+      var self = this;
+      window.LZJM.Engine.diaryWrite(this.diaryNpc, false).then(function (got) {
+        if (got) try { toastr.info('📔 ' + self.diaryNpc + ' 的备忘录更新了', '霖州手机', { timeOut: 3000 }); } catch (e) {}
+      }).catch(function (e) {
+        console.warn('[霖州引擎] 备忘录生成失败', e);
+        try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
+      }).finally(function () {
+        self.dBusy = false;
+        if (self.screen === 'diary') self.render();
+      });
+    },
+    // 显式「写一篇」：当日判重不挡（同日多篇由 usedDates 排日期，撞车也并列存档不覆盖）
+    diaryWriteOne: function () {
+      if (this.dBusy || !this.diaryNpc) return;
+      this.dBusy = true;
+      this.render();
+      var self = this;
+      window.LZJM.Engine.diaryWrite(this.diaryNpc, true).catch(function (e) {
+        console.warn('[霖州引擎] 备忘录生成失败', e);
+        try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
+      }).finally(function () {
+        self.dBusy = false;
+        if (self.screen === 'diary') self.render();
+      });
+    },
+    // 重roll：先删指定旧篇（下标认条目，删完再生成，AI 选题自然避开其余日期）
+    diaryReroll: function (idx) {
+      if (this.dBusy || !this.diaryNpc) return;
+      try { window.LZJM.Engine.diaryDeleteAt(this.diaryNpc, idx); } catch (e) {}
+      this.diaryWriteOne();
+    },
+
     // 选线弹窗：居中菜单，独立于手机壳——古代线没有手机也要能由此换回现代线
     showLines: function () {
       this.injectStyle();
@@ -2766,6 +2901,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           '<div class="lzjm-homegrid">' +
           '<div class="lzjm-app" data-app="wechat"><div class="lzjm-app-ico" style="background:#22c05e;border:none;position:relative">' + ICON_WECHAT +
           (totalUn ? '<span class="lzjm-appdot">' + (totalUn > 99 ? '99+' : totalUn) + '</span>' : '') + '</div><span>微信</span></div>' +
+          '<div class="lzjm-app" data-app="diary"><div class="lzjm-app-ico" style="background:#d9930d;border:none;color:#fff">' + ICON_MEMO + '</div><span>备忘录</span></div>' +
           '<div class="lzjm-app" data-app="settings"><div class="lzjm-app-ico" style="background:#8e97a8;border:none;color:#fff">' + ICON_GEAR + '</div><span>设置</span></div>' +
           '<div class="lzjm-app" data-app="close" title="收起手机"><div class="lzjm-app-ico" style="background:#e5484d;border:none;color:#fff">' + ICON_POWEROFF + '</div><span>关闭</span></div>' +
           '</div></div></div>';
@@ -2910,6 +3046,48 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // body 必须包 .lzjm-body（flex:1）——否则底部横条不贴底，跟着内容跑
         body = '<div class="lzjm-body"><div class="lzjm-mptext"><textarea class="lzjm-mpta" id="lzjm-mptext" maxlength="280" placeholder="这一刻的想法…"></textarea></div>' +
           '<textarea class="lzjm-mpimg" id="lzjm-mpimg" maxlength="60" placeholder="图片（可选）：用文字描述这张图片的画面，如：一张拍糊的试卷"></textarea></div>';
+
+      } else if (this.screen === 'diary') {
+        var secD = eng.section() || {};
+        var chipsD = (secD.contacts || []).map(function (c) {
+          return '<button class="lzjm-dchip' + (c.name === UI.diaryNpc ? ' on' : '') + '" data-dnpc="' + esc(c.name) + '">' + esc(c.name) + '</button>';
+        }).join('');
+        var entsD = UI.diaryNpc ? eng.diaryEntries(UI.diaryNpc) : [];
+        var rowsD = '';
+        for (var di2 = entsD.length - 1; di2 >= 0; di2--) {
+          var eD = entsD[di2];
+          rowsD +=
+            '<div class="lzjm-drow" data-dopen="' + di2 + '">' +
+            '<div class="lzjm-drow-main"><div class="lzjm-drow-t">' + esc(eD.title || '（无标题）') + '</div>' +
+            '<div class="lzjm-drow-s">' + esc(String(eD.content).replace(/\s+/g, ' ').slice(0, 42)) + '</div></div>' +
+            '<span class="lzjm-drow-date">' + esc(eD.date) + '</span>' +
+            '<div class="lzjm-drow-ops">' +
+            '<button class="lzjm-dop" data-dreroll="' + di2 + '" title="删掉这篇，重新生成一篇">重roll</button>' +
+            '<button class="lzjm-dop" data-ddel="' + di2 + '">删除</button>' +
+            '</div></div>';
+        }
+        body = '<div class="lzjm-body" style="display:flex;flex-direction:column;overflow:hidden">' +
+          '<div class="lzjm-dchips">' + (chipsD || '<span class="lzjm-sysrow">本世界线暂无联系人</span>') + '</div>' +
+          '<div class="lzjm-dlist">' +
+          (rowsD || '<div class="lzjm-sysrow" style="margin-top:40px">还没有备忘录<br>点下方「写一篇」，偷看 TA 的一天</div>') +
+          (this.dBusy ? '<div class="lzjm-sysrow">正在生成…（首次约 10~30 秒）</div>' : '') +
+          '</div>' +
+          '<div class="lzjm-dfoot"><button class="lzjm-dwrite" data-dwrite="1"' + (this.dBusy ? ' disabled' : '') + '>写一篇</button></div>' +
+          (this.dConfirm >= 0 ? '<div class="lzjm-scrim"><div class="lzjm-confirm">删掉这篇备忘录？<div class="lzjm-cbtns"><button class="lzjm-cbtn no" data-cact="ddelno">取消</button><button class="lzjm-cbtn yes" data-cact="ddelok">删除</button></div></div></div>' : '') +
+          '</div>';
+
+      } else if (this.screen === 'dread') {
+        var entsR = UI.diaryNpc ? eng.diaryEntries(UI.diaryNpc) : [];
+        var eR = entsR[UI.dRead];
+        var parasR = eR ? String(eR.content).split('\n').filter(function (l) { return l.trim(); })
+          .map(function (l) { return '<p>' + esc(l.trim()) + '</p>'; }).join('') : '';
+        body = '<div class="lzjm-dread">' +
+          (eR
+            ? '<div class="lzjm-dread-h">' + esc(eR.date) + (eR.day ? ' · 记于' + esc(String(eR.day).replace(/^\d{4}年/, '')) : '') + '</div>' +
+              (eR.title ? '<div class="lzjm-dread-t">' + esc(eR.title) + '</div>' : '') +
+              '<div class="lzjm-dread-c">' + parasR + '</div>'
+            : '<div class="lzjm-sysrow" style="margin-top:40px">这篇备忘录不存在了</div>') +
+          '</div>';
 
       } else if (this.screen === 'cdetail') {
         // 联系人详细资料：头像姓名 + 朋友圈入口（带最新动态预览）+ 发消息/通话
@@ -3081,6 +3259,31 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       ph.querySelectorAll('[data-app="settings"]').forEach(function (el) {
         el.onclick = function () { UI.screen = 'settings'; UI._setpick = null; UI.render(); };
       });
+      // 备忘录 app：进列表（选人 chips + 存档 + 写一篇）
+      ph.querySelectorAll('[data-app="diary"]').forEach(function (el) {
+        el.onclick = function () { UI.openDiary(); };
+      });
+      ph.querySelectorAll('[data-dnpc]').forEach(function (el) {
+        el.onclick = function () { UI.openDiary(el.dataset.dnpc); };
+      });
+      ph.querySelectorAll('[data-dwrite]').forEach(function (el) {
+        el.onclick = function () { UI.diaryWriteOne(); };
+      });
+      ph.querySelectorAll('[data-dopen]').forEach(function (el) {
+        el.onclick = function () {
+          UI.dRead = parseInt(el.dataset.dopen, 10);
+          UI.dConfirm = -1;
+          UI.screen = 'dread';
+          UI.render();
+        };
+      });
+      // 行内操作要拦冒泡，免得点「重roll/删除」顺手把条目打开了
+      ph.querySelectorAll('[data-dreroll]').forEach(function (el) {
+        el.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); UI.diaryReroll(parseInt(el.dataset.dreroll, 10)); };
+      });
+      ph.querySelectorAll('[data-ddel]').forEach(function (el) {
+        el.onclick = function (ev) { if (ev && ev.stopPropagation) ev.stopPropagation(); UI.dConfirm = parseInt(el.dataset.ddel, 10); UI.render(); };
+      });
       if (UI.screen === 'settings') {
         var saveApi = function (patch) {
           var api0 = {};
@@ -3180,7 +3383,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         el.onclick = function () {
           // mprofile 的返回看来源：详细资料进来回详细资料，朋友圈进来回朋友圈
           var act = el.dataset.act === 'mback' ? (UI.mFrom === 'cdetail' ? 'cdetail' : 'moments') : el.dataset.act;
-          UI.screen = act === 'home' ? 'home' : act === 'moments' ? 'moments' : act === 'cdetail' ? 'cdetail' : 'list';
+          UI.screen = act === 'home' ? 'home' : act === 'moments' ? 'moments' : act === 'cdetail' ? 'cdetail' : act === 'diary' ? 'diary' : 'list';
           UI.panel = null;
           UI.render();
         };
@@ -3468,6 +3671,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           else if (a === 'del') { UI.removeAt(UI.confirmDel); UI.confirmDel = -1; UI.render(); }
           else if (a === 'mdelno') { UI.mConfirmDel = -1; UI.render(); }
           else if (a === 'mdelok') { var mdi = UI.mConfirmDel; UI.mConfirmDel = -1; UI.momentsDeleteAt(mdi); }
+          else if (a === 'ddelno') { UI.dConfirm = -1; UI.render(); }
+          else if (a === 'ddelok') { var ddx = UI.dConfirm; UI.dConfirm = -1; try { window.LZJM.Engine.diaryDeleteAt(UI.diaryNpc, ddx); } catch (e) {} UI.render(); }
           else if (a === 'tswap') { UI.panel = 'transferto'; UI.render(); }
           else if (a === 'taccno') { UI.tConfirm = -1; UI.render(); }
           else if (a === 'pdelno') { UI.pConfirmDel = ''; UI.render(); }
@@ -4087,6 +4292,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     if (screen === 'mprofile') return '<div class="lzjm-appbar lzjm-appbar-ovl"><span class="lzjm-back" data-act="mback">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'mpost') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="mback">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r lzjm-appbar-rw"><button class="lzjm-postsend" data-mpost-send="1">发表</button></span></div>';
     if (screen === 'cdetail') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="list">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
+    if (screen === 'diary') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="home">' + ICON_BACK + '</span><span class="lzjm-appbar-t">备忘录</span><span class="lzjm-appbar-r"></span></div>';
+    if (screen === 'dread') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="diary">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
     return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="list">' + ICON_BACK + '</span><span class="lzjm-appbar-t">' + esc(disp || '') + '</span><span class="lzjm-appbar-r">' +
       (act ? '<span class="lzjm-reroll" data-act="reroll" title="' + (act === 'retry' ? '上一条消息发送失败，点击重新获取回复' : '重新生成对方的上一条回复') + '">' + ICON_REROLL + '</span>' : '') +
       '</span></div>';
@@ -5644,6 +5851,72 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     },
 
 
+
+    // ── 备忘录（日记）──
+    // 存档挂在 Store key「diary:名字」：条目 = {date:'YYYY-MM-DD', title, content, day, time}
+    // 判重两层：①进 app 自动补写按状态栏故事日（meta.lastGenDay，当日不刷新）
+    //          ②选题注入 usedDates 排除已存在日期；即便撞车也不覆盖——同日多篇并列存档
+    diaryKey: function (name) { return 'diary:' + name; },
+    diaryEntries: function (name) { return window.LZJM.Store.history(this.diaryKey(name)); },
+
+    // 契约输出解析：※备忘录※|YYYY-MM-DD|标题（可空）\n正文\n※完※；分隔符容忍常见变体
+    parseDiary: function (text) {
+      var m = /※\s*备忘录\s*※\s*\|\s*(\d{4})\s*[-–—年./]\s*(\d{1,2})\s*[-–—月./]\s*(\d{1,2})\s*日?\s*\|([^\n]*)\n([\s\S]*?)※\s*完\s*※/.exec(String(text || ''));
+      if (!m) return null;
+      return {
+        date: m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2),
+        title: (m[4] || '').trim(),
+        content: m[5].trim()
+      };
+    },
+
+    // 生成一篇。force=false = 进 app 自动补写（当日已生成过则跳过返回 null）；
+    // force=true = 显式「写一篇/重roll」，无视当日判重。正文过短（<300字）带补强要求重试一次。
+    // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
+    diaryWrite: async function (name, force) {
+      var W = window.LZJM;
+      var c = this.findContact(name);
+      if (!c) throw new Error('联系人不在本线通讯录：' + name);
+      var key = this.diaryKey(name);
+      var snap = W.Status.snapshot(name);
+      var today = (snap && snap.dateText) || '';
+      if (!force && today && W.Store.meta(key).lastGenDay === today) return null;
+      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var hist = W.Store.history(name).slice(-20);
+      var profile = this.profileFor(name);
+      var self = this;
+      var attempt = async function (retry) {
+        var req = W.Prompt.diary({ name: c.name, profile: profile }, hist, snap, self.userBlock(), usedDates, retry);
+        var raw = await self.gen(req);
+        var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
+        return self.parseDiary(text);
+      };
+      var entry = await attempt(false);
+      var len = entry ? entry.content.replace(/\s/g, '').length : 0;
+      if (len && len < 300) {
+        console.warn('[霖州引擎] 备忘录正文过短（' + len + '字），带补强要求重试一次');
+        var retryEntry = await attempt(true);
+        if (retryEntry && retryEntry.content.replace(/\s/g, '').length >= len) entry = retryEntry;
+      }
+      if (!entry || !entry.content) throw new Error('备忘录生成结果无法解析（缺少 ※备忘录※/※完※ 标记）');
+      // 晚于故事当前日的日期不拦（只警告照存）——提示词已禁止，疑模型走神时宁可存不折腾用户
+      var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(today);
+      var todayKey = dm ? dm[1] + '-' + ('0' + dm[2]).slice(-2) + '-' + ('0' + dm[3]).slice(-2) : '';
+      if (todayKey && entry.date > todayKey) {
+        console.warn('[霖州引擎] 备忘录日期 ' + entry.date + ' 晚于故事当前日 ' + todayKey + '，照存（提示词已禁止，疑模型走神）');
+      }
+      var stampTime = '';
+      try { stampTime = W.Status.nowText() || ''; } catch (e) {}
+      W.Store.push(key, [{ date: entry.date, title: entry.title, content: entry.content, day: today, time: stampTime }], 100);
+      if (today) W.Store.setMeta(key, { lastGenDay: today });
+      console.log('[霖州引擎] 备忘录：' + name + ' / ' + entry.date + (entry.title ? '「' + entry.title + '」' : '') +
+        ' / 正文 ' + entry.content.length + '字' + (force ? '（显式生成）' : ''));
+      return entry;
+    },
+
+    diaryDeleteAt: function (name, index) {
+      return window.LZJM.Store.removeAt(this.diaryKey(name), index);
+    },
 
     // ── 语音/视频通话 ──
     // transcript 存 Store key「call:名字」，与聊天记录平级的一级历史：

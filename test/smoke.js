@@ -626,6 +626,68 @@ ctx.getWorldbook = async () => [
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');
 
+  // ── 7.5 备忘录：契约解析 / 当日判重 / 日期排除 / 短重试 / 撞车不覆盖 ──
+  console.log('[备忘录]');
+  const dOk = LW.Engine.parseDiary('※备忘录※|2034-08-25|月考\n今天出分了。\n※完※');
+  eq('备忘录·标准解析', [dOk.date, dOk.title, dOk.content], ['2034-08-25', '月考', '今天出分了。']);
+  eq('备忘录·空标题容忍', LW.Engine.parseDiary('※备忘录※|2034-08-25|\n正文\n※完※').title, '');
+  eq('备忘录·日期零填充', LW.Engine.parseDiary('※备忘录※|2034-8-5|t\nx\n※完※').date, '2034-08-05');
+  eq('备忘录·中文分隔符容忍', LW.Engine.parseDiary('※备忘录※|2034年8月5日|t\nx\n※完※').date, '2034-08-05');
+  const dMulti = LW.Engine.parseDiary('※备忘录※|2034-08-25|t\n第一段。\n\n第二段。\n※完※');
+  eq('备忘录·多段保留', dMulti.content.indexOf('第一段') !== -1 && dMulti.content.indexOf('第二段') !== -1, true);
+  eq('备忘录·缺标记返回null', LW.Engine.parseDiary('今天想了很多，但没写标记。'), null);
+  eq('备忘录·key形如', LW.Engine.diaryKey('周言'), 'diary:周言');
+
+  // diaryWrite 全流程（gen 走 generateRaw 桩，日期取状态栏 fixture）
+  global.__msgs = [{ role: 'assistant', message: statusText }];
+  let dGenCalls = 0, dLastReq = null;
+  ctx.generateRaw = async (req) => {
+    dGenCalls++; dLastReq = req;
+    return '※备忘录※|2034-08-25|训练\n' + '今天正常训练，十组深蹲，下课回家。'.repeat(20) + '\n※完※';
+  };
+  const dw1 = await LW.Engine.diaryWrite('周言', false);
+  eq('备忘录·首次生成', dw1 && dw1.title, '训练');
+  eq('备忘录·落库条数', LW.Engine.diaryEntries('周言').length, 1);
+  const dCalls1 = dGenCalls;
+  eq('备忘录·当日判重不刷新', (await LW.Engine.diaryWrite('周言', false)) === null && dGenCalls === dCalls1, true);
+  ctx.generateRaw = async (req) => {
+    dGenCalls++; dLastReq = req;
+    return '※备忘录※|2034-08-24|旧账\n' + '又一篇正文内容。'.repeat(30) + '\n※完※';
+  };
+  const dw3 = await LW.Engine.diaryWrite('周言', true);
+  eq('备忘录·显式写一篇无视判重', dw3 && LW.Engine.diaryEntries('周言').length, 2);
+  eq('备忘录·提示词注入usedDates', dLastReq.ordered_prompts[0].content.indexOf('2034-08-25') !== -1, true);
+  eq('备忘录·提示词含日期排除令', dLastReq.ordered_prompts[0].content.indexOf('不可使用已存在的日期') !== -1, true);
+  // 短正文 → 补强重试一次，重试稿替换短稿
+  dGenCalls = 0;
+  ctx.generateRaw = async () => {
+    dGenCalls++;
+    return dGenCalls === 1 ? '※备忘录※|2034-08-23|短\n太短。\n※完※' : '※备忘录※|2034-08-22|写长了\n' + '这次写足了篇幅。'.repeat(40) + '\n※完※';
+  };
+  const dw4 = await LW.Engine.diaryWrite('周言', true);
+  eq('备忘录·短正文补强重试', dGenCalls === 2 && dw4.title === '写长了', true);
+  // 同日撞车不覆盖：AI 又选 08-22 → 并列存成第二篇
+  ctx.generateRaw = async () => '※备忘录※|2034-08-22|撞车\n' + '同一天又来一篇。'.repeat(30) + '\n※完※';
+  await LW.Engine.diaryWrite('周言', true);
+  eq('备忘录·同日撞车并列不覆盖', (function () {
+    const a = LW.Engine.diaryEntries('周言');
+    return a.length === 4 && a.filter(function (e) { return e.date === '2034-08-22'; }).length === 2;
+  })(), true);
+  eq('备忘录·删除', LW.Engine.diaryDeleteAt('周言', 0), true);
+  eq('备忘录·删后余量', LW.Engine.diaryEntries('周言').length, 3);
+  // Prompt.diary 装配要点
+  const dreq = LW.Prompt.diary({ name: '周言', profile: '班长' }, [], { dateText: '2034年8月26日 星期五' }, '机主资料', ['2034-08-25'], false);
+  const dtxt = dreq.ordered_prompts[0].content;
+  eq('备忘录·字数下限', dtxt.indexOf('不少于 500 字') !== -1, true);
+  eq('备忘录·限知禁令', dtxt.indexOf('严禁：本人不知道的任何信息') !== -1, true);
+  eq('备忘录·回味许可', dtxt.indexOf('值得回味') !== -1, true);
+  const dreq2 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], true);
+  eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
+  const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
+  eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
+  // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
+  while (LW.Engine.diaryEntries('周言').length) LW.Store.removeAt(LW.Engine.diaryKey('周言'), LW.Engine.diaryEntries('周言').length - 1);
+
   // ── 8. 设置项：cfg 默认值 / 覆写 / 非法回退 / apiConfig 四模式 ──
   console.log('[设置项]');
   LW.Store.setSettings({ plotFloors: 3, histPriv: 20, crossMax: 2, crossLines: 9 });
@@ -689,6 +751,15 @@ ctx.getWorldbook = async () => [
   eq('图床·catbox兜底常量', esrc.indexOf("IMG_BASE_FALLBACK = 'https://files.catbox.moe/'") !== -1, true);
   eq('图床·img回退监听', esrc.indexOf("addEventListener('error', function (ev)") !== -1 && esrc.indexOf('lzjmFbk') !== -1, true);
   eq('壁纸·CSS变量可换源', wsrc.includes('var(--lzjm-wall') && wsrc.includes("setProperty('--lzjm-wall'") && wsrc.includes('HOME_WALL_FB'), true);
+  // 备忘录回归保险丝：主屏入口 / 生成判重与排除 / 重roll先删再写
+  const psrc = fs.readFileSync(path.join(ROOT, 'src/prompt.js'), 'utf8');
+  eq('备忘录·主屏入口', wsrc.includes('data-app="diary"') && wsrc.includes('ICON_MEMO'), true);
+  eq('备忘录·写一篇与选人绑定', wsrc.includes('[data-dwrite]') && wsrc.includes('[data-dnpc]'), true);
+  eq('备忘录·重roll先删再写', wsrc.includes('diaryReroll') && wsrc.includes('Engine.diaryDeleteAt(this.diaryNpc, idx)'), true);
+  eq('备忘录·当日判重在引擎', esrc.includes('lastGenDay') && esrc.includes('diaryWrite'), true);
+  eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
+  eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
+  eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');
   console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
