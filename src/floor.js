@@ -31,6 +31,12 @@
     return { amount: Math.round(amount * 100) / 100, note: String(parts[1] || '').trim().slice(0, 30) };
   }
 
+  // 接收/拒收转账的参数可全省：空参返回空串占位，由引擎对到该发送方最近一笔待收款
+  function parseTransferArgLoose(arg) {
+    if (!String(arg || '').trim()) return { amount: '', note: '' };
+    return parseTransferArg(arg);
+  }
+
   function msgToLine(m, userName) {
     if (m.who === 'sys') return String(m.text || ''); // 系统条目（通话时长等）不带人名前缀
     var who = m.who === 'user' ? userName : m.who;
@@ -301,9 +307,15 @@
           if (tt) out.push({ who: who, kind: 'transfer', amount: tt.amount, note: tt.note, to: '', state: 'waiting', time: '' });
           return;
         }
-        if (/^\[拒收转账[:：|｜]/.test(body)) { // 整行：拒收机主发来的转账（显式拒绝，优先于「回复即收款」的默认推断）
-          var dm = body.match(/^\[拒收转账[:：|｜]([^\]]*)\]$/);
-          var dt = dm && parseTransferArg(dm[1]);
+        if (/^\[接收转账(?:[:：|｜]([^\]]*))?\]$/.test(body)) { // 整行：收下机主发来的转账（参数可省，对到最近一笔待收款）
+          var am = body.match(/^\[接收转账(?:[:：|｜]([^\]]*))?\]$/);
+          var at2 = am && parseTransferArgLoose(am[1]);
+          if (at2) out.push({ who: who, kind: 'taccept', amount: at2.amount, note: at2.note, from: '', time: '' });
+          return;
+        }
+        if (/^\[拒收转账(?:[:：|｜]([^\]]*))?\]$/.test(body)) { // 整行：拒收机主发来的转账（参数可省；显式拒绝优先于「回复即收款」的默认推断）
+          var dm = body.match(/^\[拒收转账(?:[:：|｜]([^\]]*))?\]$/);
+          var dt = dm && parseTransferArgLoose(dm[1]);
           if (dt) out.push({ who: who, kind: 'tdecline', amount: dt.amount, note: dt.note, from: '', time: '' });
           return;
         }

@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-15 03:13
+//  构建时间（本地）：2026-09-17 01:41
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-15 03:13';
+var __LZJM_BUILD__ = '2026-09-17 01:41';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -788,7 +788,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       file = String(file || '').trim();
       if (!file) return '';
       if (/^https?:\/\//i.test(file)) return file;
-      return (window.LZJM.IMG_BASE || 'https://files.catbox.moe/') + file;
+      return (window.LZJM.IMG_BASE || 'https://cdn.jsdelivr.net/gh/haodayizhiyu404/linzhou-world@main/img/') + file;
     },
 
     matchDlcLine: matchDlcLine,
@@ -952,7 +952,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '- [戳一戳]',
       '- [定位:地点名]',
       '- [转账:金额:备注]  单独成行：给机主转一笔钱，备注可省（罕用，剧情真的需要给钱时；机主会在手机上点收下或拒绝）',
-      '- [拒收转账:金额:备注]  单独成行：拒收机主发来的转账（更罕用，剧情需要退钱时，如不好意思收、赌气退回；机主的卡会显示已退还）',
+      '- [接收转账:金额:备注]  单独成行：收下机主发来的转账（金额备注可省；机主那边这笔转账将标记「已收款」）',
+      '- [拒收转账:金额:备注]  单独成行：拒收机主发来的转账（金额备注可省；机主那边这笔转账将标记「已退还」）',
+      '- 机主发来的转账：回复里没有 [拒收转账] 即视为已收下，无需特意声明',
       '- [撤回]  单独成行：撤回自己刚发的上一条消息（打错字、冲动后悔时用，罕用）'
     ].join('\n');
   }
@@ -1473,6 +1475,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return { amount: Math.round(amount * 100) / 100, note: String(parts[1] || '').trim().slice(0, 30) };
   }
 
+  // 接收/拒收转账的参数可全省：空参返回空串占位，由引擎对到该发送方最近一笔待收款
+  function parseTransferArgLoose(arg) {
+    if (!String(arg || '').trim()) return { amount: '', note: '' };
+    return parseTransferArg(arg);
+  }
+
   function msgToLine(m, userName) {
     if (m.who === 'sys') return String(m.text || ''); // 系统条目（通话时长等）不带人名前缀
     var who = m.who === 'user' ? userName : m.who;
@@ -1743,9 +1751,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           if (tt) out.push({ who: who, kind: 'transfer', amount: tt.amount, note: tt.note, to: '', state: 'waiting', time: '' });
           return;
         }
-        if (/^\[拒收转账[:：|｜]/.test(body)) { // 整行：拒收机主发来的转账（显式拒绝，优先于「回复即收款」的默认推断）
-          var dm = body.match(/^\[拒收转账[:：|｜]([^\]]*)\]$/);
-          var dt = dm && parseTransferArg(dm[1]);
+        if (/^\[接收转账(?:[:：|｜]([^\]]*))?\]$/.test(body)) { // 整行：收下机主发来的转账（参数可省，对到最近一笔待收款）
+          var am = body.match(/^\[接收转账(?:[:：|｜]([^\]]*))?\]$/);
+          var at2 = am && parseTransferArgLoose(am[1]);
+          if (at2) out.push({ who: who, kind: 'taccept', amount: at2.amount, note: at2.note, from: '', time: '' });
+          return;
+        }
+        if (/^\[拒收转账(?:[:：|｜]([^\]]*))?\]$/.test(body)) { // 整行：拒收机主发来的转账（参数可省；显式拒绝优先于「回复即收款」的默认推断）
+          var dm = body.match(/^\[拒收转账(?:[:：|｜]([^\]]*))?\]$/);
+          var dt = dm && parseTransferArgLoose(dm[1]);
           if (dt) out.push({ who: who, kind: 'tdecline', amount: dt.amount, note: dt.note, from: '', time: '' });
           return;
         }
@@ -1838,9 +1852,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   function pwin() { return window.parent; }
   // 主屏壁纸（浅色可爱系；换图只改这里）。必须定义在 CSS 数组之前——
   // 数组在脚本加载时立即求值，引用晚于它的变量会得到 undefined。
-  var HOME_WALL = 'https://files.catbox.moe/2rg9in.jpg';
-  // 预载壁纸：引擎加载时就拉取，避免首次打开手机屏幕空白 1~2 秒
-  try { var _wallPre = new Image(); _wallPre.src = HOME_WALL; } catch (e) {}
+  // 壁纸主源 jsdelivr（随 linzhou-world 图床仓库），catbox 兜底：探针失败时把 CSS 变量切到原站重渲染
+  var HOME_WALL = 'https://cdn.jsdelivr.net/gh/haodayizhiyu404/linzhou-world@main/img/2rg9in.jpg';
+  var HOME_WALL_FB = 'https://files.catbox.moe/2rg9in.jpg';
+  // 预载壁纸：引擎加载时就拉取，避免首次打开手机屏幕空白 1~2 秒；
+  // onerror 说明主源被拦/丢失 → 换兜底源并重写 CSS 变量（壁纸在 CSS 里，<img> 回退监听管不到）
+  try {
+    var _wallPre = new Image();
+    _wallPre.onerror = function () {
+      HOME_WALL = HOME_WALL_FB;
+      try { window.LZJM.Apps.wechat.injectStyle(); } catch (e) {}
+    };
+    _wallPre.src = HOME_WALL;
+  } catch (e) {}
   function parseDay(s) {
     var m = /(\d+)年(\d+)月(\d+)日/.exec(s || '');
     return m ? { y: +m[1], mo: +m[2], d: +m[3] } : null;
@@ -1935,7 +1959,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 主体
     '.lzjm-body{flex:1;min-height:0;overflow-y:auto;position:relative;z-index:1}',
     // 首页（壁纸 + 大时钟 + 应用网格）；壁纸铺整个屏幕，浅色系配深色字
-    '.lzjm-scr-home{background:url(' + HOME_WALL + ') center/cover no-repeat #f4f6fb}',
+    '.lzjm-scr-home{background:var(--lzjm-wall,none) center/cover no-repeat #f4f6fb}',
     '.lzjm-scr-home .lzjm-sbar{background:transparent}',
     '.lzjm-home-wall{height:100%;padding:20px 16px 26px;display:flex;flex-direction:column;justify-content:space-between;',
     'box-sizing:border-box}',
@@ -2501,12 +2525,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     injectStyle: function () {
       var doc = pdoc();
-      if (!doc.getElementById('lzjm-style')) {
-        var st = doc.createElement('style');
+      var st = doc.getElementById('lzjm-style');
+      if (!st) {
+        st = doc.createElement('style');
         st.id = 'lzjm-style';
-        st.textContent = CSS;
         doc.head.appendChild(st);
       }
+      st.textContent = CSS;
+      // 壁纸走 CSS 变量：主源加载失败时探针 onerror 改 HOME_WALL 后重入本函数即换源
+      try { doc.documentElement.style.setProperty('--lzjm-wall', 'url("' + HOME_WALL + '")'); } catch (e) {}
     },
 
     inject: function () {
@@ -3633,6 +3660,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && n < 12; i--) n++;
       var popped = W.Store.popLast(this.chatKey, n);
       if (!popped.length) { this.render(); return; }
+      // 重roll 回退本轮转账：旧回复作废了，它「收下」的推断也一并作废，
+      // 恢复待收款让新回复重新决定（只回退本轮，旧账不动）
+      try { W.Engine.rollbackTransfers(this.chatKey); } catch (e) {}
       try { toastr.info('重roll中……', '📱 霖州引擎'); } catch (e) {}
       this.render();
       // 旧楼层里的这段台词同步归位（重roll=换一段，旧的别留在正文上下文）
@@ -3655,9 +3685,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         this.failed = false;
         if (result && result.msgs && result.msgs.length) {
           W.Store.push(key, result.msgs, 100);
-          // 转账处置两连（顺序敏感）：先落 NPC 的 [拒收转账] 契约（显式拒绝优先），
-          // 再按「对方回了话 = 收了钱」把机主发出的待收款批量翻「已收款」，同帧渲染
+          // 转账处置三连（顺序敏感）：先落 NPC 的 [拒收转账]（显式拒绝最优先），
+          // 再落 [接收转账]（显式收下），最后按「对方回了话 = 收了钱」把剩下的待收款批量翻「已收款」，同帧渲染
           try { eng.applyNpcDeclines(key); } catch (e) {}
+          try { eng.applyNpcAccepts(key); } catch (e) {}
           try { eng.markTransfersAccepted(key); } catch (e) {}
           // 生成是异步的：发出后生成了回复、人已经切去别的会话/主页 → 记未读红点
           if (this.screen !== 'chat' || this.chatKey !== key) W.Store.bumpUnread(key, result.msgs.length);
@@ -4231,7 +4262,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 (function () {
   'use strict';
 
-  var IMG_BASE = 'https://files.catbox.moe/';
+  // 图片主源：霖州往事图床仓库 linzhou-world（jsdelivr，世界书裸文件名零改动直取；
+  // 蒋默世界书有10张图不在该仓库，自动落catbox兜底，见 init 的回退监听）
+  // catbox 原站降级为兜底（小米自带浏览器等内置拦截名单整域名封 catbox 会裂图）
+  var IMG_BASE = 'https://cdn.jsdelivr.net/gh/haodayizhiyu404/linzhou-world@main/img/';
+  var IMG_BASE_FALLBACK = 'https://files.catbox.moe/';
 
   // 注入块的日期相对标签（与手机界面/提示词同一套口径）
   function parseDayE(s) {
@@ -4826,11 +4861,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     injectDigest: function () {
       try {
-        var W = window.LZJM;
-        var sec = this.section();
-        if (!sec) return;
-        // 残留清除（无条件，最先执行）：上一轮的注入若因任何原因没被摘除，
+        // 残留清除（无条件，最先执行，先于一切 return 分支）：上一轮的注入若因任何原因没被摘除，
         // 必须在本轮prompt组装前清掉——否则会作为"上一条roll的快照"骑进本轮请求。
+        // 放在 section 判定之前：世界书条目被关/被换导致无段可注时，旧残留同样不许漏网。
         try {
           var stc = window.parent.SillyTavern && window.parent.SillyTavern.getContext && window.parent.SillyTavern.getContext();
           if (stc && stc.extensionPrompts && stc.extensionPrompts['lzjm-phone-digest']) {
@@ -4838,6 +4871,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             console.log('[霖州引擎] 注入诊断：已清除上一轮残留注入');
           }
         } catch (e) {}
+        var W = window.LZJM;
+        var sec = this.section();
+        if (!sec) return;
         var root = W.Store;
         var myName = this.userName();
         var now = this.mainCount();
@@ -5446,18 +5482,40 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     },
 
     // 机主对待收款转账的处置（收下/退还）随小飞机发出即生效：按 发送方+金额+备注 定位待收款卡就地翻转。
+    // 金额省略（空串/null）时对到该发送方最近一笔待收款（从尾部向早取）；找到后把回执记录
+    // （taccept/tdecline，传 recIdx 时）的金额/备注补全成实际值，回执卡才能显示 ¥。
     // 找不到对应卡（已删/已翻过）也照常——记录行本身已进上下文，AI 下一轮照样知情
-    verdictTransfer: function (key, verdict, sender, amount, note) {
+    verdictTransfer: function (key, verdict, sender, amount, note, recIdx) {
       var W = window.LZJM, h = W.Store.history(key);
-      for (var i = 0; i < h.length; i++) {
+      var idx = -1;
+      for (var i = h.length - 1; i >= 0; i--) {
         var m = h[i];
         if (m && m.who === sender && m.kind === 'transfer' && m.state === 'waiting'
-          && m.amount === amount && (m.note || '') === (note || '')) {
-          W.Store.patchAt(key, i, { state: verdict });
-          return true;
+          && (amount == null || amount === ''
+            || (m.amount === amount && (m.note || '') === (note || '')))) { idx = i; break; }
+      }
+      if (idx < 0) return false;
+      W.Store.patchAt(key, idx, { state: verdict });
+      if (recIdx != null) {
+        try { W.Store.patchAt(key, recIdx, { amount: h[idx].amount, note: h[idx].note || '' }); } catch (e) {}
+      }
+      return true;
+    },
+
+    // 重roll 回退转账：历史尾部连续的用户消息串里，已翻「已收款/已退还」的恢复「待收款」。
+    // 只碰本轮（发送→回复→重roll 这一回合）——从尾部向早追溯，遇 NPC 消息即停；
+    // 更早轮次已落账的旧账不动。新回复生成成功后 markTransfersAccepted 会重新翻账。
+    rollbackTransfers: function (key) {
+      var W = window.LZJM, h = W.Store.history(key), n = 0;
+      for (var i = h.length - 1; i >= 0; i--) {
+        var m = h[i];
+        if (!m || m.who !== 'user') break;   // 本轮边界：NPC 消息为止
+        if (m.kind === 'transfer' && (m.state === 'accepted' || m.state === 'declined')) {
+          W.Store.patchAt(key, i, { state: 'waiting' });
+          n++;
         }
       }
-      return false;
+      return n;
     },
 
     // NPC 输出 [拒收转账] 契约并生成成功：把机主对应待收款卡翻「已退还」。
@@ -5467,7 +5525,20 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       for (var i = 0; i < h.length; i++) {
         var m = h[i];
         if (m && m.who !== 'user' && m.kind === 'tdecline') {
-          if (this.verdictTransfer(key, 'declined', 'user', m.amount, m.note)) n++;
+          if (this.verdictTransfer(key, 'declined', 'user', m.amount, m.note, i)) n++;
+        }
+      }
+      return n;
+    },
+
+    // NPC 输出 [接收转账] 契约并生成成功：把机主对应待收款卡翻「已收款」（显式收下，优先于默认推断）。
+    // 与拒收同一对账规则：金额备注可省，省略时对到机主最近一笔待收款；回执金额回填
+    applyNpcAccepts: function (key) {
+      var W = window.LZJM, h = W.Store.history(key), n = 0;
+      for (var i = 0; i < h.length; i++) {
+        var m = h[i];
+        if (m && m.who !== 'user' && m.kind === 'taccept') {
+          if (this.verdictTransfer(key, 'accepted', 'user', m.amount, m.note, i)) n++;
         }
       }
       return n;
@@ -5761,6 +5832,20 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     init: async function () {
       var W = window.LZJM;
       W.IMG_BASE = IMG_BASE;
+      W.IMG_BASE_FALLBACK = IMG_BASE_FALLBACK;
+
+      // 图片双源兜底：主源（jsdelivr）加载失败的 <img> 自动回退 catbox 原站。
+      // error 不冒泡，用捕获阶段委托挂在宿主文档上一次覆盖手机/楼层所有图。
+      try {
+        window.parent.document.addEventListener('error', function (ev) {
+          var t = ev.target;
+          if (!t || t.tagName !== 'IMG') return;
+          var src = t.getAttribute('src') || '';
+          if (src.indexOf(IMG_BASE) !== 0 || t.dataset.lzjmFbk) return;
+          t.dataset.lzjmFbk = '1';
+          t.src = IMG_BASE_FALLBACK + src.slice(IMG_BASE.length);
+        }, true);
+      } catch (e) {}
 
       await this.load();
 

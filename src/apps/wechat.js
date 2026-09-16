@@ -12,9 +12,19 @@
   function pwin() { return window.parent; }
   // 主屏壁纸（浅色可爱系；换图只改这里）。必须定义在 CSS 数组之前——
   // 数组在脚本加载时立即求值，引用晚于它的变量会得到 undefined。
-  var HOME_WALL = 'https://files.catbox.moe/2rg9in.jpg';
-  // 预载壁纸：引擎加载时就拉取，避免首次打开手机屏幕空白 1~2 秒
-  try { var _wallPre = new Image(); _wallPre.src = HOME_WALL; } catch (e) {}
+  // 壁纸主源 jsdelivr（随 linzhou-world 图床仓库），catbox 兜底：探针失败时把 CSS 变量切到原站重渲染
+  var HOME_WALL = 'https://cdn.jsdelivr.net/gh/haodayizhiyu404/linzhou-world@main/img/2rg9in.jpg';
+  var HOME_WALL_FB = 'https://files.catbox.moe/2rg9in.jpg';
+  // 预载壁纸：引擎加载时就拉取，避免首次打开手机屏幕空白 1~2 秒；
+  // onerror 说明主源被拦/丢失 → 换兜底源并重写 CSS 变量（壁纸在 CSS 里，<img> 回退监听管不到）
+  try {
+    var _wallPre = new Image();
+    _wallPre.onerror = function () {
+      HOME_WALL = HOME_WALL_FB;
+      try { window.LZJM.Apps.wechat.injectStyle(); } catch (e) {}
+    };
+    _wallPre.src = HOME_WALL;
+  } catch (e) {}
   function parseDay(s) {
     var m = /(\d+)年(\d+)月(\d+)日/.exec(s || '');
     return m ? { y: +m[1], mo: +m[2], d: +m[3] } : null;
@@ -109,7 +119,7 @@
     // 主体
     '.lzjm-body{flex:1;min-height:0;overflow-y:auto;position:relative;z-index:1}',
     // 首页（壁纸 + 大时钟 + 应用网格）；壁纸铺整个屏幕，浅色系配深色字
-    '.lzjm-scr-home{background:url(' + HOME_WALL + ') center/cover no-repeat #f4f6fb}',
+    '.lzjm-scr-home{background:var(--lzjm-wall,none) center/cover no-repeat #f4f6fb}',
     '.lzjm-scr-home .lzjm-sbar{background:transparent}',
     '.lzjm-home-wall{height:100%;padding:20px 16px 26px;display:flex;flex-direction:column;justify-content:space-between;',
     'box-sizing:border-box}',
@@ -675,12 +685,15 @@
 
     injectStyle: function () {
       var doc = pdoc();
-      if (!doc.getElementById('lzjm-style')) {
-        var st = doc.createElement('style');
+      var st = doc.getElementById('lzjm-style');
+      if (!st) {
+        st = doc.createElement('style');
         st.id = 'lzjm-style';
-        st.textContent = CSS;
         doc.head.appendChild(st);
       }
+      st.textContent = CSS;
+      // 壁纸走 CSS 变量：主源加载失败时探针 onerror 改 HOME_WALL 后重入本函数即换源
+      try { doc.documentElement.style.setProperty('--lzjm-wall', 'url("' + HOME_WALL + '")'); } catch (e) {}
     },
 
     inject: function () {
@@ -1807,6 +1820,9 @@
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && n < 12; i--) n++;
       var popped = W.Store.popLast(this.chatKey, n);
       if (!popped.length) { this.render(); return; }
+      // 重roll 回退本轮转账：旧回复作废了，它「收下」的推断也一并作废，
+      // 恢复待收款让新回复重新决定（只回退本轮，旧账不动）
+      try { W.Engine.rollbackTransfers(this.chatKey); } catch (e) {}
       try { toastr.info('重roll中……', '📱 霖州引擎'); } catch (e) {}
       this.render();
       // 旧楼层里的这段台词同步归位（重roll=换一段，旧的别留在正文上下文）
@@ -1829,9 +1845,10 @@
         this.failed = false;
         if (result && result.msgs && result.msgs.length) {
           W.Store.push(key, result.msgs, 100);
-          // 转账处置两连（顺序敏感）：先落 NPC 的 [拒收转账] 契约（显式拒绝优先），
-          // 再按「对方回了话 = 收了钱」把机主发出的待收款批量翻「已收款」，同帧渲染
+          // 转账处置三连（顺序敏感）：先落 NPC 的 [拒收转账]（显式拒绝最优先），
+          // 再落 [接收转账]（显式收下），最后按「对方回了话 = 收了钱」把剩下的待收款批量翻「已收款」，同帧渲染
           try { eng.applyNpcDeclines(key); } catch (e) {}
+          try { eng.applyNpcAccepts(key); } catch (e) {}
           try { eng.markTransfersAccepted(key); } catch (e) {}
           // 生成是异步的：发出后生成了回复、人已经切去别的会话/主页 → 记未读红点
           if (this.screen !== 'chat' || this.chatKey !== key) W.Store.bumpUnread(key, result.msgs.length);

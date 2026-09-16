@@ -412,7 +412,7 @@
       file = String(file || '').trim();
       if (!file) return '';
       if (/^https?:\/\//i.test(file)) return file;
-      return (window.LZJM.IMG_BASE || 'https://files.catbox.moe/') + file;
+      return (window.LZJM.IMG_BASE || 'https://cdn.jsdelivr.net/gh/haodayizhiyu404/linzhou-world@main/img/') + file;
     },
 
     matchDlcLine: matchDlcLine,
