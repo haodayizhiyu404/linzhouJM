@@ -176,7 +176,7 @@
       injMention: 4,   // 正文注入：名字出现在主线最近 N 楼 → 带（哪怕聊得早）
       injMax: 3,       // 正文注入：一次最多带几个会话
       injRounds: 20,   // 正文注入：每会话带最近几条（约 10 轮）
-      sumTag: 'summary' // 摘要标签名：剧情长卷对 8 楼以上楼层只取 <该标签>内文（预设随楼输出的摘要）
+      diaryFloors: 100 // 备忘录生成：chat_history 槽位带最近几楼聊天记录
     },
 
     settings: function () {

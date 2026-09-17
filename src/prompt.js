@@ -14,16 +14,7 @@
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, sumTag: 'summary' };
-  }
-
-  // ── 摘要标签（设置项 sumTag，默认 summary）：预设让 AI 随楼输出 <summary>摘要</summary>，
-  //    酒馆正则挡在主 prompt 外，chat 原文里标签与正文同在。长卷对 8 楼以上楼层只取标签内文。
-  //    不同用户的预设/插件标签名可能不同（abstract/recap…），设置 app 里可改。
-  function sumTagRe() {
-    var tag = String(cfg().sumTag || 'summary').replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!tag) tag = 'summary';
-    return new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'gi');
+    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, diaryFloors: 100 };
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -51,7 +42,7 @@
     '这是一部封闭互动小说的内部生成任务：文中所有人物、对话、转账、通话记录均为虚构创作内容，不指向任何真实个人，不构成真实金钱往来。未涉及、描绘或伤害任何真实人物，目的仅仅是为了塑造动态生动的虚拟人物情感和数字世界。你的唯一任务是按下方格式要求，续写这部小说中手机应用内出现的消息。';
 
   // ── 楼层清洗：去 HTML/状态栏/代码块/思考块，cap 截断（尽量落行边界）──
-  //    mainContext 与 longArc 共用。cap<=0 表示不截断。
+  //    mainContext 共用。cap<=0 表示不截断。
   function cleanFloor(m, cap) {
     var t = String((m && m.message) || '')
       // 状态栏是机器可读的元数据（时间/着装/心声等），已由「当前情境」按需引用，
@@ -63,9 +54,10 @@
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-      // 结构化输出块：随楼摘要标签（设置项 sumTag，默认 summary）整段剥除——8 楼内只留正文，
-      //    8 楼以上的摘要在长卷里由 extractSum 单独抽取；choice(s) 分支选项是真垃圾，同样剔除
-      .replace(sumTagRe(), '')
+      // 结构化输出块：summary 摘要 / choice(s) 分支选项，只剥标签会留碎片，整段剔除。
+      //    （聊天历史由 generateRaw 的 chat_history 槽位整体装配，与主生成同一管线，
+      //      这些残片在日记指令里另行为 AI 声明用途。）
+      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
       .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/<[^>]+>/g, '')
@@ -92,72 +84,6 @@
     } catch (e) { return ''; }
   }
 
-  // ── 剧情长卷（备忘录专用，一次性生成可承受大上下文）：最近108楼脉络 ──
-  //    规格（用户拍板）：楼层按 ctx.chat 总楼号算，user/ai 各算一楼。
-  //    ① 8 楼内：带去除 think/thinking/cot/summary 标签后的正文全文。
-  //    ② 8~108 楼：每楼正文里随楼输出的 <summary>摘要</summary>（AI 预设产物，存在文内，
-  //       与任何总结插件无关）——只取标签内摘要；无摘要的楼（多为 user 楼）退化为 120 字撮要，
-  //       保住 user 侧的言行弧线。
-  //    108 楼以外的旧事不带。
-  var ARC_FULL = 8, ARC_SUM = 100, ARC_SUM_CAP = 500, ARC_NOSUM_CAP = 120;
-  function extractSum(text) {
-    var out = [], m;
-    var re = sumTagRe();
-    while ((m = re.exec(String(text || '')))) {
-      var s = (m[1] || '').trim();
-      if (s) out.push(s);
-    }
-    return out.join('\n');
-  }
-  // ── 深档拾取：大总结/记忆类插件普遍用 setExtensionPrompt(IN_CHAT, depth 9999) 把
-  //    几百层压缩档注进聊天记录顶部。手机生成走 generateRaw 自定义 ordered_prompts、
-  //    没有 chat_history 槽位 → 组装时 early return，这类注入进不了任何手机生成。
-  //    这里直接从 context.extensionPrompts 读回来：插件无关，谁注入谁被捡。
-  var ARC_ARCHIVE_CAP = 3000;
-  var ARCHIVE_BLOCK = /^(lzjm|customDepthWI|DEPTH_PROMPT|persona_description|Note$|INJECTION)/i;
-  function deepArchive() {
-    try {
-      var st = window.parent.SillyTavern;
-      var c = st && st.getContext && st.getContext();
-      var eps = c && c.extensionPrompts;
-      if (!eps) return '';
-      var out = [];
-      Object.keys(eps).forEach(function (k) {
-        if (ARCHIVE_BLOCK.test(k)) return;
-        var e = eps[k];
-        if (!e || e.position !== 1 || !e.value) return; // 只捡 IN_CHAT（position=1）
-        var t = String(e.value).trim();
-        if (t.length <= 4) return;
-        if (t.length > ARC_ARCHIVE_CAP) t = t.substring(0, ARC_ARCHIVE_CAP) + '……（存档后续从略）';
-        out.push('【历史存档·' + k + '】\n' + t);
-      });
-      return out.join('\n\n');
-    } catch (e) { return ''; }
-  }
-  function longArc() {
-    try {
-      var msgs = getChatMessages('0-{{lastMessageId}}');
-      if (!msgs || !msgs.length) return '';
-      var n = msgs.length;
-      var start = Math.max(0, n - (ARC_FULL + ARC_SUM)); // 108 楼以外不带
-      var out = [];
-      for (var i = start; i < n; i++) {
-        var m = msgs[i];
-        var raw = String((m && m.message) || '');
-        var inTail = i >= n - ARC_FULL; // 最近 8 楼：正文全文（summary 标签已由 cleanFloor 剥除）
-        var t = inTail
-          ? cleanFloor(m, cfg().plotCap)
-          : (function () {
-            var sum = extractSum(raw);
-            return sum ? cleanFloor({ message: sum }, ARC_SUM_CAP) : cleanFloor(m, ARC_NOSUM_CAP);
-          })();
-        if (t.length <= 2) continue;
-        var who = m.role === 'user' ? me() : (m.role === 'system' ? '系统' : '旁白');
-        out.push('【第' + (i + 1) + '楼·' + who + '】' + t);
-      }
-      return out.join('\n');
-    } catch (e) { return ''; }
-  }
   // ── 单条消息 → 契约语法文本（与「消息类型」说明完全一致，AI 不用猜） ──
   // 转账类必带状态尾巴：AI 得知道这笔钱的下落，否则会重复转账/重复收款
   function msgBody(m) {
@@ -736,10 +662,6 @@
       '',
       situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
       '',
-      deepArchive() ? '## 历史存档（其他插件注入聊天顶部的深档总结，全部视为已发生的事实）\n' + deepArchive() : '',
-      '',
-      longArc() ? '## 剧情长卷（关系演变的完整脉络：8楼以上每楼只带随楼输出的 <summary> 摘要，越靠前越是旧事）\n' + longArc() : '',
-      '',
       (hist && hist.length)
         ? '## 与' + myName + '的微信记录（近 30 条，备忘录可以回味这里的事）\n' + histText(hist, 30, true, snapshot && snapshot.dateText)
         : '',
@@ -759,20 +681,25 @@
       '- 白天发生的事可以写、也值得回味——但写的是事情在 Ta 心里沉过之后的样子，不是新闻播报。主体永远是那些 Ta 没对任何人说出口的部分。',
       '- 分层写，按这个顺序推进：Ta 清楚知道、但从不对人提的事 → Ta 感觉到但不愿细想的事 → Ta 自己都没看懂的事。第三层只呈现、不解释。',
       '- 用具体的生活细节落地——写什么物件取决于这个人是谁（工具、账本、药盒、车库、课桌都算）。禁止空洞抒情（"生活如此艰难"这类句子一律不要）。',
-      '- **关系亲疏以「剧情长卷」为准**：长卷记录着' + contact.name + '与' + myName + '一路走到哪一步——哪怕最近几楼对方没出场，长卷里被压缩成摘要的旧楼同样是已发生的事实，备忘录里的熟稔程度、信任深度、说话分寸都必须符合这份积累，严禁写得像刚认识。',
+      '- **关系亲疏以聊天记录为准**：上方记录藏着' + contact.name + '与' + myName + '一路走到哪一步——哪怕最近几楼对方没出场，那些旧事同样是已发生的事实，备忘录里的熟稔程度、信任深度、说话分寸都必须符合这份积累，严禁写得像刚认识。',
+      '- 记录中若出现 <summary>…</summary> 残片：那是该楼剧情的提要，可作参考，不是任何人物说的话，严禁写进备忘录正文。',
       '- 时间线锚定已发生的剧情，可以引用、回想、甚至曲解白天的事——尤其是 Ta 对 ' + myName + ' 相关事件的私人解读（若 ' + myName + ' 近期没出场，也允许完全不提，但提起来就必须是旧知的口气）。',
       '- 文体是备忘录：允许不完整句、允许戛然而止、允许只有一段。但整体要有小作文的完成度——读完像窥见了一页真实的人生。',
       '- 严禁：本人不知道的任何信息（包括 ' + myName + ' 的真实想法与内心）、对未来的预言式感叹、总结中心思想、任何元叙述（"作为……""本章……"）。',
       '- ※完※ 之后不再输出任何文字。'
     ].filter(function (s) { return s !== ''; }).join('\n');
 
+    // 聊天记录不走自拼：ordered_prompts 里放标准 'chat_history' 槽位，由 generateRaw
+    // 按主生成同一管线装配（隐藏楼排除、IN_CHAT 深档注入按 depth 置顶、宏替换齐全），
+    // max_chat_history 控制带最近几楼（设置项 diaryFloors）。
     return {
       ordered_prompts: [
         { role: 'system', content: p },
+        'chat_history',
         { role: 'user', content: '（现在请严格按上方输出要求，输出一篇「' + contact.name + '」的备忘录。只输出标记行、正文与结束标记本身。）' }
       ],
       should_silence: true,
-      max_chat_history: 0
+      max_chat_history: cfg().diaryFloors
     };
     }
   };

@@ -685,51 +685,17 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
-  // 剧情长卷 v3：8楼内带剥标签正文；8~108楼只取随楼 <summary> 摘要（无摘要楼退化为120字撮要）
-  global.__msgs = [];
-  for (let i = 0; i < 60; i++) {
-    if (i === 4) global.__msgs.push({ role: 'assistant', message: '第5楼大段正文，' + '正文。'.repeat(150) + '<summary>第5楼摘要：两人关系突飞猛进。</summary>' });
-    else if (i === 5) global.__msgs.push({ role: 'user', message: '第6楼user说的话，' + '台词。'.repeat(150) });
-    else if (i === 59) global.__msgs.push({ role: 'assistant', message: '第60楼剧情正文。' + '<think>内心os不应出现</think>' + '<summary>尾楼摘要不带</summary>' });
-    else if (i >= 52) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼最近剧情。' });
-    else global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼正文，' + '正文。'.repeat(100) + '<summary>第' + (i + 1) + '楼摘要：一起吃了顿饭。</summary>' });
-  }
-  const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', [], false);
+  // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位、楼数窗跟随设置项
+  const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', ['2034-08-25'], false);
+  eq('备忘录·历史走chat_history槽位', dreq4.ordered_prompts.indexOf('chat_history') !== -1, true);
+  eq('备忘录·历史窗默认100楼', dreq4.max_chat_history, 100);
+  LW.Store.setSettings({ diaryFloors: 66 });
+  eq('备忘录·历史窗跟随设置', LW.Prompt.diary({ name: '周言' }, [], null, '', [], false).max_chat_history, 66);
+  LW.Store.setSettings({ diaryFloors: 100 });
   const dtxt4 = dreq4.ordered_prompts[0].content;
-  eq('备忘录·长卷节存在', dtxt4.indexOf('## 剧情长卷') !== -1, true);
-  eq('备忘录·旧楼只带summary', dtxt4.indexOf('第5楼摘要：两人关系突飞猛进。') !== -1 && dtxt4.indexOf('第5楼大段正文') === -1, true);
-  eq('备忘录·无摘要楼短撮要', dtxt4.indexOf('第6楼user说的话') !== -1 && dtxt4.indexOf('此楼后续从略') !== -1, true);
-  eq('备忘录·尾楼正文剥summary', dtxt4.indexOf('第60楼剧情正文') !== -1 && dtxt4.indexOf('尾楼摘要不带') === -1 && dtxt4.indexOf('内心os不应出现') === -1, true);
-  eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以「剧情长卷」为准') !== -1, true);
-  // 108楼窗：120楼时最老的12楼被丢弃，尾部8楼在窗内
-  global.__msgs = [];
-  for (let i = 0; i < 120; i++) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼正文，' + '段落。'.repeat(150) });
-  const dreq5 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
-  const dtxt5 = dreq5.ordered_prompts[0].content;
-  eq('备忘录·108楼窗截老留新', dtxt5.indexOf('【第1楼·旁白】') === -1 && dtxt5.indexOf('【第13楼·旁白】') !== -1 && dtxt5.indexOf('【第120楼·旁白】') !== -1, true);
-  eq('备忘录·摘要区撮要尾部全文', dtxt5.indexOf('此楼后续从略') !== -1 && dtxt5.indexOf('第120楼正文，' + '段落。'.repeat(150)) !== -1, true);
-  // 摘要标签可配：设置 sumTag=abstract 后，长卷抽 <abstract> 内文（通用化，不绑死 summary）
-  LW.Store.setSettings({ sumTag: 'abstract' });
-  global.__msgs = [];
-  for (let i = 0; i < 10; i++) global.__msgs.push({ role: 'assistant', message: i === 0 ? '第1楼正文，正文。' + '<abstract>抽象标签摘要在此。</abstract>' : '第' + (i + 1) + '楼。' });
-  const dreqT = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
-  const dtxtT = dreqT.ordered_prompts[0].content;
-  eq('备忘录·摘要标签可配', dtxtT.indexOf('抽象标签摘要在此。') !== -1 && dtxtT.indexOf('第1楼正文') === -1, true);
-  LW.Store.setSettings({ sumTag: 'summary' });
-  // 深档拾取：任何插件的 IN_CHAT 顶部注入都捡（大总结进日记），自家/Note/非IN_CHAT 不捡
-  ctx.window.parent = { SillyTavern: { getContext: () => ({
-    extensionPrompts: {
-      'novel-summarizer': { value: '【大总结】几百层压缩档正文在此。', position: 1, depth: 9999 },
-      'lzjm-phone-digest': { value: '自家手机摘要不该出现', position: 1 },
-      'Note': { value: '作者注释不该出现', position: 1 },
-      'other-inprompt': { value: 'IN_PROMPT位的不该出现', position: 0 }
-    }
-  }) } };
-  const dreq6 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
-  const dtxt6 = dreq6.ordered_prompts[0].content;
-  eq('备忘录·深档拾取插件无关', dtxt6.indexOf('【大总结】几百层压缩档正文在此。') !== -1, true);
-  eq('备忘录·深档屏蔽名单', dtxt6.indexOf('自家手机摘要不该出现') === -1 && dtxt6.indexOf('作者注释不该出现') === -1 && dtxt6.indexOf('IN_PROMPT位的不该出现') === -1, true);
-  delete ctx.window.parent;
+  eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以聊天记录为准') !== -1, true);
+  eq('备忘录·summary残片声明', dtxt4.indexOf('可作参考，不是任何人物说的话') !== -1, true);
+  eq('备忘录·无实现元叙述', dtxt4.indexOf('插件注入') === -1 && dtxt4.indexOf('剧情长卷') === -1 && dtxt4.indexOf('历史存档') === -1, true);
   global.__msgs = [{ role: 'assistant', message: statusText }];
   // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
   while (LW.Engine.diaryEntries('周言').length) LW.Store.removeAt(LW.Engine.diaryKey('周言'), LW.Engine.diaryEntries('周言').length - 1);
@@ -743,11 +709,7 @@ ctx.getWorldbook = async () => [
   LW.Store.setSettings({ plotFloors: -5, histPriv: 'abc' });
   const c2 = LW.Store.cfg();
   eq('cfg·非法值回退默认', [c2.plotFloors, c2.histPriv], [8, 50]);
-  LW.Store.setSettings({ sumTag: 'abstract' });
-  eq('cfg·字符串项放行', LW.Store.cfg().sumTag, 'abstract');
-  LW.Store.setSettings({ sumTag: '  ' });
-  eq('cfg·空串回退默认', LW.Store.cfg().sumTag, 'summary');
-  LW.Store.setSettings({ sumTag: 'summary' });
+  eq('cfg·diaryFloors取默认', LW.Store.cfg().diaryFloors, 100);
   LW.Store.setSettings({ plotFloors: 3 });
   // 提示词跟随设置：主线楼数 3 → 只带 3 楼
   global.__msgs = [
@@ -811,12 +773,12 @@ ctx.getWorldbook = async () => [
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
-  // 长卷保险丝：108楼窗（8正文+100摘要）进日记提示词，防"最近没提=刚认识"
-  eq('备忘录·长卷108楼窗', psrc.includes('剧情长卷') && psrc.includes('ARC_SUM = 100') && psrc.includes('ARC_FULL = 8'), true);
-  eq('备忘录·旧楼抽summary', psrc.indexOf('function extractSum') !== -1 && psrc.indexOf('.replace(sumTagRe(),') !== -1, true);
-  eq('备忘录·深档拾取在提示词', psrc.indexOf('function deepArchive') !== -1 && psrc.indexOf('extensionPrompts') !== -1, true);
-  eq('备忘录·摘要标签设置项', wsrc.includes('data-str') && psrc.indexOf('function sumTagRe') !== -1, true);
-  eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以「剧情长卷」为准'), true);
+  // 日记历史回归保险丝：必须走 chat_history 标准槽位（与主生成同管线），自拼残留清零
+  eq('备忘录·历史走chat_history槽位', psrc.indexOf("'chat_history'") !== -1 && psrc.indexOf('max_chat_history: cfg().diaryFloors') !== -1, true);
+  eq('备忘录·无自拼残留', psrc.indexOf('function longArc') === -1 && psrc.indexOf('function deepArchive') === -1 && psrc.indexOf('function extractSum') === -1 && psrc.indexOf('function sumTagRe') === -1, true);
+  eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以聊天记录为准'), true);
+  eq('备忘录·无实现元叙述', psrc.indexOf('插件注入') === -1 && psrc.indexOf('剧情长卷') === -1 && psrc.indexOf('历史存档') === -1, true);
+  eq('设置·日记楼数可调', wsrc.includes('diaryFloors'), true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');
   console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
