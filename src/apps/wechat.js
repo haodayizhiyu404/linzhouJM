@@ -691,7 +691,7 @@
     mMenu: -1,           // 展开「赞/评论」小菜单的动态下标
     mCmt: -1,            // 展开评论输入框的动态下标
     diaryNpc: null,      // 备忘录当前选中的人（默认通讯录第一位）
-    dBusy: false,        // 备忘录生成中（自动补写与显式写一篇共用一把锁）
+    dBusy: false,        // 备忘录生成中（写一篇/重roll 共用一把锁）
     dConfirm: -1,        // 待确认删除的备忘录下标（-1=无）
     dRead: -1,           // dread 阅读页展示的条目下标
     panel: null,         // null | 'actions' | 'sticker' | 'image' | 'voice' | 'location' | 'transferto' | 'transfer'
@@ -845,31 +845,14 @@
       this.dRead = -1;
       this.screen = 'diary';
       this.render();
-      this.diaryEnsure();
     },
-    // 进 app 自动补写一篇：引擎按状态栏故事日判重（当日已生成过则跳过不刷新）
-    diaryEnsure: function () {
-      if (this.dBusy || !this.diaryNpc) return;
-      this.dBusy = true;
-      this.render();
-      var self = this;
-      window.LZJM.Engine.diaryWrite(this.diaryNpc, false).then(function (got) {
-        if (got) try { toastr.info('📔 ' + self.diaryNpc + ' 的备忘录更新了', '霖州手机', { timeOut: 3000 }); } catch (e) {}
-      }).catch(function (e) {
-        console.warn('[霖州引擎] 备忘录生成失败', e);
-        try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
-      }).finally(function () {
-        self.dBusy = false;
-        if (self.screen === 'diary') self.render();
-      });
-    },
-    // 显式「写一篇」：当日判重不挡（同日多篇由 usedDates 排日期，撞车也并列存档不覆盖）
+    // 手动「写一篇」：无当日判重——同日想写几篇写几篇，日期由 usedDates 排除、撞车并列不覆盖
     diaryWriteOne: function () {
       if (this.dBusy || !this.diaryNpc) return;
       this.dBusy = true;
       this.render();
       var self = this;
-      window.LZJM.Engine.diaryWrite(this.diaryNpc, true).catch(function (e) {
+      window.LZJM.Engine.diaryWrite(this.diaryNpc).catch(function (e) {
         console.warn('[霖州引擎] 备忘录生成失败', e);
         try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
       }).finally(function () {

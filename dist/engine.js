@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 13:45
+//  构建时间（本地）：2026-09-17 16:19
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 13:45';
+var __LZJM_BUILD__ = '2026-09-17 16:19';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2608,7 +2608,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     mMenu: -1,           // 展开「赞/评论」小菜单的动态下标
     mCmt: -1,            // 展开评论输入框的动态下标
     diaryNpc: null,      // 备忘录当前选中的人（默认通讯录第一位）
-    dBusy: false,        // 备忘录生成中（自动补写与显式写一篇共用一把锁）
+    dBusy: false,        // 备忘录生成中（写一篇/重roll 共用一把锁）
     dConfirm: -1,        // 待确认删除的备忘录下标（-1=无）
     dRead: -1,           // dread 阅读页展示的条目下标
     panel: null,         // null | 'actions' | 'sticker' | 'image' | 'voice' | 'location' | 'transferto' | 'transfer'
@@ -2762,31 +2762,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       this.dRead = -1;
       this.screen = 'diary';
       this.render();
-      this.diaryEnsure();
     },
-    // 进 app 自动补写一篇：引擎按状态栏故事日判重（当日已生成过则跳过不刷新）
-    diaryEnsure: function () {
-      if (this.dBusy || !this.diaryNpc) return;
-      this.dBusy = true;
-      this.render();
-      var self = this;
-      window.LZJM.Engine.diaryWrite(this.diaryNpc, false).then(function (got) {
-        if (got) try { toastr.info('📔 ' + self.diaryNpc + ' 的备忘录更新了', '霖州手机', { timeOut: 3000 }); } catch (e) {}
-      }).catch(function (e) {
-        console.warn('[霖州引擎] 备忘录生成失败', e);
-        try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
-      }).finally(function () {
-        self.dBusy = false;
-        if (self.screen === 'diary') self.render();
-      });
-    },
-    // 显式「写一篇」：当日判重不挡（同日多篇由 usedDates 排日期，撞车也并列存档不覆盖）
+    // 手动「写一篇」：无当日判重——同日想写几篇写几篇，日期由 usedDates 排除、撞车并列不覆盖
     diaryWriteOne: function () {
       if (this.dBusy || !this.diaryNpc) return;
       this.dBusy = true;
       this.render();
       var self = this;
-      window.LZJM.Engine.diaryWrite(this.diaryNpc, true).catch(function (e) {
+      window.LZJM.Engine.diaryWrite(this.diaryNpc).catch(function (e) {
         console.warn('[霖州引擎] 备忘录生成失败', e);
         try { toastr.error('备忘录生成失败：' + (e && e.message || e), '霖州手机'); } catch (e2) {}
       }).finally(function () {
@@ -5874,8 +5857,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     // ── 备忘录（日记）──
     // 存档挂在 Store key「diary:名字」：条目 = {date:'YYYY-MM-DD', title, content, day, time}
-    // 判重两层：①进 app 自动补写按状态栏故事日（meta.lastGenDay，当日不刷新）
-    //          ②选题注入 usedDates 排除已存在日期；即便撞车也不覆盖——同日多篇并列存档
+    // 纯手动触发（进 app 不自动生成）：选题注入 usedDates 排除已存在日期；
+    // 即便撞车也不覆盖——同日多篇并列存档。正文过短（<300字）带补强要求重试一次。
     diaryKey: function (name) { return 'diary:' + name; },
     diaryEntries: function (name) { return window.LZJM.Store.history(this.diaryKey(name)); },
 
@@ -5890,17 +5873,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       };
     },
 
-    // 生成一篇。force=false = 进 app 自动补写（当日已生成过则跳过返回 null）；
-    // force=true = 显式「写一篇/重roll」，无视当日判重。正文过短（<300字）带补强要求重试一次。
+    // 生成一篇（手动「写一篇/重roll」，无当日判重）。正文过短（<300字）带补强要求重试一次。
     // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
-    diaryWrite: async function (name, force) {
+    diaryWrite: async function (name) {
       var W = window.LZJM;
       var c = this.findContact(name);
       if (!c) throw new Error('联系人不在本线通讯录：' + name);
       var key = this.diaryKey(name);
       var snap = W.Status.snapshot(name);
       var today = (snap && snap.dateText) || '';
-      if (!force && today && W.Store.meta(key).lastGenDay === today) return null;
       var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
       var hist = W.Store.history(name).slice(-20);
       var profile = this.profileFor(name);
@@ -5928,9 +5909,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var stampTime = '';
       try { stampTime = W.Status.nowText() || ''; } catch (e) {}
       W.Store.push(key, [{ date: entry.date, title: entry.title, content: entry.content, day: today, time: stampTime }], 100);
-      if (today) W.Store.setMeta(key, { lastGenDay: today });
       console.log('[霖州引擎] 备忘录：' + name + ' / ' + entry.date + (entry.title ? '「' + entry.title + '」' : '') +
-        ' / 正文 ' + entry.content.length + '字' + (force ? '（显式生成）' : ''));
+        ' / 正文 ' + entry.content.length + '字');
       return entry;
     },
 

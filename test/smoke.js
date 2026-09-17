@@ -645,17 +645,16 @@ ctx.getWorldbook = async () => [
     dGenCalls++; dLastReq = req;
     return '※备忘录※|2034-08-25|训练\n' + '今天正常训练，十组深蹲，下课回家。'.repeat(20) + '\n※完※';
   };
-  const dw1 = await LW.Engine.diaryWrite('周言', false);
+  const dw1 = await LW.Engine.diaryWrite('周言');
   eq('备忘录·首次生成', dw1 && dw1.title, '训练');
   eq('备忘录·落库条数', LW.Engine.diaryEntries('周言').length, 1);
-  const dCalls1 = dGenCalls;
-  eq('备忘录·当日判重不刷新', (await LW.Engine.diaryWrite('周言', false)) === null && dGenCalls === dCalls1, true);
   ctx.generateRaw = async (req) => {
     dGenCalls++; dLastReq = req;
     return '※备忘录※|2034-08-24|旧账\n' + '又一篇正文内容。'.repeat(30) + '\n※完※';
   };
-  const dw3 = await LW.Engine.diaryWrite('周言', true);
-  eq('备忘录·显式写一篇无视判重', dw3 && LW.Engine.diaryEntries('周言').length, 2);
+  // 纯手动：同日再点「写一篇」不拦截，并列存档（撞车也不覆盖，见撞车用例）
+  const dw3 = await LW.Engine.diaryWrite('周言');
+  eq('备忘录·同日手动再写一篇并列存档', dw3 && LW.Engine.diaryEntries('周言').length, 2);
   eq('备忘录·提示词注入usedDates', dLastReq.ordered_prompts[0].content.indexOf('2034-08-25') !== -1, true);
   eq('备忘录·提示词含日期排除令', dLastReq.ordered_prompts[0].content.indexOf('不可使用已存在的日期') !== -1, true);
   // 短正文 → 补强重试一次，重试稿替换短稿
@@ -664,11 +663,11 @@ ctx.getWorldbook = async () => [
     dGenCalls++;
     return dGenCalls === 1 ? '※备忘录※|2034-08-23|短\n太短。\n※完※' : '※备忘录※|2034-08-22|写长了\n' + '这次写足了篇幅。'.repeat(40) + '\n※完※';
   };
-  const dw4 = await LW.Engine.diaryWrite('周言', true);
+  const dw4 = await LW.Engine.diaryWrite('周言');
   eq('备忘录·短正文补强重试', dGenCalls === 2 && dw4.title === '写长了', true);
   // 同日撞车不覆盖：AI 又选 08-22 → 并列存成第二篇
   ctx.generateRaw = async () => '※备忘录※|2034-08-22|撞车\n' + '同一天又来一篇。'.repeat(30) + '\n※完※';
-  await LW.Engine.diaryWrite('周言', true);
+  await LW.Engine.diaryWrite('周言');
   eq('备忘录·同日撞车并列不覆盖', (function () {
     const a = LW.Engine.diaryEntries('周言');
     return a.length === 4 && a.filter(function (e) { return e.date === '2034-08-22'; }).length === 2;
@@ -769,7 +768,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·主屏入口', wsrc.includes('data-app="diary"') && wsrc.includes('ICON_MEMO'), true);
   eq('备忘录·写一篇与选人绑定', wsrc.includes('[data-dwrite]') && wsrc.includes('[data-dnpc]'), true);
   eq('备忘录·重roll先删再写', wsrc.includes('diaryReroll') && wsrc.includes('Engine.diaryDeleteAt(this.diaryNpc, idx)'), true);
-  eq('备忘录·当日判重在引擎', esrc.includes('lastGenDay') && esrc.includes('diaryWrite'), true);
+  // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，wechat 不得有自动补写
+  eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
+  eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1, true);
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
