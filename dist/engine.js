@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 13:17
+//  构建时间（本地）：2026-09-17 13:29
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 13:17';
+var __LZJM_BUILD__ = '2026-09-17 13:29';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -184,7 +184,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       injRecent: 8,    // 正文注入：会话在主线最近 N 楼内聊过 → 带
       injMention: 4,   // 正文注入：名字出现在主线最近 N 楼 → 带（哪怕聊得早）
       injMax: 3,       // 正文注入：一次最多带几个会话
-      injRounds: 20    // 正文注入：每会话带最近几条（约 10 轮）
+      injRounds: 20,   // 正文注入：每会话带最近几条（约 10 轮）
+      sumTag: 'summary' // 摘要标签名：剧情长卷对 8 楼以上楼层只取 <该标签>内文（预设随楼输出的摘要）
     },
 
     settings: function () {
@@ -208,8 +209,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var out = {};
       var d = this.DEFAULTS, s = this.settings();
       for (var k in d) {
-        var v = Number(s[k]);
-        out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
+        if (typeof d[k] === 'number') {
+          var v = Number(s[k]);
+          out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
+        } else {
+          // 字符串项（如 sumTag）：非空串原样放行，否则回默认
+          out[k] = (typeof s[k] === 'string' && s[k].trim()) ? s[k].trim() : d[k];
+        }
       }
       return out;
     },
@@ -817,7 +823,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
+    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, sumTag: 'summary' };
+  }
+
+  // ── 摘要标签（设置项 sumTag，默认 summary）：预设让 AI 随楼输出 <summary>摘要</summary>，
+  //    酒馆正则挡在主 prompt 外，chat 原文里标签与正文同在。长卷对 8 楼以上楼层只取标签内文。
+  //    不同用户的预设/插件标签名可能不同（abstract/recap…），设置 app 里可改。
+  function sumTagRe() {
+    var tag = String(cfg().sumTag || 'summary').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!tag) tag = 'summary';
+    return new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'gi');
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -857,10 +872,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-      // 结构化输出块：summary 摘要 / choice(s) 分支选项整段剔除。
-      //    <summary> 是预设让 AI 随正文每楼输出的摘要（酒馆正则挡在 prompt 外，chat 里原文还在），
-      //    长卷对 8 楼以上的旧楼会单独抽取它；8 楼内按用户规格只留正文，这里剥掉
-      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
+      // 结构化输出块：随楼摘要标签（设置项 sumTag，默认 summary）整段剥除——8 楼内只留正文，
+      //    8 楼以上的摘要在长卷里由 extractSum 单独抽取；choice(s) 分支选项是真垃圾，同样剔除
+      .replace(sumTagRe(), '')
       .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/<[^>]+>/g, '')
@@ -895,15 +909,39 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   //       保住 user 侧的言行弧线。
   //    108 楼以外的旧事不带。
   var ARC_FULL = 8, ARC_SUM = 100, ARC_SUM_CAP = 500, ARC_NOSUM_CAP = 120;
-  var SUM_TAG_RE = /<summary>([\s\S]*?)<\/summary>/gi;
   function extractSum(text) {
     var out = [], m;
-    SUM_TAG_RE.lastIndex = 0;
-    while ((m = SUM_TAG_RE.exec(String(text || '')))) {
+    var re = sumTagRe();
+    while ((m = re.exec(String(text || '')))) {
       var s = (m[1] || '').trim();
       if (s) out.push(s);
     }
     return out.join('\n');
+  }
+  // ── 深档拾取：大总结/记忆类插件普遍用 setExtensionPrompt(IN_CHAT, depth 9999) 把
+  //    几百层压缩档注进聊天记录顶部。手机生成走 generateRaw 自定义 ordered_prompts、
+  //    没有 chat_history 槽位 → 组装时 early return，这类注入进不了任何手机生成。
+  //    这里直接从 context.extensionPrompts 读回来：插件无关，谁注入谁被捡。
+  var ARC_ARCHIVE_CAP = 3000;
+  var ARCHIVE_BLOCK = /^(lzjm|customDepthWI|DEPTH_PROMPT|persona_description|Note$|INJECTION)/i;
+  function deepArchive() {
+    try {
+      var st = window.parent.SillyTavern;
+      var c = st && st.getContext && st.getContext();
+      var eps = c && c.extensionPrompts;
+      if (!eps) return '';
+      var out = [];
+      Object.keys(eps).forEach(function (k) {
+        if (ARCHIVE_BLOCK.test(k)) return;
+        var e = eps[k];
+        if (!e || e.position !== 1 || !e.value) return; // 只捡 IN_CHAT（position=1）
+        var t = String(e.value).trim();
+        if (t.length <= 4) return;
+        if (t.length > ARC_ARCHIVE_CAP) t = t.substring(0, ARC_ARCHIVE_CAP) + '……（存档后续从略）';
+        out.push('【历史存档·' + k + '】\n' + t);
+      });
+      return out.join('\n\n');
+    } catch (e) { return ''; }
   }
   function longArc() {
     try {
@@ -1506,6 +1544,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       userInfo ? '## 机主资料 · ' + myName + '（备忘录里可能以真名出现）\n' + userInfo : '',
       '',
       situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
+      '',
+      deepArchive() ? '## 历史存档（其他插件注入聊天顶部的深档总结，全部视为已发生的事实）\n' + deepArchive() : '',
       '',
       longArc() ? '## 剧情长卷（关系演变的完整脉络：8楼以上每楼只带随楼输出的 <summary> 摘要，越靠前越是旧事）\n' + longArc() : '',
       '',
@@ -3360,6 +3400,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             window.LZJM.Store.setSettings(patch);
           };
         });
+        ph.querySelectorAll('[data-str]').forEach(function (el) {
+          el.onchange = function () {
+            var patch = {}; patch[el.dataset.str] = String(el.value || '').trim();
+            window.LZJM.Store.setSettings(patch);
+          };
+        });
         ph.querySelectorAll('[data-atext]').forEach(function (el) {
           el.onchange = function () { var patch = {}; patch[el.dataset.atext] = el.value; saveApi(patch); };
         });
@@ -4319,7 +4365,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
-    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
+    function textrow(key, name, desc) {
+      return '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">' + name + '</div>' +
+        '<div class="lzjm-setdesc">' + desc + '</div></div>' +
+        '<input class="lzjm-setnum" data-str="' + key + '" value="' + esc(String(cfg[key] || '')) + '"></div>';
+    }
+    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字') +
+      textrow('sumTag', '摘要标签名', '长卷对8楼以上楼层只取该标签内文');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +

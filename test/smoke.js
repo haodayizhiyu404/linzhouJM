@@ -708,6 +708,28 @@ ctx.getWorldbook = async () => [
   const dtxt5 = dreq5.ordered_prompts[0].content;
   eq('备忘录·108楼窗截老留新', dtxt5.indexOf('【第1楼·旁白】') === -1 && dtxt5.indexOf('【第13楼·旁白】') !== -1 && dtxt5.indexOf('【第120楼·旁白】') !== -1, true);
   eq('备忘录·摘要区撮要尾部全文', dtxt5.indexOf('此楼后续从略') !== -1 && dtxt5.indexOf('第120楼正文，' + '段落。'.repeat(150)) !== -1, true);
+  // 摘要标签可配：设置 sumTag=abstract 后，长卷抽 <abstract> 内文（通用化，不绑死 summary）
+  LW.Store.setSettings({ sumTag: 'abstract' });
+  global.__msgs = [];
+  for (let i = 0; i < 10; i++) global.__msgs.push({ role: 'assistant', message: i === 0 ? '第1楼正文，正文。' + '<abstract>抽象标签摘要在此。</abstract>' : '第' + (i + 1) + '楼。' });
+  const dreqT = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
+  const dtxtT = dreqT.ordered_prompts[0].content;
+  eq('备忘录·摘要标签可配', dtxtT.indexOf('抽象标签摘要在此。') !== -1 && dtxtT.indexOf('第1楼正文') === -1, true);
+  LW.Store.setSettings({ sumTag: 'summary' });
+  // 深档拾取：任何插件的 IN_CHAT 顶部注入都捡（大总结进日记），自家/Note/非IN_CHAT 不捡
+  ctx.window.parent = { SillyTavern: { getContext: () => ({
+    extensionPrompts: {
+      'novel-summarizer': { value: '【大总结】几百层压缩档正文在此。', position: 1, depth: 9999 },
+      'lzjm-phone-digest': { value: '自家手机摘要不该出现', position: 1 },
+      'Note': { value: '作者注释不该出现', position: 1 },
+      'other-inprompt': { value: 'IN_PROMPT位的不该出现', position: 0 }
+    }
+  }) } };
+  const dreq6 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
+  const dtxt6 = dreq6.ordered_prompts[0].content;
+  eq('备忘录·深档拾取插件无关', dtxt6.indexOf('【大总结】几百层压缩档正文在此。') !== -1, true);
+  eq('备忘录·深档屏蔽名单', dtxt6.indexOf('自家手机摘要不该出现') === -1 && dtxt6.indexOf('作者注释不该出现') === -1 && dtxt6.indexOf('IN_PROMPT位的不该出现') === -1, true);
+  delete ctx.window.parent;
   global.__msgs = [{ role: 'assistant', message: statusText }];
   // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
   while (LW.Engine.diaryEntries('周言').length) LW.Store.removeAt(LW.Engine.diaryKey('周言'), LW.Engine.diaryEntries('周言').length - 1);
@@ -721,6 +743,11 @@ ctx.getWorldbook = async () => [
   LW.Store.setSettings({ plotFloors: -5, histPriv: 'abc' });
   const c2 = LW.Store.cfg();
   eq('cfg·非法值回退默认', [c2.plotFloors, c2.histPriv], [8, 50]);
+  LW.Store.setSettings({ sumTag: 'abstract' });
+  eq('cfg·字符串项放行', LW.Store.cfg().sumTag, 'abstract');
+  LW.Store.setSettings({ sumTag: '  ' });
+  eq('cfg·空串回退默认', LW.Store.cfg().sumTag, 'summary');
+  LW.Store.setSettings({ sumTag: 'summary' });
   LW.Store.setSettings({ plotFloors: 3 });
   // 提示词跟随设置：主线楼数 3 → 只带 3 楼
   global.__msgs = [
@@ -786,7 +813,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   // 长卷保险丝：108楼窗（8正文+100摘要）进日记提示词，防"最近没提=刚认识"
   eq('备忘录·长卷108楼窗', psrc.includes('剧情长卷') && psrc.includes('ARC_SUM = 100') && psrc.includes('ARC_FULL = 8'), true);
-  eq('备忘录·旧楼抽summary', psrc.indexOf('function extractSum') !== -1 && psrc.indexOf("<\\/summary>/gi, '')") !== -1, true);
+  eq('备忘录·旧楼抽summary', psrc.indexOf('function extractSum') !== -1 && psrc.indexOf('.replace(sumTagRe(),') !== -1, true);
+  eq('备忘录·深档拾取在提示词', psrc.indexOf('function deepArchive') !== -1 && psrc.indexOf('extensionPrompts') !== -1, true);
+  eq('备忘录·摘要标签设置项', wsrc.includes('data-str') && psrc.indexOf('function sumTagRe') !== -1, true);
   eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以「剧情长卷」为准'), true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');

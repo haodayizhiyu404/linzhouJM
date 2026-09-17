@@ -1410,6 +1410,12 @@
             window.LZJM.Store.setSettings(patch);
           };
         });
+        ph.querySelectorAll('[data-str]').forEach(function (el) {
+          el.onchange = function () {
+            var patch = {}; patch[el.dataset.str] = String(el.value || '').trim();
+            window.LZJM.Store.setSettings(patch);
+          };
+        });
         ph.querySelectorAll('[data-atext]').forEach(function (el) {
           el.onchange = function () { var patch = {}; patch[el.dataset.atext] = el.value; saveApi(patch); };
         });
@@ -2369,7 +2375,13 @@
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
-    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
+    function textrow(key, name, desc) {
+      return '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">' + name + '</div>' +
+        '<div class="lzjm-setdesc">' + desc + '</div></div>' +
+        '<input class="lzjm-setnum" data-str="' + key + '" value="' + esc(String(cfg[key] || '')) + '"></div>';
+    }
+    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字') +
+      textrow('sumTag', '摘要标签名', '长卷对8楼以上楼层只取该标签内文');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +

@@ -14,7 +14,16 @@
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
+    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, sumTag: 'summary' };
+  }
+
+  // ── 摘要标签（设置项 sumTag，默认 summary）：预设让 AI 随楼输出 <summary>摘要</summary>，
+  //    酒馆正则挡在主 prompt 外，chat 原文里标签与正文同在。长卷对 8 楼以上楼层只取标签内文。
+  //    不同用户的预设/插件标签名可能不同（abstract/recap…），设置 app 里可改。
+  function sumTagRe() {
+    var tag = String(cfg().sumTag || 'summary').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!tag) tag = 'summary';
+    return new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'gi');
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -54,10 +63,9 @@
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-      // 结构化输出块：summary 摘要 / choice(s) 分支选项整段剔除。
-      //    <summary> 是预设让 AI 随正文每楼输出的摘要（酒馆正则挡在 prompt 外，chat 里原文还在），
-      //    长卷对 8 楼以上的旧楼会单独抽取它；8 楼内按用户规格只留正文，这里剥掉
-      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
+      // 结构化输出块：随楼摘要标签（设置项 sumTag，默认 summary）整段剥除——8 楼内只留正文，
+      //    8 楼以上的摘要在长卷里由 extractSum 单独抽取；choice(s) 分支选项是真垃圾，同样剔除
+      .replace(sumTagRe(), '')
       .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/<[^>]+>/g, '')
@@ -92,15 +100,39 @@
   //       保住 user 侧的言行弧线。
   //    108 楼以外的旧事不带。
   var ARC_FULL = 8, ARC_SUM = 100, ARC_SUM_CAP = 500, ARC_NOSUM_CAP = 120;
-  var SUM_TAG_RE = /<summary>([\s\S]*?)<\/summary>/gi;
   function extractSum(text) {
     var out = [], m;
-    SUM_TAG_RE.lastIndex = 0;
-    while ((m = SUM_TAG_RE.exec(String(text || '')))) {
+    var re = sumTagRe();
+    while ((m = re.exec(String(text || '')))) {
       var s = (m[1] || '').trim();
       if (s) out.push(s);
     }
     return out.join('\n');
+  }
+  // ── 深档拾取：大总结/记忆类插件普遍用 setExtensionPrompt(IN_CHAT, depth 9999) 把
+  //    几百层压缩档注进聊天记录顶部。手机生成走 generateRaw 自定义 ordered_prompts、
+  //    没有 chat_history 槽位 → 组装时 early return，这类注入进不了任何手机生成。
+  //    这里直接从 context.extensionPrompts 读回来：插件无关，谁注入谁被捡。
+  var ARC_ARCHIVE_CAP = 3000;
+  var ARCHIVE_BLOCK = /^(lzjm|customDepthWI|DEPTH_PROMPT|persona_description|Note$|INJECTION)/i;
+  function deepArchive() {
+    try {
+      var st = window.parent.SillyTavern;
+      var c = st && st.getContext && st.getContext();
+      var eps = c && c.extensionPrompts;
+      if (!eps) return '';
+      var out = [];
+      Object.keys(eps).forEach(function (k) {
+        if (ARCHIVE_BLOCK.test(k)) return;
+        var e = eps[k];
+        if (!e || e.position !== 1 || !e.value) return; // 只捡 IN_CHAT（position=1）
+        var t = String(e.value).trim();
+        if (t.length <= 4) return;
+        if (t.length > ARC_ARCHIVE_CAP) t = t.substring(0, ARC_ARCHIVE_CAP) + '……（存档后续从略）';
+        out.push('【历史存档·' + k + '】\n' + t);
+      });
+      return out.join('\n\n');
+    } catch (e) { return ''; }
   }
   function longArc() {
     try {
@@ -703,6 +735,8 @@
       userInfo ? '## 机主资料 · ' + myName + '（备忘录里可能以真名出现）\n' + userInfo : '',
       '',
       situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
+      '',
+      deepArchive() ? '## 历史存档（其他插件注入聊天顶部的深档总结，全部视为已发生的事实）\n' + deepArchive() : '',
       '',
       longArc() ? '## 剧情长卷（关系演变的完整脉络：8楼以上每楼只带随楼输出的 <summary> 摘要，越靠前越是旧事）\n' + longArc() : '',
       '',

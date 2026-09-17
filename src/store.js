@@ -175,7 +175,8 @@
       injRecent: 8,    // 正文注入：会话在主线最近 N 楼内聊过 → 带
       injMention: 4,   // 正文注入：名字出现在主线最近 N 楼 → 带（哪怕聊得早）
       injMax: 3,       // 正文注入：一次最多带几个会话
-      injRounds: 20    // 正文注入：每会话带最近几条（约 10 轮）
+      injRounds: 20,   // 正文注入：每会话带最近几条（约 10 轮）
+      sumTag: 'summary' // 摘要标签名：剧情长卷对 8 楼以上楼层只取 <该标签>内文（预设随楼输出的摘要）
     },
 
     settings: function () {
@@ -199,8 +200,13 @@
       var out = {};
       var d = this.DEFAULTS, s = this.settings();
       for (var k in d) {
-        var v = Number(s[k]);
-        out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
+        if (typeof d[k] === 'number') {
+          var v = Number(s[k]);
+          out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
+        } else {
+          // 字符串项（如 sumTag）：非空串原样放行，否则回默认
+          out[k] = (typeof s[k] === 'string' && s[k].trim()) ? s[k].trim() : d[k];
+        }
       }
       return out;
     },
