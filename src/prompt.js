@@ -54,10 +54,11 @@
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-      // 结构化输出块：summary 摘要 / choice(s) 分支选项，只剥标签会留碎片，整段剔除。
-      //    （聊天历史由 generateRaw 的 chat_history 槽位整体装配，与主生成同一管线，
+      // 结构化输出块：choice(s) 分支选项是模型的草稿不是剧情，整段剔除。
+      //    （压缩摘要对每个人都是不同的自定义标签——summary/abstract/whatever——
+      //      统一交给下方兜底正则处理：只剥标签、内容保留。摘要就是剧情本体，
+      //      挖掉反而断档；聊天历史由 generateRaw 的 chat_history 槽位整体装配，
       //      这些残片在日记指令里另行为 AI 声明用途。）
-      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
       .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/<[^>]+>/g, '')
