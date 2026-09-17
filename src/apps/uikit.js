@@ -30,7 +30,10 @@
     '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
     // 全域兜底：屏幕内任何可滚元素都强制细条+透明轨道（Firefox 细条渲染无箭头按钮；
     // 各 app 如需隐藏滚动条，自身 scrollbar-width:none 规则在注入顺序上更靠后、仍可覆盖本行）
-    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}'
+    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}',
+    // 有头 Edge/Chrome 在经典（非悬浮）滚动条模式下会给自定义滚动条按系统主题画端部按钮
+    // （Windows 下即上下三角箭头）；显式置零隐藏，各端渲染路径差异一并堵死
+    '.lzjm-screen ::-webkit-scrollbar-button{display:none;width:0;height:0}'
   ].join('\n');
 
   // ── 跨应用图标（window 全局，各文件 IIFE 内直接按名引用） ──

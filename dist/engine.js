@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 18:00
+//  构建时间（本地）：2026-09-17 18:49
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 18:00';
+var __LZJM_BUILD__ = '2026-09-17 18:49';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1947,7 +1947,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
     // 全域兜底：屏幕内任何可滚元素都强制细条+透明轨道（Firefox 细条渲染无箭头按钮；
     // 各 app 如需隐藏滚动条，自身 scrollbar-width:none 规则在注入顺序上更靠后、仍可覆盖本行）
-    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}'
+    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}',
+    // 有头 Edge/Chrome 在经典（非悬浮）滚动条模式下会给自定义滚动条按系统主题画端部按钮
+    // （Windows 下即上下三角箭头）；显式置零隐藏，各端渲染路径差异一并堵死
+    '.lzjm-screen ::-webkit-scrollbar-button{display:none;width:0;height:0}'
   ].join('\n');
 
   // ── 跨应用图标（window 全局，各文件 IIFE 内直接按名引用） ──
@@ -4431,9 +4434,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-dwrite:disabled{background:#a8ddb9}',
     // 阅读页：整页白纸、无卡片——日期/标题/正文同落一页，靠排版分层（iOS 备忘录式）
     '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
-    '.lzjm-dread::-webkit-scrollbar{width:3px}',
-    '.lzjm-dread::-webkit-scrollbar-track{background:transparent}',
-    '.lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
+    '.lzjm-screen .lzjm-dread::-webkit-scrollbar{width:3px}',
+    '.lzjm-screen .lzjm-dread::-webkit-scrollbar-track{background:transparent}',
+    '.lzjm-screen .lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
     '.lzjm-dread-h{font-size:12px;color:#9aa0a8;letter-spacing:.05em;margin-bottom:6px}',
     '.lzjm-dread-t{font-size:21px;font-weight:600;color:#1a1d21;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.06);margin-bottom:18px}',
     '.lzjm-dread-c{font-size:15px;line-height:1.95;color:#262a2e}',
