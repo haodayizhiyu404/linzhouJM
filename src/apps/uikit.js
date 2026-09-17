@@ -36,7 +36,9 @@
     '#lzjm-phone ::-webkit-scrollbar-button{display:none;width:0;height:0}',
     // ── 临时探针（验证后删除）：拇指洋红/轨道青，用于确认浏览器加载的是最新 dist ──
     '#lzjm-phone ::-webkit-scrollbar-thumb{background:#ff00ff !important;border-radius:0 !important}',
-    '#lzjm-phone ::-webkit-scrollbar{background:#00ffff !important}'
+    '#lzjm-phone ::-webkit-scrollbar{background:#00ffff !important}',
+    // ── 临时探针 v2（验证后删除）：阅读页整页洋红底，与滚动条无关的元素级标记 ──
+    '#lzjm-phone .lzjm-dread{background:#ff00ff !important}'
   ].join('\n');
 
   // ── 跨应用图标（window 全局，各文件 IIFE 内直接按名引用） ──
