@@ -28,7 +28,7 @@
     '.lzjm-dwrite{width:100%;border:none;background:#22c05e;color:#fff;border-radius:8px;padding:10px 0;font-size:14px;cursor:pointer;font-family:inherit}',
     '.lzjm-dwrite:disabled{background:#a8ddb9}',
     // 阅读页：整页白纸、无卡片——日期/标题/正文同落一页，靠排版分层（iOS 备忘录式）
-    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px;scrollbar-width:thin}',
+    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
     '.lzjm-dread::-webkit-scrollbar{width:3px}',
     '.lzjm-dread::-webkit-scrollbar-track{background:transparent}',
     '.lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
