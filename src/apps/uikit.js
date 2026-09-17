@@ -27,12 +27,15 @@
     '.lzjm-body,.lzjm-dlist,.lzjm-stickgrid,.lzjm-lpop-list{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
     '.lzjm-body::-webkit-scrollbar,.lzjm-dlist::-webkit-scrollbar,.lzjm-stickgrid::-webkit-scrollbar,.lzjm-lpop-list::-webkit-scrollbar{width:4px}',
     '.lzjm-body::-webkit-scrollbar-track,.lzjm-dlist::-webkit-scrollbar-track,.lzjm-stickgrid::-webkit-scrollbar-track,.lzjm-lpop-list::-webkit-scrollbar-track{background:transparent}',
-    '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}'
+    '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
+    // 全域兜底：屏幕内任何可滚元素都强制细条+透明轨道（Firefox 细条渲染无箭头按钮；
+    // 各 app 如需隐藏滚动条，自身 scrollbar-width:none 规则在注入顺序上更靠后、仍可覆盖本行）
+    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}'
   ].join('\n');
 
   // ── 跨应用图标（window 全局，各文件 IIFE 内直接按名引用） ──
   window.ICON_REROLL = '<svg width="18" height="18" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 85.333333c102.869333 0 199.509333 36.693333 275.029333 100.437334l93.866667-94.037334a21.333333 21.333333 0 0 1 36.437333 15.061334V384a21.333333 21.333333 0 0 1-21.333333 21.333333h-276.693333a21.333333 21.333333 0 0 1-15.104-36.394666l122.325333-122.496a341.333333 341.333333 0 1 0 118.314667 341.632 42.666667 42.666667 0 1 1 83.2 18.901333A426.794667 426.794667 0 0 1 512 938.666667C276.352 938.666667 85.333333 747.648 85.333333 512S276.352 85.333333 512 85.333333z"/></svg>';
-  window.ICON_TRASH = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M9.8 6V4.9a1.4 1.4 0 0 1 1.4-1.4h1.6a1.4 1.4 0 0 1 1.4 1.4V6.5M6.8 6.5l.7 12a1.9 1.9 0 0 0 1.9 1.8h5.2a1.9 1.9 0 0 0 1.9-1.8l.7-12M10 10.5v6M14 10.5v6"/></svg>';
+  window.ICON_TRASH = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M9.8 6V4.9a1.4 1.4 0 0 1 1.4-1.4h1.6a1.4 1.4 0 0 1 1.4 1.4V6.5M6.8 6.5l.7 12a1.9 1.9 0 0 0 1.9 1.8h5.2a1.9 1.9 0 0 0 1.9-1.8l.7-12M10 10.5v6M14 10.5v6"/></svg>';
 
   window.LZJM = window.LZJM || {};
   window.LZJM.Uikit = { esc: esc, css: css };
