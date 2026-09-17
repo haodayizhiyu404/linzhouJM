@@ -767,7 +767,7 @@ ctx.getWorldbook = async () => [
   const psrc = fs.readFileSync(path.join(ROOT, 'src/prompt.js'), 'utf8');
   eq('备忘录·主屏入口', wsrc.includes('data-app="diary"') && wsrc.includes('ICON_MEMO'), true);
   eq('备忘录·写一篇与选人绑定', wsrc.includes('[data-dwrite]') && wsrc.includes('[data-dnpc]'), true);
-  eq('备忘录·重roll先删再写', wsrc.includes('diaryReroll') && wsrc.includes('Engine.diaryDeleteAt(this.diaryNpc, idx)'), true);
+  eq('备忘录·重roll先确认再删写', wsrc.includes('diaryReroll') && wsrc.includes('drerollok') && wsrc.indexOf('Engine.diaryDeleteAt(this.diaryNpc, idx)') === -1, true);
   // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，wechat 不得有自动补写
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
   eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1, true);
