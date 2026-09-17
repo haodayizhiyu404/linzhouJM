@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 21:01
+//  构建时间（本地）：2026-09-17 21:04
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 21:01';
+var __LZJM_BUILD__ = '2026-09-17 21:04';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2259,10 +2259,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-stickcell img{width:100%;height:100%;object-fit:cover;display:block}',
         // 滚动条（统一的细灰条，不用浏览器默认样式）
     // 滚动条：细、淡灰、无箭头、透明轨道（webkit + Firefox 双管）
-    '.lzjm-screen ::-webkit-scrollbar{width:4px;height:5px}',
+    '.lzjm-screen ::-webkit-scrollbar{width:3px;height:5px}',
     '.lzjm-screen ::-webkit-scrollbar-track{background:transparent}',
-    '.lzjm-screen ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:2px}',
-    '.lzjm-screen ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.26)}',
+    '.lzjm-screen ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
+    '.lzjm-screen ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.22)}',
     // 底部 home 指示条
     '.lzjm-homebar{flex:none;height:18px;display:flex;align-items:center;justify-content:center;background:#f7f7f9;position:relative;z-index:3}',
     '.lzjm-homebar:after{content:"";display:block;width:110px;height:4px;border-radius:2px;background:rgba(0,0,0,.75)}',
