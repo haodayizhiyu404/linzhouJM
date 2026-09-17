@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 21:12
+//  构建时间（本地）：2026-09-17 21:19
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 21:12';
+var __LZJM_BUILD__ = '2026-09-17 21:19';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -5274,7 +5274,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             }
             lines.push((m.who === 'user' ? myName : m.who) + '：' + W.Floor.msgToLine(m, myName).replace(/^[^：]*：/, ''));
           });
-          blocks.push((cands[ci].isGrp ? '◆群聊舱 · ' + name + '（仅群成员知情）' : '◆私聊舱 · ' + myName + ' ↔ ' + name + '（除当事双方外无人知情）') + when + '：\n' + lines.join('\n'));
+          blocks.push((cands[ci].isGrp ? '「' + name + '」群聊（仅群成员知情）' : '「与' + name + '的私聊」（仅' + myName + '与' + name + '两人知情）') + when + '：\n' + lines.join('\n'));
         }
         if (!blocks.length) {
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
@@ -5286,8 +5286,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // 块头无nonce（调试nonce仅进console）。
         var INJECT_POS = 'in_chat';
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-        var fullContent = '【手机近况 · 微信】' + myName + '近期在手机上聊过天，摘录如下。仅作背景氛围，正文不必专门提及。\n'
-          + '【铁律·信息隔离】以下每段记录都是独立密封舱：你的角色不在舱内，就绝无可能知道舱内任何内容——不得转述、不得暗示、不得"恰好提起"，哪怕舱内信息与其当前行程直接相关；唯一合法的披露方式，是舱内知情当事人本人在对话中亲口说出。\n'
+        var fullContent = '【手机近况 · 微信】以下是' + myName + '手机里的近期聊天记录，供你把握人物关系与近况，正文不必专门提及。\n'
+          + '【保密规则】以上全部是' + myName + '的私人聊天记录：只有每条记录里实际发言的人知道该条内容，其他所有角色都不可能知道——不管身份多高、与内容多相关、当前是否在场。相关不等于知情。写作时请遵守：不得让非当事人角色说出、转述、暗示或以"恰好听说"等方式引用这些内容；旁白也不得把这些内容当作公开事实陈述；如果剧情确需用到某条信息，唯一的写法是让知情的当事人本人在场并亲口说出。\n'
           + blocks.join('\n');
         var injected = false;
         if (INJECT_POS === 'in_chat') {
