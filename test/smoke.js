@@ -655,8 +655,8 @@ ctx.getWorldbook = async () => [
   // 纯手动：同日再点「写一篇」不拦截，并列存档（撞车也不覆盖，见撞车用例）
   const dw3 = await LW.Engine.diaryWrite('周言');
   eq('备忘录·同日手动再写一篇并列存档', dw3 && LW.Engine.diaryEntries('周言').length, 2);
-  eq('备忘录·提示词注入usedDates', dLastReq.ordered_prompts[0].content.indexOf('2034-08-25') !== -1, true);
-  eq('备忘录·提示词含日期排除令', dLastReq.ordered_prompts[0].content.indexOf('不可使用已存在的日期') !== -1, true);
+  eq('备忘录·提示词注入usedDates', dLastReq.ordered_prompts[2].content.indexOf('2034-08-25') !== -1, true);
+  eq('备忘录·提示词含日期排除令', dLastReq.ordered_prompts[2].content.indexOf('不可使用已存在的日期') !== -1, true);
   // 短正文 → 补强重试一次，重试稿替换短稿
   dGenCalls = 0;
   ctx.generateRaw = async () => {
@@ -674,22 +674,24 @@ ctx.getWorldbook = async () => [
   })(), true);
   eq('备忘录·删除', LW.Engine.diaryDeleteAt('周言', 0), true);
   eq('备忘录·删后余量', LW.Engine.diaryEntries('周言').length, 3);
-  // Prompt.diary 装配要点
+  // Prompt.diary 装配要点：上下文在 system（chat_history 前），输出要求在 user 尾（chat_history 后）
   const dreq = LW.Prompt.diary({ name: '周言', profile: '班长' }, [], { dateText: '2034年8月26日 星期五' }, '机主资料', ['2034-08-25'], false);
-  const dtxt = dreq.ordered_prompts[0].content;
+  const dtxt = dreq.ordered_prompts[2].content;
+  eq('备忘录·输出要求在chat_history后', dreq.ordered_prompts.indexOf('chat_history') === 1 && dreq.ordered_prompts[0].content.indexOf('输出要求') === -1, true);
+  eq('备忘录·上下文在system', dreq.ordered_prompts[0].content.indexOf('人物档案 · 周言') !== -1, true);
   eq('备忘录·字数下限', dtxt.indexOf('不少于 500 字') !== -1, true);
   eq('备忘录·限知禁令', dtxt.indexOf('严禁：本人不知道的任何信息') !== -1, true);
   eq('备忘录·回味许可', dtxt.indexOf('值得回味') !== -1, true);
   const dreq2 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], true);
-  eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
+  eq('备忘录·短重试标记', dreq2.ordered_prompts[2].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
-  eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
+  eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[2].content.indexOf('不可使用已存在的日期') === -1, true);
   // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位；不设楼数上限——
   // 截断只会从最旧侧砍掉 summary 衔接带，用户自有压缩体系兜底
   const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', ['2034-08-25'], false);
   eq('备忘录·历史走chat_history槽位', dreq4.ordered_prompts.indexOf('chat_history') !== -1, true);
   eq('备忘录·无楼数上限', dreq4.max_chat_history, undefined);
-  const dtxt4 = dreq4.ordered_prompts[0].content;
+  const dtxt4 = dreq4.ordered_prompts[2].content;
   eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以聊天记录为准') !== -1, true);
   eq('备忘录·summary残片声明', dtxt4.indexOf('可作参考，不是任何人物说的话') !== -1, true);
   eq('备忘录·无实现元叙述', dtxt4.indexOf('插件注入') === -1 && dtxt4.indexOf('剧情长卷') === -1 && dtxt4.indexOf('历史存档') === -1, true);
