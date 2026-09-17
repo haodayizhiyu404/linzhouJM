@@ -685,29 +685,29 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
-  // 剧情长卷：8楼全文+往上100楼摘要（108楼窗）；旧楼正文被总结插件原地替换成 <summary> → 解包保留
-  const sumText = '【剧情总结】第1-10楼：' + 'summary内容。'.repeat(60);
+  // 剧情长卷 v3：8楼内带剥标签正文；8~108楼只取随楼 <summary> 摘要（无摘要楼退化为120字撮要）
   global.__msgs = [];
   for (let i = 0; i < 60; i++) {
-    if (i === 5) global.__msgs.push({ role: 'system', message: sumText });
-    else if (i >= 52) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼最近剧情，' + '详写。'.repeat(100) });
-    else global.__msgs.push({ role: 'assistant', message: '<summary>第' + (i + 1) + '楼旧档摘要：两人一起吃了顿饭，聊了很久。</summary>' });
+    if (i === 4) global.__msgs.push({ role: 'assistant', message: '第5楼大段正文，' + '正文。'.repeat(150) + '<summary>第5楼摘要：两人关系突飞猛进。</summary>' });
+    else if (i === 5) global.__msgs.push({ role: 'user', message: '第6楼user说的话，' + '台词。'.repeat(150) });
+    else if (i === 59) global.__msgs.push({ role: 'assistant', message: '第60楼剧情正文。' + '<think>内心os不应出现</think>' + '<summary>尾楼摘要不带</summary>' });
+    else if (i >= 52) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼最近剧情。' });
+    else global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼正文，' + '正文。'.repeat(100) + '<summary>第' + (i + 1) + '楼摘要：一起吃了顿饭。</summary>' });
   }
   const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', [], false);
   const dtxt4 = dreq4.ordered_prompts[0].content;
   eq('备忘录·长卷节存在', dtxt4.indexOf('## 剧情长卷') !== -1, true);
-  eq('备忘录·长卷总结楼全量', dtxt4.indexOf(sumText) !== -1, true);
-  eq('备忘录·summary解包保留', dtxt4.indexOf('第30楼旧档摘要：两人一起吃了顿饭，聊了很久。') !== -1 && dtxt4.indexOf('<summary>') === -1, true);
-  eq('备忘录·窗内旧楼全带不截断', dtxt4.indexOf('【第31楼·旁白】') !== -1 && dtxt4.indexOf('此楼后续从略') === -1, true);
-  eq('备忘录·尾部8楼全文', dtxt4.indexOf('详写。'.repeat(100)) !== -1, true);
+  eq('备忘录·旧楼只带summary', dtxt4.indexOf('第5楼摘要：两人关系突飞猛进。') !== -1 && dtxt4.indexOf('第5楼大段正文') === -1, true);
+  eq('备忘录·无摘要楼短撮要', dtxt4.indexOf('第6楼user说的话') !== -1 && dtxt4.indexOf('此楼后续从略') !== -1, true);
+  eq('备忘录·尾楼正文剥summary', dtxt4.indexOf('第60楼剧情正文') !== -1 && dtxt4.indexOf('尾楼摘要不带') === -1 && dtxt4.indexOf('内心os不应出现') === -1, true);
   eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以「剧情长卷」为准') !== -1, true);
-  // 108楼窗：120楼时最老的12楼被丢弃，摘要区(100楼)超200字截断，尾部8楼全文保留
+  // 108楼窗：120楼时最老的12楼被丢弃，尾部8楼在窗内
   global.__msgs = [];
-  for (let i = 0; i < 120; i++) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼冗长正文，' + '段落。'.repeat(150) });
+  for (let i = 0; i < 120; i++) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼正文，' + '段落。'.repeat(150) });
   const dreq5 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   const dtxt5 = dreq5.ordered_prompts[0].content;
   eq('备忘录·108楼窗截老留新', dtxt5.indexOf('【第1楼·旁白】') === -1 && dtxt5.indexOf('【第13楼·旁白】') !== -1 && dtxt5.indexOf('【第120楼·旁白】') !== -1, true);
-  eq('备忘录·摘要区截断尾部全文', dtxt5.indexOf('此楼后续从略') !== -1 && dtxt5.indexOf('第120楼冗长正文，' + '段落。'.repeat(150)) !== -1, true);
+  eq('备忘录·摘要区撮要尾部全文', dtxt5.indexOf('此楼后续从略') !== -1 && dtxt5.indexOf('第120楼正文，' + '段落。'.repeat(150)) !== -1, true);
   global.__msgs = [{ role: 'assistant', message: statusText }];
   // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
   while (LW.Engine.diaryEntries('周言').length) LW.Store.removeAt(LW.Engine.diaryKey('周言'), LW.Engine.diaryEntries('周言').length - 1);
@@ -784,9 +784,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
-  // 长卷保险丝：108楼窗（8全文+100摘要）进日记提示词，防"最近没提=刚认识"
+  // 长卷保险丝：108楼窗（8正文+100摘要）进日记提示词，防"最近没提=刚认识"
   eq('备忘录·长卷108楼窗', psrc.includes('剧情长卷') && psrc.includes('ARC_SUM = 100') && psrc.includes('ARC_FULL = 8'), true);
-  eq('备忘录·summary解包', psrc.indexOf("<\\/summary>/gi, '$1')") !== -1, true);
+  eq('备忘录·旧楼抽summary', psrc.indexOf('function extractSum') !== -1 && psrc.indexOf("<\\/summary>/gi, '')") !== -1, true);
   eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以「剧情长卷」为准'), true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');

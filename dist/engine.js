@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 09:56
+//  构建时间（本地）：2026-09-17 13:17
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 09:56';
+var __LZJM_BUILD__ = '2026-09-17 13:17';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -857,9 +857,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-      // 摘要块：总结插件会把旧楼正文原地替换成 <summary>压缩摘要</summary>——
-      // 内容本身就是剧情，解包保留（去标签留内文）；choice(s) 分支选项才是真垃圾，整段剔除
-      .replace(/<summary>([\s\S]*?)<\/summary>/gi, '$1')
+      // 结构化输出块：summary 摘要 / choice(s) 分支选项整段剔除。
+      //    <summary> 是预设让 AI 随正文每楼输出的摘要（酒馆正则挡在 prompt 外，chat 里原文还在），
+      //    长卷对 8 楼以上的旧楼会单独抽取它；8 楼内按用户规格只留正文，这里剥掉
+      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
       .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
       .replace(/```[\s\S]*?```/g, '')
       .replace(/<[^>]+>/g, '')
@@ -887,12 +888,23 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   }
 
   // ── 剧情长卷（备忘录专用，一次性生成可承受大上下文）：最近108楼脉络 ──
-  //    规格（用户拍板）：8楼全文 + 往上100楼摘要；楼层按 ctx.chat 总楼号算，user/ai 各算一楼。
-  //    用户的压缩体系下，8楼以上的正文已被总结插件原地替换成 <summary> 摘要（cleanFloor 解包保留），
-  //    这 100 楼天然是压缩档；没装压缩的用户由每楼 200 字 cap 兜底，防一次性生成爆表。
-  //    108 楼以外的旧事不带。够不着的只有「只在生成时以 system 注入、不进 chat 数组」的
-  //    注入式总结——平台限制，任何插件都读不到，原地摘要已覆盖同一批剧情，不追。
-  var ARC_FULL = 8, ARC_SUM = 100, ARC_SUM_CAP = 200, ARC_SYS_CAP = 800;
+  //    规格（用户拍板）：楼层按 ctx.chat 总楼号算，user/ai 各算一楼。
+  //    ① 8 楼内：带去除 think/thinking/cot/summary 标签后的正文全文。
+  //    ② 8~108 楼：每楼正文里随楼输出的 <summary>摘要</summary>（AI 预设产物，存在文内，
+  //       与任何总结插件无关）——只取标签内摘要；无摘要的楼（多为 user 楼）退化为 120 字撮要，
+  //       保住 user 侧的言行弧线。
+  //    108 楼以外的旧事不带。
+  var ARC_FULL = 8, ARC_SUM = 100, ARC_SUM_CAP = 500, ARC_NOSUM_CAP = 120;
+  var SUM_TAG_RE = /<summary>([\s\S]*?)<\/summary>/gi;
+  function extractSum(text) {
+    var out = [], m;
+    SUM_TAG_RE.lastIndex = 0;
+    while ((m = SUM_TAG_RE.exec(String(text || '')))) {
+      var s = (m[1] || '').trim();
+      if (s) out.push(s);
+    }
+    return out.join('\n');
+  }
   function longArc() {
     try {
       var msgs = getChatMessages('0-{{lastMessageId}}');
@@ -902,11 +914,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var out = [];
       for (var i = start; i < n; i++) {
         var m = msgs[i];
-        var isSys = m.role === 'system';
-        var inTail = i >= n - ARC_FULL; // 最近 8 楼：全文
-        var t = cleanFloor(m, isSys ? ARC_SYS_CAP : (inTail ? cfg().plotCap : ARC_SUM_CAP));
+        var raw = String((m && m.message) || '');
+        var inTail = i >= n - ARC_FULL; // 最近 8 楼：正文全文（summary 标签已由 cleanFloor 剥除）
+        var t = inTail
+          ? cleanFloor(m, cfg().plotCap)
+          : (function () {
+            var sum = extractSum(raw);
+            return sum ? cleanFloor({ message: sum }, ARC_SUM_CAP) : cleanFloor(m, ARC_NOSUM_CAP);
+          })();
         if (t.length <= 2) continue;
-        var who = m.role === 'user' ? me() : (isSys ? '系统' : '旁白');
+        var who = m.role === 'user' ? me() : (m.role === 'system' ? '系统' : '旁白');
         out.push('【第' + (i + 1) + '楼·' + who + '】' + t);
       }
       return out.join('\n');
@@ -1490,7 +1507,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '',
       situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
       '',
-      longArc() ? '## 剧情长卷（关系演变的完整脉络：旧楼已被压缩成摘要，越靠前越是旧事）\n' + longArc() : '',
+      longArc() ? '## 剧情长卷（关系演变的完整脉络：8楼以上每楼只带随楼输出的 <summary> 摘要，越靠前越是旧事）\n' + longArc() : '',
       '',
       (hist && hist.length)
         ? '## 与' + myName + '的微信记录（近 30 条，备忘录可以回味这里的事）\n' + histText(hist, 30, true, snapshot && snapshot.dateText)
