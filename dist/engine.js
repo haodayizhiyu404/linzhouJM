@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 17:16
+//  构建时间（本地）：2026-09-17 17:23
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 17:16';
+var __LZJM_BUILD__ = '2026-09-17 17:23';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2402,11 +2402,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-dfoot{flex:none;padding:10px 14px 12px;border-top:1px solid rgba(0,0,0,.06);background:#f7f7f9}',
     '.lzjm-dwrite{width:100%;border:none;background:#22c05e;color:#fff;border-radius:8px;padding:10px 0;font-size:14px;cursor:pointer;font-family:inherit}',
     '.lzjm-dwrite:disabled{background:#a8ddb9}',
-    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;padding:16px 14px 28px;background:#eef0f3}',
-    '.lzjm-dread-h{font-size:12px;color:#8a9099;text-align:center;letter-spacing:.06em;margin:6px 0 12px}',
-    '.lzjm-dread-t{font-size:18px;font-weight:600;color:#1a1d21;text-align:center;margin-bottom:14px}',
-    '.lzjm-dread-c{background:#fff;border-radius:14px;padding:20px 18px;box-shadow:0 1px 3px rgba(20,24,28,.06),0 6px 18px rgba(20,24,28,.05)}',
-    '.lzjm-dread-c p{margin:0 0 12px;font-size:14.5px;line-height:1.95;color:#2a2e33}',
+    // 阅读页：整页白纸、无卡片——日期/标题/正文同落一页，靠排版分层（iOS 备忘录式）
+    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px;scrollbar-width:thin}',
+    '.lzjm-dread::-webkit-scrollbar{width:3px}',
+    '.lzjm-dread::-webkit-scrollbar-track{background:transparent}',
+    '.lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
+    '.lzjm-dread-h{font-size:12px;color:#9aa0a8;letter-spacing:.05em;margin-bottom:6px}',
+    '.lzjm-dread-t{font-size:21px;font-weight:600;color:#1a1d21;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.06);margin-bottom:18px}',
+    '.lzjm-dread-c{font-size:15px;line-height:1.95;color:#262a2e}',
+    '.lzjm-dread-c p{margin:0 0 14px}',
     '.lzjm-dread-c p:last-child{margin-bottom:0}'
   ].join('\n');
 
