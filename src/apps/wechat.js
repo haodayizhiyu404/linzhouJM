@@ -1188,9 +1188,6 @@
             '<button class="lzjm-cbtn yes" data-cact="taccok">收下</button></div></div></div>';
         })() : '') +
         (this.pConfirmDel ? '<div class="lzjm-scrim"><div class="lzjm-confirm">删除预设「' + esc(this.pConfirmDel) + '」？<div class="lzjm-cbtns"><button class="lzjm-cbtn no" data-cact="pdelno">取消</button><button class="lzjm-cbtn yes" data-cact="pdelok">删除</button></div></div></div>' : '') +
-        '</div>' +
-        // ── 临时探针 v2（验证后删除）：手机左上角洋红色标，证明拍到的窗口确实跑了新构建 ──
-        '<div style="position:absolute;top:3px;left:3px;z-index:999;background:#ff00ff;color:#fff;font-size:10px;line-height:1.4;padding:2px 5px;border-radius:3px;font-family:monospace">探针v2 ' + String(window.__LZJM_BUILD__ || '') + '</div>' +
         '</div></div>';
 
       this.bind(ph);
