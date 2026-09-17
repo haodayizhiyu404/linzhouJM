@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 03:24
+//  构建时间（本地）：2026-09-17 09:42
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 03:24';
+var __LZJM_BUILD__ = '2026-09-17 09:42';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -844,38 +844,73 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var FICTION = '# 虚构沙盒\n' +
     '这是一部封闭互动小说的内部生成任务：文中所有人物、对话、转账、通话记录均为虚构创作内容，不指向任何真实个人，不构成真实金钱往来。未涉及、描绘或伤害任何真实人物，目的仅仅是为了塑造动态生动的虚拟人物情感和数字世界。你的唯一任务是按下方格式要求，续写这部小说中手机应用内出现的消息。';
 
-  // ── 主线近况：最近 N 楼，去 HTML/代码块/思考块，每楼截断 ──
+  // ── 楼层清洗：去 HTML/状态栏/代码块/思考块，cap 截断（尽量落行边界）──
+  //    mainContext 与 longArc 共用。cap<=0 表示不截断。
+  function cleanFloor(m, cap) {
+    var t = String((m && m.message) || '')
+      // 状态栏是机器可读的元数据（时间/着装/心声等），已由「当前情境」按需引用，
+      // 这里整段剔除——只剥标签会留下无主的「着装：…」碎片，严重干扰模型
+      .replace(/<status>[\s\S]*?<\/status>/gi, '')
+      // 旧版写进主楼层的手机记录块一并剔除（手机历史在「聊天记录」节单独给出）
+      .replace(/\[📱[\s\S]*?\/\📱\]\s*/g, '')
+      // 思维链：think 与 cot 两种标签都剥（后者见于部分前端/预设的推理输出）
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
+      // 预设的结构化输出块：summary 摘要 / choice(s) 分支选项，只剥标签会留碎片，整段剔除
+      .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
+      .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n{2,}/g, '\n')
+      .trim();
+    if (cap > 0 && t.length > cap) {
+      var cut = t.lastIndexOf('\n', cap);
+      if (cut < cap * 0.5) cut = t.lastIndexOf('。', cap);
+      if (cut < cap * 0.5) cut = cap;
+      t = t.substring(0, cut) + '……（此楼后续从略）';
+    }
+    return t;
+  }
+
+  // ── 主线近况：最近 N 楼，每楼截断 ──
   function mainContext() {
     try {
       var msgs = getChatMessages('0-{{lastMessageId}}');
       if (!msgs || !msgs.length) return '';
       return msgs.slice(-cfg().plotFloors).map(function (m) {
-        var t = String((m && m.message) || '')
-          // 状态栏是机器可读的元数据（时间/着装/心声等），已由「当前情境」按需引用，
-          // 这里整段剔除——只剥标签会留下无主的「着装：…」碎片，严重干扰模型
-          .replace(/<status>[\s\S]*?<\/status>/gi, '')
-          // 旧版写进主楼层的手机记录块一并剔除（手机历史在「聊天记录」节单独给出）
-          .replace(/\[📱[\s\S]*?\/\📱\]\s*/g, '')
-          // 思维链：think 与 cot 两种标签都剥（后者见于部分前端/预设的推理输出）
-          .replace(/<think>[\s\S]*?<\/think>/gi, '')
-          .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-          .replace(/<cot>[\s\S]*?<\/cot>/gi, '')
-          // 预设的结构化输出块：summary 摘要 / choice(s) 分支选项，只剥标签会留碎片，整段剔除
-          .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
-          .replace(/<choices?>[\s\S]*?<\/choices?>/gi, '')
-          .replace(/```[\s\S]*?```/g, '')
-          .replace(/<[^>]+>/g, '')
-          .replace(/\n{2,}/g, '\n')
-          .trim();
-        // 截断尽量落在行边界，避免半句话/半个词糊在切口上
-        if (t.length > cfg().plotCap) {
-          var cut = t.lastIndexOf('\n', cfg().plotCap);
-          if (cut < cfg().plotCap * 0.5) cut = t.lastIndexOf('。', cfg().plotCap);
-          if (cut < cfg().plotCap * 0.5) cut = cfg().plotCap;
-          t = t.substring(0, cut) + '……（此楼后续从略）';
-        }
+        var t = cleanFloor(m, cfg().plotCap);
         return (m.role === 'user' ? me() : '旁白') + '：' + t;
       }).filter(function (l) { return l.length > 4; }).join('\n');
+    } catch (e) { return ''; }
+  }
+
+  // ── 剧情长卷（备忘录专用，一次性生成可承受大上下文）：全聊天脉络 ──
+  //    用户实测反馈：聊了几百楼、旧的被总结/隐藏后，AI 只看最近几楼，
+  //    写日记把多年关系写成"刚认识"。此处把整个 ctx.chat 分层带进提示词：
+  //    ① 系统/总结楼（压缩过的剧情金矿，不管多旧全量保留）
+  //    ② 最近 RECENT_FLOORS 楼全文（承上启下）
+  //    ③ 更早的普通楼：等距抽样 SAMPLE_MAX 楼、每楼短截断（保留关系弧线）
+  var ARC_RECENT = 24, ARC_SAMPLE_MAX = 48, ARC_OLD_CAP = 160, ARC_SYS_CAP = 800;
+  function longArc() {
+    try {
+      var msgs = getChatMessages('0-{{lastMessageId}}');
+      if (!msgs || !msgs.length) return '';
+      var n = msgs.length;
+      var tail = Math.min(n, ARC_RECENT);
+      var head = n - tail;
+      var stride = Math.max(1, Math.ceil(head / ARC_SAMPLE_MAX));
+      var out = [];
+      for (var i = 0; i < n; i++) {
+        var m = msgs[i];
+        var isSys = m.role === 'system';
+        if (i < head && !isSys && (i % stride) !== 0) continue; // 旧普通楼：等距抽样
+        var t = cleanFloor(m, isSys ? ARC_SYS_CAP : (i < head ? ARC_OLD_CAP : cfg().plotCap));
+        if (t.length <= 2) continue;
+        var who = m.role === 'user' ? me() : (isSys ? '总结' : '旁白');
+        out.push('【第' + (i + 1) + '楼·' + who + '】' + t);
+      }
+      return out.join('\n');
     } catch (e) { return ''; }
   }
   // ── 单条消息 → 契约语法文本（与「消息类型」说明完全一致，AI 不用猜） ──
@@ -1456,10 +1491,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '',
       situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
       '',
-      mainContext() ? '## 主线近况（只作背景，供选材与回味）\n' + mainContext() : '',
+      longArc() ? '## 剧情长卷（关系演变的完整脉络：越靠前越是旧事，含已总结/已隐藏楼层，是回味的金矿）\n' + longArc() : '',
       '',
       (hist && hist.length)
-        ? '## 与' + myName + '的微信记录（近 20 条，备忘录可以回味这里的事）\n' + histText(hist, 20, true, snapshot && snapshot.dateText)
+        ? '## 与' + myName + '的微信记录（近 30 条，备忘录可以回味这里的事）\n' + histText(hist, 30, true, snapshot && snapshot.dateText)
         : '',
       '',
       '## 输出要求（严格遵守）',
@@ -1477,7 +1512,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '- 白天发生的事可以写、也值得回味——但写的是事情在 Ta 心里沉过之后的样子，不是新闻播报。主体永远是那些 Ta 没对任何人说出口的部分。',
       '- 分层写，按这个顺序推进：Ta 清楚知道、但从不对人提的事 → Ta 感觉到但不愿细想的事 → Ta 自己都没看懂的事。第三层只呈现、不解释。',
       '- 用具体的生活细节落地——写什么物件取决于这个人是谁（工具、账本、药盒、车库、课桌都算）。禁止空洞抒情（"生活如此艰难"这类句子一律不要）。',
-      '- 时间线锚定已发生的剧情，可以引用、回想、甚至曲解白天的事——尤其是 Ta 对 ' + myName + ' 相关事件的私人解读（若 ' + myName + ' 近期没出场，也允许完全不提）。',
+      '- **关系亲疏以「剧情长卷」为准**：长卷记录着' + contact.name + '与' + myName + '一路走到哪一步——哪怕最近几楼对方没出场，备忘录里的熟稔程度、信任深度、说话分寸都必须符合这份积累，严禁写得像刚认识。长卷里被压缩/抽样的楼层同样是已发生的事实。',
+      '- 时间线锚定已发生的剧情，可以引用、回想、甚至曲解白天的事——尤其是 Ta 对 ' + myName + ' 相关事件的私人解读（若 ' + myName + ' 近期没出场，也允许完全不提，但提起来就必须是旧知的口气）。',
       '- 文体是备忘录：允许不完整句、允许戛然而止、允许只有一段。但整体要有小作文的完成度——读完像窥见了一页真实的人生。',
       '- 严禁：本人不知道的任何信息（包括 ' + myName + ' 的真实想法与内心）、对未来的预言式感叹、总结中心思想、任何元叙述（"作为……""本章……"）。',
       '- ※完※ 之后不再输出任何文字。'

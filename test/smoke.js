@@ -685,6 +685,29 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
+  // 剧情长卷：200楼旧档抽样 + 总结楼全量保留 + 最近24楼全文 + 关系锚定规则
+  const sumText = '【剧情总结】第1-10楼：' + 'summary内容。'.repeat(60);
+  const arcOldLong = '很久以前在旧楼发生的事，' + '台词。'.repeat(200);
+  global.__msgs = [];
+  for (let i = 0; i < 200; i++) {
+    if (i === 5) global.__msgs.push({ role: 'system', message: sumText });
+    else if (i === 12) global.__msgs.push({ role: 'assistant', message: arcOldLong });
+    else if (i === 13) global.__msgs.push({ role: 'assistant', message: '这楼不该被抽中' });
+    else if (i >= 176) global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼最近剧情，' + '详写。'.repeat(100) });
+    else global.__msgs.push({ role: 'assistant', message: '第' + (i + 1) + '楼普通剧情' });
+  }
+  const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', [], false);
+  const dtxt4 = dreq4.ordered_prompts[0].content;
+  eq('备忘录·长卷节存在', dtxt4.indexOf('## 剧情长卷') !== -1, true);
+  eq('备忘录·长卷总结楼全量', dtxt4.indexOf(sumText) !== -1, true);
+  eq('备忘录·长卷旧楼带楼号截断', (function () {
+    return dtxt4.indexOf('【第14楼·旁白】这楼不该被抽中') === -1 // stride 抽样跳过
+      && dtxt4.indexOf('【第13楼·旁白】很久以前在旧楼发生的事') !== -1 // 被抽中的旧楼在
+      && dtxt4.indexOf('此楼后续从略') !== -1; // 且按 ARC_OLD_CAP 截断
+  })(), true);
+  eq('备忘录·长卷最近楼全文', dtxt4.indexOf('详写。'.repeat(100)) !== -1, true);
+  eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以「剧情长卷」为准') !== -1, true);
+  global.__msgs = [{ role: 'assistant', message: statusText }];
   // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
   while (LW.Engine.diaryEntries('周言').length) LW.Store.removeAt(LW.Engine.diaryKey('周言'), LW.Engine.diaryEntries('周言').length - 1);
 
@@ -760,6 +783,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
+  // 长卷保险丝：全聊天脉络进日记提示词，防"最近没提=刚认识"
+  eq('备忘录·长卷三层结构', psrc.includes('剧情长卷') && psrc.includes('ARC_SAMPLE_MAX') && psrc.includes('ARC_SYS_CAP'), true);
+  eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以「剧情长卷」为准'), true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');
   console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
