@@ -14,7 +14,7 @@
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, diaryFloors: 100 };
+    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -690,16 +690,16 @@
     ].filter(function (s) { return s !== ''; }).join('\n');
 
     // 聊天记录不走自拼：ordered_prompts 里放标准 'chat_history' 槽位，由 generateRaw
-    // 按主生成同一管线装配（隐藏楼排除、IN_CHAT 深档注入按 depth 置顶、宏替换齐全），
-    // max_chat_history 控制带最近几楼（设置项 diaryFloors）。
+    // 按主生成同一管线装配（隐藏楼排除、IN_CHAT 深档注入按 depth 置顶、宏替换齐全）。
+    // 不设 max_chat_history：用户自己管压缩（novel-summarizer 隐藏旧楼+大文档注入），
+    // 可见楼本来就少；上限只会从最旧侧截断 summary 衔接带，宁可全量。
     return {
       ordered_prompts: [
         { role: 'system', content: p },
         'chat_history',
         { role: 'user', content: '（现在请严格按上方输出要求，输出一篇「' + contact.name + '」的备忘录。只输出标记行、正文与结束标记本身。）' }
       ],
-      should_silence: true,
-      max_chat_history: cfg().diaryFloors
+      should_silence: true
     };
     }
   };

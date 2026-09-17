@@ -684,13 +684,11 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[0].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[0].content.indexOf('不可使用已存在的日期') === -1, true);
-  // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位、楼数窗跟随设置项
+  // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位；不设楼数上限——
+  // 截断只会从最旧侧砍掉 summary 衔接带，用户自有压缩体系兜底
   const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', ['2034-08-25'], false);
   eq('备忘录·历史走chat_history槽位', dreq4.ordered_prompts.indexOf('chat_history') !== -1, true);
-  eq('备忘录·历史窗默认100楼', dreq4.max_chat_history, 100);
-  LW.Store.setSettings({ diaryFloors: 66 });
-  eq('备忘录·历史窗跟随设置', LW.Prompt.diary({ name: '周言' }, [], null, '', [], false).max_chat_history, 66);
-  LW.Store.setSettings({ diaryFloors: 100 });
+  eq('备忘录·无楼数上限', dreq4.max_chat_history, undefined);
   const dtxt4 = dreq4.ordered_prompts[0].content;
   eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以聊天记录为准') !== -1, true);
   eq('备忘录·summary残片声明', dtxt4.indexOf('可作参考，不是任何人物说的话') !== -1, true);
@@ -708,7 +706,7 @@ ctx.getWorldbook = async () => [
   LW.Store.setSettings({ plotFloors: -5, histPriv: 'abc' });
   const c2 = LW.Store.cfg();
   eq('cfg·非法值回退默认', [c2.plotFloors, c2.histPriv], [8, 50]);
-  eq('cfg·diaryFloors取默认', LW.Store.cfg().diaryFloors, 100);
+  eq('cfg·已删项不再出现', 'diaryFloors' in c2, false);
   LW.Store.setSettings({ plotFloors: 3 });
   // 提示词跟随设置：主线楼数 3 → 只带 3 楼
   global.__msgs = [
@@ -775,11 +773,11 @@ ctx.getWorldbook = async () => [
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   // 日记历史回归保险丝：必须走 chat_history 标准槽位（与主生成同管线），自拼残留清零
-  eq('备忘录·历史走chat_history槽位', psrc.indexOf("'chat_history'") !== -1 && psrc.indexOf('max_chat_history: cfg().diaryFloors') !== -1, true);
+  eq('备忘录·历史走chat_history槽位', psrc.indexOf("'chat_history'") !== -1 && psrc.indexOf('diaryFloors') === -1, true);
   eq('备忘录·无自拼残留', psrc.indexOf('function longArc') === -1 && psrc.indexOf('function deepArchive') === -1 && psrc.indexOf('function extractSum') === -1 && psrc.indexOf('function sumTagRe') === -1, true);
   eq('备忘录·关系锚定规则', psrc.includes('关系亲疏以聊天记录为准'), true);
   eq('备忘录·无实现元叙述', psrc.indexOf('插件注入') === -1 && psrc.indexOf('剧情长卷') === -1 && psrc.indexOf('历史存档') === -1, true);
-  eq('设置·日记楼数可调', wsrc.includes('diaryFloors'), true);
+  eq('设置·无日记楼数项', wsrc.indexOf('diaryFloors') === -1 && psrc.indexOf('diaryFloors') === -1, true);
   global.__msgs = null;
   LW.Engine.applyLine(null, '收尾');
   console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');

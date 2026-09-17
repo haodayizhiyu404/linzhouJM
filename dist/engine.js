@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 16:19
+//  构建时间（本地）：2026-09-17 16:30
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 16:19';
+var __LZJM_BUILD__ = '2026-09-17 16:30';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -184,8 +184,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       injRecent: 8,    // 正文注入：会话在主线最近 N 楼内聊过 → 带
       injMention: 4,   // 正文注入：名字出现在主线最近 N 楼 → 带（哪怕聊得早）
       injMax: 3,       // 正文注入：一次最多带几个会话
-      injRounds: 20,   // 正文注入：每会话带最近几条（约 10 轮）
-      diaryFloors: 100 // 备忘录生成：chat_history 槽位带最近几楼聊天记录
+      injRounds: 20    // 正文注入：每会话带最近几条（约 10 轮）
     },
 
     settings: function () {
@@ -209,13 +208,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var out = {};
       var d = this.DEFAULTS, s = this.settings();
       for (var k in d) {
-        if (typeof d[k] === 'number') {
-          var v = Number(s[k]);
-          out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
-        } else {
-          // 字符串项（如 sumTag）：非空串原样放行，否则回默认
-          out[k] = (typeof s[k] === 'string' && s[k].trim()) ? s[k].trim() : d[k];
-        }
+        var v = Number(s[k]);
+        out[k] = (isFinite(v) && v > 0) ? Math.round(v) : d[k];
       }
       return out;
     },
@@ -823,7 +817,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20, diaryFloors: 100 };
+    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -1499,16 +1493,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     ].filter(function (s) { return s !== ''; }).join('\n');
 
     // 聊天记录不走自拼：ordered_prompts 里放标准 'chat_history' 槽位，由 generateRaw
-    // 按主生成同一管线装配（隐藏楼排除、IN_CHAT 深档注入按 depth 置顶、宏替换齐全），
-    // max_chat_history 控制带最近几楼（设置项 diaryFloors）。
+    // 按主生成同一管线装配（隐藏楼排除、IN_CHAT 深档注入按 depth 置顶、宏替换齐全）。
+    // 不设 max_chat_history：用户自己管压缩（novel-summarizer 隐藏旧楼+大文档注入），
+    // 可见楼本来就少；上限只会从最旧侧截断 summary 衔接带，宁可全量。
     return {
       ordered_prompts: [
         { role: 'system', content: p },
         'chat_history',
         { role: 'user', content: '（现在请严格按上方输出要求，输出一篇「' + contact.name + '」的备忘录。只输出标记行、正文与结束标记本身。）' }
       ],
-      should_silence: true,
-      max_chat_history: cfg().diaryFloors
+      should_silence: true
     };
     }
   };
@@ -4203,7 +4197,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   }
 
   // 设置屏：生成 API（跟随正文/只换模型/自定义+可存预设）+ 提示词携带量。全部即时保存。
-  var SET_NRANGES = { plotFloors: [1, 20], plotCap: [100, 2000], histPriv: [10, 100], histGroup: [10, 100], crossMax: [1, 6], crossLines: [5, 50], injRecent: [1, 30], injMention: [1, 20], injMax: [1, 6], injRounds: [10, 100], diaryFloors: [20, 200] };
+  var SET_NRANGES = { plotFloors: [1, 20], plotCap: [100, 2000], histPriv: [10, 100], histGroup: [10, 100], crossMax: [1, 6], crossLines: [5, 50], injRecent: [1, 30], injMention: [1, 20], injMax: [1, 6], injRounds: [10, 100] };
   function settingsHtml() {
     var W = window.LZJM;
     var cfg = W.Store.cfg();
@@ -4269,8 +4263,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
-    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字') +
-      numrow('diaryFloors', '日记带几楼聊天记录');
+    var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +
