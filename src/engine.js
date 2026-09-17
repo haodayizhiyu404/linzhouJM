@@ -670,6 +670,7 @@
           return d !== 0 ? d : (a.key < b.key ? -1 : (a.key > b.key ? 1 : 0));
         });
         var curDay = ''; try { curDay = W.Status.nowDay(); } catch (e0) {}
+        var stickerSeen = {};   // 注入级表情去重（跨会话块，见下方 forEach 内说明）
         for (var ci = 0; ci < cands.length && blocks.length < injCfg().injMax; ci++) {
           var hist = root.history(cands[ci].key);
           var meta = cands[ci].meta;
@@ -690,7 +691,15 @@
               lines.push('〔' + dayRelE(m.day, curDay) + (m.time ? ' ' + m.time : '') + '〕');
               prevDay = m.day;
             }
-            lines.push((m.who === 'user' ? myName : m.who) + '：' + W.Floor.msgToLine(m, myName).replace(/^[^：]*：/, ''));
+            var line = (m.who === 'user' ? myName : m.who) + '：' + W.Floor.msgToLine(m, myName).replace(/^[^：]*：/, '');
+            // 同一张表情在整份注入里只保留首次出现——反复出现的表情会被模型当成
+            // "高频好用素材"复读（如连续多轮发同一张），去重只影响注入展示、不动历史数据
+            var stk = line.match(/：\[表情:([^\]]+)\]$/);
+            if (stk) {
+              if (stickerSeen[stk[1]]) return;
+              stickerSeen[stk[1]] = true;
+            }
+            lines.push(line);
           });
           blocks.push((cands[ci].isGrp ? '「' + name + '」群聊（仅群成员知情）' : '「与' + name + '的私聊」（仅' + myName + '与' + name + '两人知情）') + when + '：\n' + lines.join('\n'));
         }
@@ -706,6 +715,7 @@
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
         var fullContent = '【手机近况 · 微信】以下是' + myName + '手机里的近期聊天记录，供你把握人物关系与近况，正文不必专门提及。\n'
           + '【保密规则】以下全部是' + myName + '的私人聊天记录：只有每条记录里实际发言的人知道该条内容，其他所有角色都不可能知道——不管身份多高、与内容多相关、当前是否在场。相关不等于知情。写作时请遵守：不得让非当事人角色说出、转述、暗示或以"恰好听说"等方式引用这些内容；旁白也不得把这些内容当作公开事实陈述；如果剧情确需用到某条信息，唯一的写法是让知情的当事人本人在场并亲口说出。\n'
+          + '【使用提示】角色发微信表情请节制：不必每轮都发，同一段对话中不要重复同一张表情；没有贴切的表情时用文字表达即可。\n'
           + blocks.join('\n');
         var injected = false;
         if (INJECT_POS === 'in_chat') {
