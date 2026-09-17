@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 21:04
+//  构建时间（本地）：2026-09-17 21:12
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 21:04';
+var __LZJM_BUILD__ = '2026-09-17 21:12';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4436,7 +4436,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-dwrite{width:100%;border:none;background:#22c05e;color:#fff;border-radius:8px;padding:10px 0;font-size:14px;cursor:pointer;font-family:inherit}',
     '.lzjm-dwrite:disabled{background:#a8ddb9}',
     // 阅读页：整页白纸、无卡片——日期/标题/正文同落一页，靠排版分层（iOS 备忘录式）
-    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px}',
+    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#faf8f2;padding:26px 22px 48px}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar{width:3px}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar-track{background:transparent}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
@@ -5274,7 +5274,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             }
             lines.push((m.who === 'user' ? myName : m.who) + '：' + W.Floor.msgToLine(m, myName).replace(/^[^：]*：/, ''));
           });
-          blocks.push('「' + name + '」' + (cands[ci].isGrp ? '（群聊，仅群成员知情）' : '（私聊，仅对话双方知情）') + when + '：\n' + lines.join('\n'));
+          blocks.push((cands[ci].isGrp ? '◆群聊舱 · ' + name + '（仅群成员知情）' : '◆私聊舱 · ' + myName + ' ↔ ' + name + '（除当事双方外无人知情）') + when + '：\n' + lines.join('\n'));
         }
         if (!blocks.length) {
           console.log('[霖州引擎] 注入诊断@' + now + '楼 | 无命中会话，不注入');
@@ -5286,7 +5286,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // 块头无nonce（调试nonce仅进console）。
         var INJECT_POS = 'in_chat';
         var nonce = Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
-        var fullContent = '【手机近况 · 微信】' + myName + '近期在手机上聊过天（仅作背景，正文不必专门提及。角色可自然引用自己参与过的聊天——私聊只限对话双方、群聊只限群成员知情；不得说出自己不在场的私聊内容）：\n' + blocks.join('\n');
+        var fullContent = '【手机近况 · 微信】' + myName + '近期在手机上聊过天，摘录如下。仅作背景氛围，正文不必专门提及。\n'
+          + '【铁律·信息隔离】以下每段记录都是独立密封舱：你的角色不在舱内，就绝无可能知道舱内任何内容——不得转述、不得暗示、不得"恰好提起"，哪怕舱内信息与其当前行程直接相关；唯一合法的披露方式，是舱内知情当事人本人在对话中亲口说出。\n'
+          + blocks.join('\n');
         var injected = false;
         if (INJECT_POS === 'in_chat') {
           try {
