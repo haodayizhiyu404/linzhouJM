@@ -23,16 +23,19 @@
     '.lzjm-cbtn.no{background:#f2f3f5;color:#333}',
     '.lzjm-cbtn.yes{background:#e64b4b;color:#fff}',
     // 干净细滚动条（多容器共用）：纯色细拇指、无轨道底色、无箭头。
-    // Firefox 走 scrollbar-color（设为非 auto 即不渲染箭头/轨道），Webkit 走伪元素。
-    '.lzjm-body,.lzjm-dlist,.lzjm-stickgrid,.lzjm-lpop-list{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
+    // Chromium 系只走 ::-webkit-scrollbar 伪元素。★切勿在这些容器上写 standard 属性
+    // （scrollbar-width/scrollbar-color）：Chromium 检测到后会放弃悬浮条、改画经典滚动条
+    // （两端按系统主题画三角按钮），且 standard 优先级压过伪元素、规则全部失效
+    // （2026-09 三角之谜的元凶；霖州往事 dist 恰无 standard 属性故始终干净）。
+    // Firefox 没有 webkit 伪元素，standard 属性全部收进下方 @supports 块，Chromium 永不执行。
     '.lzjm-body::-webkit-scrollbar,.lzjm-dlist::-webkit-scrollbar,.lzjm-stickgrid::-webkit-scrollbar,.lzjm-lpop-list::-webkit-scrollbar{width:4px}',
     '.lzjm-body::-webkit-scrollbar-track,.lzjm-dlist::-webkit-scrollbar-track,.lzjm-stickgrid::-webkit-scrollbar-track,.lzjm-lpop-list::-webkit-scrollbar-track{background:transparent}',
     '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
-    // 全域兜底：屏幕内任何可滚元素都强制细条+透明轨道（Firefox 细条渲染无箭头按钮；
-    // 各 app 如需隐藏滚动条，自身 scrollbar-width:none 规则在注入顺序上更靠后、仍可覆盖本行）
-    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}',
-    // 有头 Edge/Chrome 在经典（非悬浮）滚动条模式下会给自定义滚动条按系统主题画端部按钮
-    // （Windows 下即上下三角箭头）；显式置零隐藏，各端渲染路径差异一并堵死
+    // Firefox 专用兜底：仅不支持 ::-webkit-scrollbar 的浏览器（Firefox）进入本块——
+    // 屏幕内任何可滚元素强制细条+透明轨道；各 app 隐藏滚动条的 scrollbar-width:none
+    // 也在本块，注入顺序靠后仍可覆盖细条声明。Chromium/Safari 跳过本块走纯伪元素路径。
+    '@supports not selector(::-webkit-scrollbar){.lzjm-body,.lzjm-dlist,.lzjm-stickgrid,.lzjm-lpop-list,.lzjm-dread{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}.lzjm-ttolist,.lzjm-panel,.lzjm-callsubs,.lzjm-mfeed{scrollbar-width:none}}',
+    // 端部按钮保险栓：经典模式下按主题画出的三角按钮显式置零（悬浮/自定义路径本就不画）
     '#lzjm-phone ::-webkit-scrollbar-button{display:none;width:0;height:0}'
   ].join('\n');
 

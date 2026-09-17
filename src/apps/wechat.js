@@ -232,7 +232,7 @@
     '.lzjm-tto-line b{color:#57606a;font-weight:600}',
     '.lzjm-ttohd{font-size:12px;color:#8a8f99;padding:4px 2px 6px}',
     '.lzjm-panel.lzjm-pto{display:flex;flex-direction:column}',
-    '.lzjm-ttolist{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}',
+    '.lzjm-ttolist{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;-ms-overflow-style:none}',
     '.lzjm-ttolist::-webkit-scrollbar{display:none}',
     '.lzjm-ttofoot{flex:none;display:flex;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,.05)}',
     '.lzjm-locbox .cap{font-size:12.5px;font-weight:600;padding:7px 9px}',
@@ -271,7 +271,7 @@
     '.lzjm-stgstick{max-width:64px;border-radius:6px;display:block}',
     // [+] 面板（绝对定位：从输入条上方弹出，盖住聊天区，不引起内容重排）
     '.lzjm-panel{position:absolute;left:0;right:0;bottom:100%;z-index:4;background:#f7f7f9;border-top:1px solid rgba(0,0,0,.06);',
-    'padding:14px 14px 8px;display:none;max-height:236px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;box-shadow:0 -8px 20px rgba(0,0,0,.05)}',
+    'padding:14px 14px 8px;display:none;max-height:236px;overflow-y:auto;-ms-overflow-style:none;box-shadow:0 -8px 20px rgba(0,0,0,.05)}',
     '.lzjm-panel::-webkit-scrollbar{display:none}',
     '.lzjm-panel.lzjm-open{display:block}',
     '.lzjm-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px}',
@@ -312,7 +312,7 @@
     '.lzjm-callstatus{font-size:13px;color:#c9d1d9;min-height:18px}',
     // 字幕区：顶部占位条把短内容顶到底部；内容超高时占位条收缩为 0，可向上滚动翻记录。
     // 隐藏滚动条（带不带无所谓，藏了更干净）。
-    '.lzjm-callsubs{position:relative;z-index:1;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:6px 4px;scrollbar-width:none}',
+    '.lzjm-callsubs{position:relative;z-index:1;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:6px 4px}',
     '.lzjm-callsubs::-webkit-scrollbar{display:none}',
     '.lzjm-callsubs:before{content:"";flex:1;min-height:0}',
     // 仿玻璃气泡：char 靠左、user 靠右，内容靠左不居中。
@@ -410,7 +410,7 @@
     '.lzjm-cdetcall{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;font-size:14px;color:#111;cursor:pointer}',
     '.lzjm-cdetcall+.lzjm-cdetcall{border-left:1px solid rgba(0,0,0,.07)}',
     '.lzjm-cdetcall svg{width:20px;height:20px}',
-    '.lzjm-mfeed{flex:1;min-height:0;overflow-y:auto;background:#fff;padding-bottom:14px;scrollbar-width:none}',
+    '.lzjm-mfeed{flex:1;min-height:0;overflow-y:auto;background:#fff;padding-bottom:14px}',
     '.lzjm-mfeed::-webkit-scrollbar{display:none}',
     '.lzjm-mcover{height:248px;position:relative;background:linear-gradient(160deg,#6f8cba,#a9bedd 55%,#d2dfee);overflow:visible}',
     '.lzjm-mcover img{width:100%;height:100%;object-fit:cover;display:block}',

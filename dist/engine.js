@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 19:25
+//  构建时间（本地）：2026-09-17 20:50
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 19:25';
+var __LZJM_BUILD__ = '2026-09-17 20:50';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1940,16 +1940,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-cbtn.no{background:#f2f3f5;color:#333}',
     '.lzjm-cbtn.yes{background:#e64b4b;color:#fff}',
     // 干净细滚动条（多容器共用）：纯色细拇指、无轨道底色、无箭头。
-    // Firefox 走 scrollbar-color（设为非 auto 即不渲染箭头/轨道），Webkit 走伪元素。
-    '.lzjm-body,.lzjm-dlist,.lzjm-stickgrid,.lzjm-lpop-list{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
+    // Chromium 系只走 ::-webkit-scrollbar 伪元素。★切勿在这些容器上写 standard 属性
+    // （scrollbar-width/scrollbar-color）：Chromium 检测到后会放弃悬浮条、改画经典滚动条
+    // （两端按系统主题画三角按钮），且 standard 优先级压过伪元素、规则全部失效
+    // （2026-09 三角之谜的元凶；霖州往事 dist 恰无 standard 属性故始终干净）。
+    // Firefox 没有 webkit 伪元素，standard 属性全部收进下方 @supports 块，Chromium 永不执行。
     '.lzjm-body::-webkit-scrollbar,.lzjm-dlist::-webkit-scrollbar,.lzjm-stickgrid::-webkit-scrollbar,.lzjm-lpop-list::-webkit-scrollbar{width:4px}',
     '.lzjm-body::-webkit-scrollbar-track,.lzjm-dlist::-webkit-scrollbar-track,.lzjm-stickgrid::-webkit-scrollbar-track,.lzjm-lpop-list::-webkit-scrollbar-track{background:transparent}',
     '.lzjm-body::-webkit-scrollbar-thumb,.lzjm-dlist::-webkit-scrollbar-thumb,.lzjm-stickgrid::-webkit-scrollbar-thumb,.lzjm-lpop-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
-    // 全域兜底：屏幕内任何可滚元素都强制细条+透明轨道（Firefox 细条渲染无箭头按钮；
-    // 各 app 如需隐藏滚动条，自身 scrollbar-width:none 规则在注入顺序上更靠后、仍可覆盖本行）
-    '.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}',
-    // 有头 Edge/Chrome 在经典（非悬浮）滚动条模式下会给自定义滚动条按系统主题画端部按钮
-    // （Windows 下即上下三角箭头）；显式置零隐藏，各端渲染路径差异一并堵死
+    // Firefox 专用兜底：仅不支持 ::-webkit-scrollbar 的浏览器（Firefox）进入本块——
+    // 屏幕内任何可滚元素强制细条+透明轨道；各 app 隐藏滚动条的 scrollbar-width:none
+    // 也在本块，注入顺序靠后仍可覆盖细条声明。Chromium/Safari 跳过本块走纯伪元素路径。
+    '@supports not selector(::-webkit-scrollbar){.lzjm-body,.lzjm-dlist,.lzjm-stickgrid,.lzjm-lpop-list,.lzjm-dread{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}.lzjm-screen *{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent}.lzjm-ttolist,.lzjm-panel,.lzjm-callsubs,.lzjm-mfeed{scrollbar-width:none}}',
+    // 端部按钮保险栓：经典模式下按主题画出的三角按钮显式置零（悬浮/自定义路径本就不画）
     '#lzjm-phone ::-webkit-scrollbar-button{display:none;width:0;height:0}'
   ].join('\n');
 
@@ -2197,7 +2200,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-tto-line b{color:#57606a;font-weight:600}',
     '.lzjm-ttohd{font-size:12px;color:#8a8f99;padding:4px 2px 6px}',
     '.lzjm-panel.lzjm-pto{display:flex;flex-direction:column}',
-    '.lzjm-ttolist{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none}',
+    '.lzjm-ttolist{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;-ms-overflow-style:none}',
     '.lzjm-ttolist::-webkit-scrollbar{display:none}',
     '.lzjm-ttofoot{flex:none;display:flex;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,.05)}',
     '.lzjm-locbox .cap{font-size:12.5px;font-weight:600;padding:7px 9px}',
@@ -2236,7 +2239,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-stgstick{max-width:64px;border-radius:6px;display:block}',
     // [+] 面板（绝对定位：从输入条上方弹出，盖住聊天区，不引起内容重排）
     '.lzjm-panel{position:absolute;left:0;right:0;bottom:100%;z-index:4;background:#f7f7f9;border-top:1px solid rgba(0,0,0,.06);',
-    'padding:14px 14px 8px;display:none;max-height:236px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;box-shadow:0 -8px 20px rgba(0,0,0,.05)}',
+    'padding:14px 14px 8px;display:none;max-height:236px;overflow-y:auto;-ms-overflow-style:none;box-shadow:0 -8px 20px rgba(0,0,0,.05)}',
     '.lzjm-panel::-webkit-scrollbar{display:none}',
     '.lzjm-panel.lzjm-open{display:block}',
     '.lzjm-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px}',
@@ -2277,7 +2280,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-callstatus{font-size:13px;color:#c9d1d9;min-height:18px}',
     // 字幕区：顶部占位条把短内容顶到底部；内容超高时占位条收缩为 0，可向上滚动翻记录。
     // 隐藏滚动条（带不带无所谓，藏了更干净）。
-    '.lzjm-callsubs{position:relative;z-index:1;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:6px 4px;scrollbar-width:none}',
+    '.lzjm-callsubs{position:relative;z-index:1;flex:1;min-height:0;width:100%;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding:6px 4px}',
     '.lzjm-callsubs::-webkit-scrollbar{display:none}',
     '.lzjm-callsubs:before{content:"";flex:1;min-height:0}',
     // 仿玻璃气泡：char 靠左、user 靠右，内容靠左不居中。
@@ -2375,7 +2378,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-cdetcall{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;font-size:14px;color:#111;cursor:pointer}',
     '.lzjm-cdetcall+.lzjm-cdetcall{border-left:1px solid rgba(0,0,0,.07)}',
     '.lzjm-cdetcall svg{width:20px;height:20px}',
-    '.lzjm-mfeed{flex:1;min-height:0;overflow-y:auto;background:#fff;padding-bottom:14px;scrollbar-width:none}',
+    '.lzjm-mfeed{flex:1;min-height:0;overflow-y:auto;background:#fff;padding-bottom:14px}',
     '.lzjm-mfeed::-webkit-scrollbar{display:none}',
     '.lzjm-mcover{height:248px;position:relative;background:linear-gradient(160deg,#6f8cba,#a9bedd 55%,#d2dfee);overflow:visible}',
     '.lzjm-mcover img{width:100%;height:100%;object-fit:cover;display:block}',
@@ -4433,7 +4436,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-dwrite{width:100%;border:none;background:#22c05e;color:#fff;border-radius:8px;padding:10px 0;font-size:14px;cursor:pointer;font-family:inherit}',
     '.lzjm-dwrite:disabled{background:#a8ddb9}',
     // 阅读页：整页白纸、无卡片——日期/标题/正文同落一页，靠排版分层（iOS 备忘录式）
-    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px;scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}',
+    '.lzjm-dread{flex:1;min-height:0;overflow-y:auto;background:#fff;padding:26px 22px 48px}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar{width:3px}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar-track{background:transparent}',
     '.lzjm-screen .lzjm-dread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:2px}',
