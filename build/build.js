@@ -10,7 +10,9 @@ const ORDER = [
   'src/worldbook.js',
   'src/prompt.js',
   'src/floor.js',
+  'src/apps/uikit.js',
   'src/apps/wechat.js',
+  'src/apps/diary.js',
   'src/engine.js',
 ];
 

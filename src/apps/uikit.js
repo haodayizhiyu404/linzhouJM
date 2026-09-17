@@ -1,0 +1,33 @@
+// ═══════════════════════════════════════════════════════════
+//  apps/uikit.js —— 手机 UI 共享件：esc / 确认弹窗等通用 CSS / 跨应用图标
+//  任何 app 的屏幕都直接取用；新增 app 优先复用这里的东西而不是重造。
+//  注意：构建按序裸拼接，无模块系统，跨文件一律走 window.LZJM 命名空间。
+// ═══════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ── 通用 CSS（多 app 共用的弹窗/提示/按钮，先于各 app 样式注入） ──
+  var css = [
+    '.lzjm-sysrow{text-align:center;font-size:11.5px;color:#9aa0a8;margin:10px 0}',
+    // 确认弹窗（删除/重roll等）：遮罩 + 白卡，暗色场景由 .lzjm-callpop/.lzjm-calldel 覆写
+    '.lzjm-scrim{position:absolute;inset:0;background:rgba(0,0,0,.38);display:flex;align-items:center;justify-content:center;z-index:50}',
+    '.lzjm-confirm{background:#fff;border-radius:14px;padding:20px 20px 14px;width:216px;text-align:center;font-size:14px;color:#111;box-shadow:0 8px 30px rgba(0,0,0,.25)}',
+    '.lzjm-cbtns{display:flex;gap:8px;margin-top:13px}',
+    '.lzjm-cbtn{flex:1;border:none;border-radius:8px;padding:6px 0;font-size:14px;cursor:pointer}',
+    '.lzjm-cbtn.no{background:#f2f3f5;color:#333}',
+    '.lzjm-cbtn.yes{background:#e64b4b;color:#fff}'
+  ].join('\n');
+
+  // ── 跨应用图标（window 全局，各文件 IIFE 内直接按名引用） ──
+  window.ICON_REROLL = '<svg width="18" height="18" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 85.333333c102.869333 0 199.509333 36.693333 275.029333 100.437334l93.866667-94.037334a21.333333 21.333333 0 0 1 36.437333 15.061334V384a21.333333 21.333333 0 0 1-21.333333 21.333333h-276.693333a21.333333 21.333333 0 0 1-15.104-36.394666l122.325333-122.496a341.333333 341.333333 0 1 0 118.314667 341.632 42.666667 42.666667 0 1 1 83.2 18.901333A426.794667 426.794667 0 0 1 512 938.666667C276.352 938.666667 85.333333 747.648 85.333333 512S276.352 85.333333 512 85.333333z"/></svg>';
+  window.ICON_TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h16M9.8 6V4.9a1.4 1.4 0 0 1 1.4-1.4h1.6a1.4 1.4 0 0 1 1.4 1.4V6.5M6.8 6.5l.7 12a1.9 1.9 0 0 0 1.9 1.8h5.2a1.9 1.9 0 0 0 1.9-1.8l.7-12M10 10.5v6M14 10.5v6"/></svg>';
+
+  window.LZJM = window.LZJM || {};
+  window.LZJM.Uikit = { esc: esc, css: css };
+})();

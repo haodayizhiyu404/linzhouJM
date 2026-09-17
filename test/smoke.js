@@ -15,7 +15,8 @@ const ctx = {
   replaceVariables: (v) => { const snap = JSON.parse(JSON.stringify(v)); for (const k of Object.keys(__vars)) delete __vars[k]; Object.assign(__vars, snap); },
 };
 vm.createContext(ctx);
-for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/engine.js']) {
+// 装载顺序与 build/build.js 的 ORDER 一致（含 apps/ UI 层，供引擎侧调用 UI 的用例）
+for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const LW = ctx.window.LZJM;
@@ -746,6 +747,8 @@ ctx.getWorldbook = async () => [
   // ── UI 源码静态检查（回归保险丝）──
   console.log('[UI 源码]');
   const wsrc = fs.readFileSync(path.join(ROOT, 'src/apps/wechat.js'), 'utf8');
+  const usrc = fs.readFileSync(path.join(ROOT, 'src/apps/uikit.js'), 'utf8');
+  const dsrc = fs.readFileSync(path.join(ROOT, 'src/apps/diary.js'), 'utf8');
   eq('关闭app·有点击绑定', wsrc.includes('ph.querySelectorAll(\'[data-app="close"]\').forEach'), true);
   eq('关闭app·绑定未被误改成正则字面量（fdb0520 事故）', /^\s*\/\s*ph\\\./m.test(wsrc), false);
   eq('选线弹窗·按可视视口显式定位', wsrc.includes('function placeLinesPop') && wsrc.includes('visualViewport'), true);
@@ -766,11 +769,14 @@ ctx.getWorldbook = async () => [
   // 备忘录回归保险丝：主屏入口 / 生成判重与排除 / 重roll先删再写
   const psrc = fs.readFileSync(path.join(ROOT, 'src/prompt.js'), 'utf8');
   eq('备忘录·主屏入口', wsrc.includes('data-app="diary"') && wsrc.includes('ICON_MEMO'), true);
-  eq('备忘录·写一篇与选人绑定', wsrc.includes('[data-dwrite]') && wsrc.includes('[data-dnpc]'), true);
-  eq('备忘录·重roll先确认再删写', wsrc.includes('diaryReroll') && wsrc.includes('drerollok') && wsrc.indexOf('Engine.diaryDeleteAt(this.diaryNpc, idx)') === -1, true);
-  // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，wechat 不得有自动补写
+  eq('备忘录·写一篇与选人绑定', dsrc.includes('[data-dwrite]') && dsrc.includes('[data-dnpc]'), true);
+  eq('备忘录·重roll先确认再删写', dsrc.includes('reroll') && dsrc.includes('drerollok') && dsrc.indexOf('Engine.diaryDeleteAt(this.diaryNpc, idx)') === -1, true);
+  // 拆分保险丝：wechat 只留委托，不得残留备忘录屏幕与样式；esc 单一实现在 uikit
+  eq('备忘录·wechat仅委托', wsrc.includes('DiaryApp.render(this)') && wsrc.includes('DiaryApp.bind(ph, UI)') && wsrc.indexOf('lzjm-dread') === -1 && wsrc.indexOf('function esc') === -1, true);
+  eq('uikit·共享件在位', usrc.includes('lzjm-scrim') && usrc.includes('lzjm-cbtn') && usrc.includes('function esc') && usrc.includes('ICON_REROLL'), true);
+  // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，备忘录不得有自动补写
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
-  eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1, true);
+  eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1 && dsrc.indexOf('diaryEnsure') === -1, true);
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
