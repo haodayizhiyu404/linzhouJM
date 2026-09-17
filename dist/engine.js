@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 21:49
+//  构建时间（本地）：2026-09-17 21:55
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 21:49';
+var __LZJM_BUILD__ = '2026-09-17 21:55';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -935,6 +935,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   function histText(hist, n, withNames, curDay) {
     var out = [];
     var prevDay = null;
+    var stickerSeen = {};   // 同一张表情在展示记录里只留首次——高频出现的表情会被
+                            // 模型当成"好用素材"在生成时复读（只影响展示，不动历史数据）
     hist.slice(-n).forEach(function (m) {
       if (m.day && m.day !== prevDay) {
         out.push('[' + relDay(m.day, curDay) + (m.time ? ' ' + m.time : '') + ']');
@@ -942,6 +944,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       }
       var body = msgBody(m);
       if (m.recalled) body += '（此条已撤回）';
+      var stk = body.match(/^\[表情:([^\]]+)\]$/);
+      if (stk) {
+        if (stickerSeen[stk[1]]) return;
+        stickerSeen[stk[1]] = true;
+      }
       if (!withNames) { out.push(body); return; }
       var who = m.who === 'user' ? me() : m.who;
       out.push(who + '：' + body);
@@ -1063,6 +1070,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 只输出「' + contact.name + '」发来的新消息，1~5 条，按情绪与话题自然增减，必要时可超出（如情绪激动）',
         '- 每条独立成行，只写消息内容；不要前缀、时间戳、动作描写、括号心理',
         '- 每条不超过 35 字，像真人打字，不重复对方刚说过的话',
+        '- 表情按需使用，不是每轮必发；同一张表情绝不连续重复，发过一次的隔多轮再考虑复用',
         '- 「' + contact.name + '」的情感与态度必须符合上方「关系」所述阶段，遵循人设和关系进度双重约束，输出最符合的人物聊天反馈信息',
         typeSyntax(stickerNames),
         '- 直接输出消息本身，不要以「好的」「收到」这类寒暄开头'
@@ -1417,6 +1425,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 输出 3~8 条群消息，每条一行，格式严格为「成员名：消息」',
         '- 谁接得上这句谁说，不必人人开口；可以互相接梗、拆台',
         '- 每条不超过 35 字，口语',
+        '- 表情按需使用，不是每条消息必配；同一张表情绝不连续重复，发过一次的隔多轮再考虑复用',
         typeSyntax(stickerNames),
         '- 直接输出消息，不要以寒暄开头',
         // 群夹带私聊：成员借群里的话题顺势私聊机主的通道（引擎侧已配捕捉路由）。
