@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-09-17 21:55
+//  构建时间（本地）：2026-09-22 01:33
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-09-17 21:55';
+var __LZJM_BUILD__ = '2026-09-22 01:33';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1987,6 +1987,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
   function pdoc() { return window.parent.document; }
   function pwin() { return window.parent; }
+  // 合法会话键集合（联系人 + 群 + 朋友圈）：错名/机主名的历史残留 key 不算——
+  // 那些记录没有对应会话行，计进来会把桌面角标/微信 tab 红点顶成看不到消息的幽灵数字。
+  // 新量已由 capturePhoneText 白名单拦截，这里负责让存量残留不再冒头。
+  function validChatKeys(eng) {
+    var ok = {};
+    try {
+      var sec = eng.section() || {};
+      (sec.contacts || []).forEach(function (c) { if (c && c.name) ok[c.name] = 1; });
+      (sec.groups || []).forEach(function (g) { if (g && g.name) ok['group:' + g.name] = 1; });
+      ok[eng.momentsKey] = 1;
+    } catch (e) {}
+    return ok;
+  }
   // 主屏壁纸（浅色可爱系；换图只改这里）。必须定义在 CSS 数组之前——
   // 数组在脚本加载时立即求值，引用晚于它的变量会得到 undefined。
   // 壁纸主源 jsdelivr（随 linzhou-world 图床仓库），catbox 兜底：探针失败时把 CSS 变量切到原站重渲染
@@ -2904,8 +2917,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var totalUn = 0;
         try {
           // 桌面图标是 app 级角标：会话未读 + 朋友圈动态未读（朋友对机主动态的赞/评论）都上角标，
-          // 与发现 tab 红点是同一份计数（Store.meta(momentsKey).unread）
-          W.Store.historyKeys().forEach(function (k) { totalUn += W.Store.meta(k).unread || 0; });
+          // 与发现 tab 红点是同一份计数（Store.meta(momentsKey).unread）；只计合法会话键
+          var okKeys0 = validChatKeys(eng);
+          W.Store.historyKeys().forEach(function (k) { if (okKeys0[k]) totalUn += W.Store.meta(k).unread || 0; });
         } catch (e0) {}
         body =
           '<div class="lzjm-body"><div class="lzjm-home-wall">' +
@@ -2998,8 +3012,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // 底栏：微信 | 通讯录 | 发现（发现挂朋友圈未读红点；微信挂会话总红点）
         var totalUn2 = 0;
         try {
-          // 只算会话未读；朋友圈的未读挂发现 tab（mUn2），别混进微信 tab
-          W.Store.historyKeys().forEach(function (k) { if (k !== eng.momentsKey) totalUn2 += W.Store.meta(k).unread || 0; });
+          // 只算会话未读；朋友圈的未读挂发现 tab（mUn2），别混进微信 tab；只计合法会话键
+          var okKeys2 = validChatKeys(eng);
+          W.Store.historyKeys().forEach(function (k) { if (k !== eng.momentsKey && okKeys2[k]) totalUn2 += W.Store.meta(k).unread || 0; });
         } catch (e0) {}
         var mUn2 = 0;
         try { mUn2 = W.Store.meta(eng.momentsKey).unread || 0; } catch (e0) {}
@@ -5348,8 +5363,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     capturePhoneBlock: function (msg) {
       return this.capturePhoneText(String((msg && msg.message) || ''));
     },
-    // 从任意文本里抠 <!--phone--> 主动块并按人路由进私聊（带未读/近况元信息）。
+    // 从任意文本里抠 <!--phone--> 主动块并按人路由进会话（带未读/近况元信息）。
     // 正文末位捕捉与手机群聊生成夹带私聊，两条管道共用此函数。
+    // 收件人白名单 = 本线通讯录（联系人+群）：模型写错名字（不在通讯录、写成机主
+    // 本人）时整组丢弃——不入库、不冒红点。否则会留下没有会话行的幽灵红点，
+    // 只能手动删聊天变量。正文不受影响（注释块本就不渲染），剧情在正文里继续走。
     capturePhoneText: function (text) {
       var W = window.LZJM;
       var re = /<!--\s*phone\s*([\s\S]*?)-->/gi;
@@ -5363,19 +5381,33 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       parsed.forEach(function (p) { (byWho[p.who] = byWho[p.who] || []).push(p); });
       var names = Object.keys(byWho);
       var UI = W.Apps && W.Apps.wechat;
+      var sec0 = this.section() || {};
+      var owner = this.userName();
+      var contactSet = {}, groupSet = {};
+      (sec0.contacts || []).forEach(function (c) { if (c && c.name) contactSet[c.name] = 1; });
+      (sec0.groups || []).forEach(function (g) { if (g && g.name) groupSet[g.name] = 1; });
+      var routed = [];
       names.forEach(function (n) {
-        W.Store.push(n, byWho[n], 100);
+        // 私聊优先；群名走 group: 前缀键（与 generateFor 群聊是同一个会话）
+        var key = (contactSet[n] && n !== owner) ? n : (groupSet[n] ? 'group:' + n : null);
+        if (!key) {
+          console.warn('[霖州引擎] 主动消息丢弃：收件人「' + n + '」不在本线通讯录或为机主本人（' +
+            byWho[n].length + ' 条），保留在原块不进手机。');
+          return;
+        }
+        routed.push(n);
+        W.Store.push(key, byWho[n], 100);
         // 未读：正开着该对话框看 = 已读；否则累加红点（打开即清零，见 wechat.openChat）
-        var viewing = UI && UI.screen === 'chat' && UI.chatKey === n;
-        if (!viewing) W.Store.bumpUnread(n, byWho[n].length);
+        var viewing = UI && UI.screen === 'chat' && UI.chatKey === key;
+        if (!viewing) W.Store.bumpUnread(key, byWho[n].length);
         var arr = byWho[n];
         var last = arr[arr.length - 1];
         var headText = last.kind === 'text' ? last.text
           : last.kind === 'calllog' ? '[' + (last.mode === 'video' ? '视频通话' : '语音通话') + ']'
           : '[' + ({ sticker: '表情', voice: '语音', image: '图片', poke: '戳一戳', location: '定位', transfer: '转账', taccept: '转账', tdecline: '转账' }[last.kind] || '消息') + ']';
-        W.Store.setMeta(n, { headline: String(headText).slice(0, 40), atMainCount: Engine.mainCount() });
+        W.Store.setMeta(key, { headline: String(headText).slice(0, 40), atMainCount: Engine.mainCount() });
       });
-      return names;
+      return routed;
     },
     // 扫最近的 assistant 消息（默认 5 条，仅即时事件后调用），抓未处理键里的注释块。
     // 防重键 = 楼层id + swipe序号 + 块内容哈希：重 roll 同层新 swipe 会换新键正常

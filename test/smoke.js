@@ -205,7 +205,7 @@ ctx.getCharLorebooks = () => ({ primary: '测试书' });
 ctx.getWorldbook = async () => [
   { comment: '霖州蒋默::通讯录', enabled: true, content: JSON.stringify({
     'DLC·高中': {
-      contacts: [{ name: '周言', avatar: 'a.png' }, { name: '张裕民', avatar: 'z.png' }],
+      contacts: [{ name: '周言', avatar: 'a.png' }, { name: '张裕民', avatar: 'z.png' }, { name: '沈锡元', avatar: 's.png' }, { name: '许嘉文', avatar: 'x.png' }],
       groups: [{
         name: '霖附吃瓜二手交易市场', open: true, avatar: 'g.png',
         style: '节奏快', crowd: '超百人，多为陌生人',
@@ -224,6 +224,9 @@ ctx.getWorldbook = async () => [
 ];
 (async () => {
   const wb = await LW.Worldbook.load();
+  // 主动消息捕捉用例依赖世界线定位后的通讯录白名单；沙盒无 DOM，先架空 UI 再切线
+  LW.Apps.wechat.inject = function () {}; LW.Apps.wechat.render = function () {}; LW.Apps.wechat.remove = function () {};
+  LW.Engine.applyLine('DLC·高中', '测试归位');
   const g0 = (wb.rosters['DLC·高中'].groups || [])[0] || {};
   eq('群avatar透传', g0.avatar, 'g.png');
   eq('群style透传', g0.style, '节奏快');
@@ -623,6 +626,20 @@ ctx.getWorldbook = async () => [
   const sideNames = LW.Engine.capturePhoneText('陆飞：哈哈<!--phone\n许嘉文：我有，直接送你\n-->还有');
   eq('群夹带·路由到人', sideNames.indexOf('许嘉文') !== -1, true);
   eq('群夹带·写入私聊', LW.Store.history('许嘉文').some(function (m) { return m.text.indexOf('直接送你') !== -1; }), true);
+  // 错名防护：不在通讯录/写成机主本人的组整组丢弃——不入库、不冒红点（幽灵红点修复）
+  ctx.getVariables().user = '裴知意'; // userName() 的变量兜底，充当机主名
+  const dropNames = LW.Engine.capturePhoneText('<!--phone\n查无此人：在吗\n裴知意：谢谢款待\n许嘉文：东西到了\n-->');
+  eq('错名·未知联系人丢弃', dropNames.indexOf('查无此人') === -1, true);
+  eq('错名·机主本人丢弃', dropNames.indexOf('裴知意') === -1, true);
+  eq('错名·通讯录内不误伤', dropNames.indexOf('许嘉文') !== -1, true);
+  eq('错名·未知联系人不入库', LW.Store.history('查无此人').length, 0);
+  eq('错名·机主不入库', LW.Store.history('裴知意').length, 0);
+  eq('错名·机主不冒红点', LW.Store.meta('裴知意').unread || 0, 0);
+  // 群名行进群聊键（group: 前缀，与 generateFor 群聊同一会话），不再错建成私聊幽灵
+  LW.Engine.capturePhoneText('<!--phone\n霖附吃瓜二手交易市场：球赛定了\n-->');
+  eq('群名·路由进群键', LW.Store.history('group:霖附吃瓜二手交易市场').some(function (m) { return m.text.indexOf('球赛定了') !== -1; }), true);
+  eq('群名·不建私聊幽灵', LW.Store.history('霖附吃瓜二手交易市场').length, 0);
+  delete ctx.getVariables().user;
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');

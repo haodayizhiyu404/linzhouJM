@@ -10,6 +10,19 @@
 
   function pdoc() { return window.parent.document; }
   function pwin() { return window.parent; }
+  // 合法会话键集合（联系人 + 群 + 朋友圈）：错名/机主名的历史残留 key 不算——
+  // 那些记录没有对应会话行，计进来会把桌面角标/微信 tab 红点顶成看不到消息的幽灵数字。
+  // 新量已由 capturePhoneText 白名单拦截，这里负责让存量残留不再冒头。
+  function validChatKeys(eng) {
+    var ok = {};
+    try {
+      var sec = eng.section() || {};
+      (sec.contacts || []).forEach(function (c) { if (c && c.name) ok[c.name] = 1; });
+      (sec.groups || []).forEach(function (g) { if (g && g.name) ok['group:' + g.name] = 1; });
+      ok[eng.momentsKey] = 1;
+    } catch (e) {}
+    return ok;
+  }
   // 主屏壁纸（浅色可爱系；换图只改这里）。必须定义在 CSS 数组之前——
   // 数组在脚本加载时立即求值，引用晚于它的变量会得到 undefined。
   // 壁纸主源 jsdelivr（随 linzhou-world 图床仓库），catbox 兜底：探针失败时把 CSS 变量切到原站重渲染
@@ -927,8 +940,9 @@
         var totalUn = 0;
         try {
           // 桌面图标是 app 级角标：会话未读 + 朋友圈动态未读（朋友对机主动态的赞/评论）都上角标，
-          // 与发现 tab 红点是同一份计数（Store.meta(momentsKey).unread）
-          W.Store.historyKeys().forEach(function (k) { totalUn += W.Store.meta(k).unread || 0; });
+          // 与发现 tab 红点是同一份计数（Store.meta(momentsKey).unread）；只计合法会话键
+          var okKeys0 = validChatKeys(eng);
+          W.Store.historyKeys().forEach(function (k) { if (okKeys0[k]) totalUn += W.Store.meta(k).unread || 0; });
         } catch (e0) {}
         body =
           '<div class="lzjm-body"><div class="lzjm-home-wall">' +
@@ -1021,8 +1035,9 @@
         // 底栏：微信 | 通讯录 | 发现（发现挂朋友圈未读红点；微信挂会话总红点）
         var totalUn2 = 0;
         try {
-          // 只算会话未读；朋友圈的未读挂发现 tab（mUn2），别混进微信 tab
-          W.Store.historyKeys().forEach(function (k) { if (k !== eng.momentsKey) totalUn2 += W.Store.meta(k).unread || 0; });
+          // 只算会话未读；朋友圈的未读挂发现 tab（mUn2），别混进微信 tab；只计合法会话键
+          var okKeys2 = validChatKeys(eng);
+          W.Store.historyKeys().forEach(function (k) { if (k !== eng.momentsKey && okKeys2[k]) totalUn2 += W.Store.meta(k).unread || 0; });
         } catch (e0) {}
         var mUn2 = 0;
         try { mUn2 = W.Store.meta(eng.momentsKey).unread || 0; } catch (e0) {}
