@@ -712,6 +712,8 @@ ctx.getWorldbook = async () => [
   const dtxt4 = dreq4.ordered_prompts[2].content;
   eq('备忘录·关系锚定规则', dtxt4.indexOf('关系亲疏以聊天记录为准') !== -1, true);
   eq('备忘录·summary残片声明', dtxt4.indexOf('可作参考，不是任何人物说的话') !== -1, true);
+  eq('备忘录·抒情不是禁区', dtxt4.indexOf('抒情不是禁区') !== -1 && dtxt4.indexOf('禁止空洞抒情') === -1, true);
+  eq('备忘录·不要警句金句', dtxt4.indexOf('不要警句式金句') !== -1 && dtxt4.indexOf('不必事事靠侧写绕') !== -1, true);
   eq('备忘录·无实现元叙述', dtxt4.indexOf('插件注入') === -1 && dtxt4.indexOf('剧情长卷') === -1 && dtxt4.indexOf('历史存档') === -1, true);
   global.__msgs = [{ role: 'assistant', message: statusText }];
   // 清理：日记条目留在内存变量无碍，但顺手清掉免得影响后续下标类测试
