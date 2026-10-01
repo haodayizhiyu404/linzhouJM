@@ -214,7 +214,7 @@ ctx.getWorldbook = async () => [
     }
   }) },
   { comment: '周言', enabled: true, content: '周言的单人条目内容（短标题兜底）' },
-  { comment: 'NPC（DLC·高中-核心人员）', enabled: true, content: '[NPC·陆飞]\n性别: 男。\n身份: 篮球队（高中版）。\n\n[NPC·张裕民]\n性别: 男。\n身份: 班主任。' },
+  { comment: 'NPC（DLC·高中-核心人员）', enabled: true, content: '[NPC设定与时空演化规则]\n以下NPC基础档案均以故事起点（高中阶段/18岁）为初始基线。\n随着剧情推进与时间线跃迁（如大学、成人篇DLC），所有角色的年龄、社会身份、生活境遇与性格侧重均会随年岁自然演化与覆盖。若后续模块（如成人篇）给出了新的演化档案，一律以最新时间线档案为最高判定标准，基础档案仅作为“过往历史与少年底色”参考，严禁机械套用早期身份干扰当前剧情。\n\n[NPC·陆飞]\n性别: 男。\n身份: 篮球队（高中版）。\n\n[NPC·张裕民]\n性别: 男。\n身份: 班主任。' },
   { comment: 'NPC（DLC·大学）', enabled: true, content: '[NPC·陆飞]\n性别: 男。\n身份: 运动康复专业（大学版），与{{user}}同住一栋公寓。' },
   { comment: '主角人设（DLC·大学）', enabled: true, content: '[MAIN·周言·演化后]\n- 法学院学生，戴金丝边眼镜。\n\n[MAIN·{{user}}·演化后]\n- 新闻与传播学院学生，住校内宿舍。\n\n## III. 时代锚点事件\n- 第一次送别。\n\n# IV. 叙事指导\n- 这段不该进手机提示词。' },
   { comment: '世界设定杂项', enabled: true, content: '[NPC·外校生]\n性别: 女。\n身份: 来打友谊赛的。' },
@@ -241,6 +241,10 @@ ctx.getWorldbook = async () => [
   const rawNpcGz = (wb.npcLineRaw.filter(r => r.scope === 'DLC·高中-核心人员')[0] || { blocks: {} }).blocks;
   const rawNpcDx = (wb.npcLineRaw.filter(r => r.scope === 'DLC·大学')[0] || { blocks: {} }).blocks;
   eq('线NPC库raw·高中陆飞', (rawNpcGz['陆飞'] || '').indexOf('高中版') !== -1, true);
+  // 条目前缀说明块（[NPC设定与时空演化规则]）：块头无「·」不匹配 NPC 正则，不应误建档案键
+  eq('前缀块·不误建NPC键', ('NPC设定与时空演化规则' in rawNpcGz) === false && ('陆飞' in rawNpcGz) === true, true);
+  // 首个 [NPC·] 块之前的说明文字不归属任何档案体——不污染陆飞的档案
+  eq('前缀块·不污染首个档案', (rawNpcGz['陆飞'] || '').indexOf('初始基线') === -1 && (rawNpcGz['陆飞'] || '').indexOf('时空演化') === -1, true);
   eq('线NPC库raw·不串块', (rawNpcGz['陆飞'] || '').indexOf('班主任') === -1, true);
   eq('线NPC库raw·大学陆飞', (rawNpcDx['陆飞'] || '').indexOf('大学版') !== -1, true);
   eq('作用域条目不进全局池', wb.profiles['陆飞'], '');
