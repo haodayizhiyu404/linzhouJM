@@ -58,14 +58,14 @@
 
   // 跨会话上下文携带条数与个数：曾经写死，现由设置 app 可调（Store.cfg()）
   function crossLines() {
-    try { return window.LZJM.Store.cfg().crossLines; } catch (e) { return 18; }
+    try { return window.LZJM.Store.cfg().crossLines; } catch (e) { return 20; }
   }
   function crossMax() {
     try { return window.LZJM.Store.cfg().crossMax; } catch (e) { return 3; }
   }
   // 正文注入配置（含默认值兜底）
   function injCfg() {
-    var d = { injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
+    var d = { injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
     try {
       var c = window.LZJM.Store.cfg();
       for (var k in d) d[k] = c[k] || d[k];
@@ -600,7 +600,7 @@
     },
 
     // ── 正文生成前的手机动态注入：每个入选会话带最近 10 轮完整对话 ──
-    // 正文注入四参数（默认 8/4/3/20）已迁至 Store.DEFAULTS，设置 app「正文生成 · 手机注入」可调
+    // 正文注入四参数（默认 4/4/3/40）已迁至 Store.DEFAULTS，设置 app「正文生成 · 手机注入」可调
 
     injectDigest: function () {
       try {

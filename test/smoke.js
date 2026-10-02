@@ -728,7 +728,7 @@ ctx.getWorldbook = async () => [
   LW.Store.setSettings({ plotFloors: 3, histPriv: 20, crossMax: 2, crossLines: 9 });
   const c1 = LW.Store.cfg();
   eq('cfg·覆写生效', [c1.plotFloors, c1.histPriv, c1.crossMax, c1.crossLines], [3, 20, 2, 9]);
-  eq('cfg·未动项取默认', c1.plotCap, 900);
+  eq('cfg·未动项取默认', c1.plotCap, 1000);
   LW.Store.setSettings({ plotFloors: -5, histPriv: 'abc' });
   const c2 = LW.Store.cfg();
   eq('cfg·非法值回退默认', [c2.plotFloors, c2.histPriv], [8, 50]);
@@ -762,7 +762,7 @@ ctx.getWorldbook = async () => [
   LW.Store.setSettings({ api: { mode: 'custom', apiurl: 'https://g.dev', source: 'makersuite', cmodel: 'gemini-3.1' } });
   eq('api·自定义可换makersuite源', LW.Engine.apiConfig().source, 'makersuite');
   LW.Store.setSettings({ api: undefined });
-  eq('cfg·注入四键默认', [LW.Store.cfg().injRecent, LW.Store.cfg().injMention, LW.Store.cfg().injMax, LW.Store.cfg().injRounds], [8, 4, 3, 20]);
+  eq('cfg·注入四键默认', [LW.Store.cfg().injRecent, LW.Store.cfg().injMention, LW.Store.cfg().injMax, LW.Store.cfg().injRounds], [4, 4, 3, 40]);
   LW.Store.setSettings({ injRounds: 60 });
   eq('cfg·注入键可覆写', LW.Store.cfg().injRounds, 60);
   LW.Store.setSettings({ injRounds: undefined });

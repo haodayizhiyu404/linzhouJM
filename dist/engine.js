@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-01 23:29
+//  构建时间（本地）：2026-10-02 15:29
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-01 23:29';
+var __LZJM_BUILD__ = '2026-10-02 15:29';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -176,15 +176,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     //    cfg() = 设置项 + 默认值兜底，prompt.js / engine.js 共用。
     DEFAULTS: {
       plotFloors: 8,   // 手机提示词带几楼正文
-      plotCap: 900,    // 每楼正文上限字数
+      plotCap: 1000,   // 每楼正文上限字数
       histPriv: 50,    // 私聊带回几条
       histGroup: 50,   // 群聊带回几条
       crossMax: 3,     // 跨会话最多带几个（对方在的群 / 成员当天私聊）
-      crossLines: 18,  // 每个跨会话带几条
-      injRecent: 8,    // 正文注入：会话在主线最近 N 楼内聊过 → 带
+      crossLines: 20,  // 每个跨会话带几条
+      injRecent: 4,    // 正文注入：会话在主线最近 N 楼内聊过 → 带
       injMention: 4,   // 正文注入：名字出现在主线最近 N 楼 → 带（哪怕聊得早）
       injMax: 3,       // 正文注入：一次最多带几个会话
-      injRounds: 20    // 正文注入：每会话带最近几条（约 10 轮）
+      injRounds: 40    // 正文注入：每会话带最近几条（约 20 轮）
     },
 
     settings: function () {
@@ -817,7 +817,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   // 携带量配置：曾经写死的常量，现由设置 app 可调（Store.cfg()，默认值在 store.js）
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
-    return { plotFloors: 8, plotCap: 900, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 18, injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
+    return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -4664,14 +4664,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
   // 跨会话上下文携带条数与个数：曾经写死，现由设置 app 可调（Store.cfg()）
   function crossLines() {
-    try { return window.LZJM.Store.cfg().crossLines; } catch (e) { return 18; }
+    try { return window.LZJM.Store.cfg().crossLines; } catch (e) { return 20; }
   }
   function crossMax() {
     try { return window.LZJM.Store.cfg().crossMax; } catch (e) { return 3; }
   }
   // 正文注入配置（含默认值兜底）
   function injCfg() {
-    var d = { injRecent: 8, injMention: 4, injMax: 3, injRounds: 20 };
+    var d = { injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
     try {
       var c = window.LZJM.Store.cfg();
       for (var k in d) d[k] = c[k] || d[k];
@@ -5206,7 +5206,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     },
 
     // ── 正文生成前的手机动态注入：每个入选会话带最近 10 轮完整对话 ──
-    // 正文注入四参数（默认 8/4/3/20）已迁至 Store.DEFAULTS，设置 app「正文生成 · 手机注入」可调
+    // 正文注入四参数（默认 4/4/3/40）已迁至 Store.DEFAULTS，设置 app「正文生成 · 手机注入」可调
 
     injectDigest: function () {
       try {
