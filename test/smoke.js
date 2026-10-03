@@ -931,6 +931,14 @@ ctx.getWorldbook = async () => [
   const memTxt = memTurn.ordered_prompts[0].content;
   eq('通话轮·digest注入', memTxt.indexOf('提要测试内容') !== -1, true);
   eq('通话轮·基调落在输出要求前', memTxt.indexOf('【地下情人】') > memTxt.indexOf('## 输出要求') - 500 && memTxt.indexOf('【地下情人】') < memTxt.indexOf('## 输出要求'), true);
+  // 任务描述三分支：无 user 话且无记录 = 刚接通的开场；无 user 话有记录 = 重说；有 user 话 = 回应
+  const tOpen = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '', [], null, '', 'video', [], '', [], '');
+  eq('通话轮·开场任务描述', tOpen.ordered_prompts[1].content.indexOf('刚刚拨通了') !== -1 && tOpen.ordered_prompts[1].content.indexOf('开场') !== -1, true);
+  const tReroll = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '裴知意：喂', [], null, '', 'video', [], '', [], '');
+  eq('通话轮·重说任务描述', tReroll.ordered_prompts[1].content.indexOf('重新生成') !== -1, true);
+  const tReply = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '裴知意：喂', [], null, '', 'video', [], '嗯，在听', [], '');
+  eq('通话轮·回应任务描述', tReply.ordered_prompts[1].content.indexOf('说：「嗯，在听」') !== -1, true);
+  eq('通话轮·NSFW不重复', (function () { var s = memTxt; return s.indexOf('[亲密场合叙事风格指引]') === s.lastIndexOf('[亲密场合叙事风格指引]'); })(), true);
   eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('通话·边界标记仅拨号打一次', (wsrc.match(/—— 通话开始 ——/g) || []).length, 1); // 前移后接通处不得再打，否则响铃期界面错位复发
