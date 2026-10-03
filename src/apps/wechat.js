@@ -1137,7 +1137,9 @@
         var dLastCall = '';
         if (dSess.length) {
           var lsv = dSess[dSess.length - 1];
-          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.ongoing ? '通话中' : (lsv.dur || '已接通'));
+          // 列表永远不在通话中被看到（通话锁导航），无结束标记只意味着记录不全
+          // （刷新丢通话/老数据），标「已接通」不标「通话中」
+          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.dur || '已接通');
         }
         body = '<div class="lzjm-body">' +
           '<div class="lzjm-cdetcard">' + dav + '<div class="lzjm-cdetnm">' + esc(dn) + '</div></div>' +
@@ -1168,7 +1170,7 @@
             .map(function (x) {
               var when = (x.s.day ? relDay(x.s.day, hCurDay) : '') + (x.s.time ? ' ' + x.s.time : '');
               var meta = (mode === 'video' ? '视频通话' : '语音通话') + ' · ' +
-                (x.s.ongoing ? '通话中' : (x.s.dur || '已接通')) + ' · ' + x.s.count + '条';
+                (x.s.dur || '已接通') + ' · ' + x.s.count + '条';
               return '<div class="lzjm-chistrow" data-chv="' + x.idx + '">' +
                 '<span class="lzjm-chist-ico">' + (mode === 'video' ? ICON_VCALL : ICON_CALL) + '</span>' +
                 '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><i>' + esc(meta) + '</i></span>' +
@@ -1196,7 +1198,7 @@
             return '<div class="lzjm-chvbub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
           var vHead = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
-            (sv.ongoing ? ' · 通话中' : '') + (sv.day ? ' · ' + sv.day : '');
+            (sv.day ? ' · ' + sv.day : '');
           body = '<div class="lzjm-body"><div class="lzjm-chvhead">' + esc(vHead) + '</div>' +
             '<div class="lzjm-chvsubs">' + bub + '</div></div>';
         } else {

@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 16:11
+//  构建时间（本地）：2026-10-03 16:17
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 16:11';
+var __LZJM_BUILD__ = '2026-10-03 16:17';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -3114,7 +3114,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var dLastCall = '';
         if (dSess.length) {
           var lsv = dSess[dSess.length - 1];
-          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.ongoing ? '通话中' : (lsv.dur || '已接通'));
+          // 列表永远不在通话中被看到（通话锁导航），无结束标记只意味着记录不全
+          // （刷新丢通话/老数据），标「已接通」不标「通话中」
+          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.dur || '已接通');
         }
         body = '<div class="lzjm-body">' +
           '<div class="lzjm-cdetcard">' + dav + '<div class="lzjm-cdetnm">' + esc(dn) + '</div></div>' +
@@ -3145,7 +3147,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             .map(function (x) {
               var when = (x.s.day ? relDay(x.s.day, hCurDay) : '') + (x.s.time ? ' ' + x.s.time : '');
               var meta = (mode === 'video' ? '视频通话' : '语音通话') + ' · ' +
-                (x.s.ongoing ? '通话中' : (x.s.dur || '已接通')) + ' · ' + x.s.count + '条';
+                (x.s.dur || '已接通') + ' · ' + x.s.count + '条';
               return '<div class="lzjm-chistrow" data-chv="' + x.idx + '">' +
                 '<span class="lzjm-chist-ico">' + (mode === 'video' ? ICON_VCALL : ICON_CALL) + '</span>' +
                 '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><i>' + esc(meta) + '</i></span>' +
@@ -3173,7 +3175,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             return '<div class="lzjm-chvbub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
           var vHead = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
-            (sv.ongoing ? ' · 通话中' : '') + (sv.day ? ' · ' + sv.day : '');
+            (sv.day ? ' · ' + sv.day : '');
           body = '<div class="lzjm-body"><div class="lzjm-chvhead">' + esc(vHead) + '</div>' +
             '<div class="lzjm-chvsubs">' + bub + '</div></div>';
         } else {
