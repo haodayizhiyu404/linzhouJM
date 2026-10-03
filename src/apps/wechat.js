@@ -1340,10 +1340,14 @@
           if (t) UI.momentsSendComment(UI.mCmt, t);
         }
       });
-      // 通话字幕区：首次渲染滚到底（看最新），重渲染尽量保住原滚动位置
+      // 通话字幕区：有新内容到达（机主发送/对方回复/开场）自动滚到底——停在旧位置时
+      // 新回复在屏外，用户没注意到已经收到；无新内容（如仅计时刷新）保持原滚动位置
       if (this.call) {
         var cs = ph.querySelector('.lzjm-callsubs');
-        if (cs) cs.scrollTop = (prevSubs < 0) ? cs.scrollHeight : Math.min(prevSubs, cs.scrollHeight);
+        if (cs) {
+          if (this._callNew) { this._callNew = false; cs.scrollTop = cs.scrollHeight; }
+          else cs.scrollTop = (prevSubs < 0) ? cs.scrollHeight : Math.min(prevSubs, cs.scrollHeight);
+        }
       }
       // 通话：每秒刷时长；通话输入框回车即发
       if (this._ct) { clearInterval(this._ct); this._ct = null; }
@@ -2073,6 +2077,7 @@
         if (entries.length) W.Store.push(eng.callKey(name), entries, 200);
         this.call.phase = 'active';
         this.call.startAt = Date.now();
+        this._callNew = true; // 开场内容到达，滚到底
         this.render();
       } catch (e) {
         this.call = null; this.render();
@@ -2089,6 +2094,7 @@
       if (!lines.length) return;
       var key = eng.callKey(call.name);
       W.Store.push(key, lines.map(function (l) { return { who: 'user', kind: 'text', text: l }; }), 200);
+      this._callNew = true; // 机主的话上屏，滚到底
       call.busy = true;
       this.render();
       try {
@@ -2101,7 +2107,7 @@
       } catch (e) {
         try { toastr.error('对方信号不好，再试一次', '📱 霖州引擎'); } catch (e2) {}
       }
-      if (this.call === call) { call.busy = false; this.render(); }
+      if (this.call === call) { this._callNew = true; call.busy = false; this.render(); } // 对方回复上屏，滚到底
     },
 
     // 重说：弹掉对方最近一段台词，原地重生（带着机主最后一句的语境）。
@@ -2129,7 +2135,7 @@
       } catch (e) {
         try { toastr.error('重说失败，再试一次', '📱 霖州引擎'); } catch (e2) {}
       }
-      if (this.call === call) { call.busy = false; this.render(); }
+      if (this.call === call) { this._callNew = true; call.busy = false; this.render(); } // 重说结果上屏，滚到底
     },
 
     // 挂断：transcript 末尾写时长；私聊里由发起方留一条通话记录灰泡（微信真实样式：
