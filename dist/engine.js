@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 05:32
+//  构建时间（本地）：2026-10-04 05:36
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 05:32';
+var __LZJM_BUILD__ = '2026-10-04 05:36';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -7068,13 +7068,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           '.lzjm-open-pop{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;width:320px;max-height:74vh;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit;display:flex;flex-direction:column;overflow:hidden}',
           '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px;flex:none}',
           '.lzjm-open-x{cursor:pointer;opacity:.55;padding:0 4px}',
-          '.lzjm-open-list{flex:1;min-height:0;overflow-y:auto;padding-right:2px}',
-          '.lzjm-open-list::-webkit-scrollbar{width:4px}',
-          '.lzjm-open-list::-webkit-scrollbar-track{background:transparent}',
-          /* 拇指用新拟态同档灰（行内凹阴影 #d1d3d9 一系）——半透明黑在浅底上会泛硬黑边 */
-          '.lzjm-open-list::-webkit-scrollbar-thumb{background:#d3d5db;border-radius:2px}',
-          '.lzjm-open-list::-webkit-scrollbar-thumb:hover{background:#c2c4cb}',
-          '@supports not selector(::-webkit-scrollbar){.lzjm-open-list{scrollbar-width:thin;scrollbar-color:#d3d5db transparent}}',
+          /* 无滚动条移动样式：选项列表滑着选即可，不需要精读精度。Chromium 伪元素置零，
+             standard 收进 @supports 只给 Firefox（不写在 Chromium 上，避免经典条陷阱） */
+          '.lzjm-open-list{flex:1;min-height:0;overflow-y:auto;padding-right:2px;cursor:grab}',
+          '.lzjm-open-list::-webkit-scrollbar{width:0;height:0}',
+          '@supports not selector(::-webkit-scrollbar){.lzjm-open-list{scrollbar-width:none}}',
           '.lzjm-open-gh{font-size:11px;color:#8a8f98;margin:8px 2px 2px;letter-spacing:1px}',
           '.lzjm-open-row{display:flex;flex-direction:column;gap:3px;padding:8px 10px;margin:6px 0;border-radius:12px;background:#e9ebef;box-shadow:inset 3px 3px 7px #d1d3d9,inset -3px -3px 7px #ffffff}',
           '.lzjm-open-row b{font-size:13px}',
@@ -7124,6 +7122,25 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
       pop.querySelector('.lzjm-open-x').addEventListener('click', function () { pop.remove(); });
       doc.body.appendChild(pop);
+      // 桌面拖动手感（触屏原生滑动）：按住拖动滚内容，拖动距离>4px 视为拖拽并吃掉本次点击
+      try {
+        var listEl = pop.querySelector('.lzjm-open-list');
+        var dragDown = false, dragging = false, dragStartY = 0, dragStartScroll = 0;
+        listEl.addEventListener('mousedown', function (e) { dragDown = true; dragging = false; dragStartY = e.clientY; dragStartScroll = listEl.scrollTop; });
+        listEl.addEventListener('mousemove', function (e) {
+          if (!dragDown) return;
+          var dy = e.clientY - dragStartY;
+          if (!dragging && Math.abs(dy) > 4) { dragging = true; listEl.style.cursor = 'grabbing'; }
+          if (dragging) listEl.scrollTop = dragStartScroll - dy;
+        });
+        var endDrag = function () {
+          dragDown = false;
+          if (dragging) setTimeout(function () { dragging = false; listEl.style.cursor = 'grab'; }, 0);
+        };
+        listEl.addEventListener('mouseup', endDrag);
+        listEl.addEventListener('mouseleave', endDrag);
+        listEl.addEventListener('click', function (e) { if (dragging) { e.stopPropagation(); e.preventDefault(); } }, true);
+      } catch (e) {}
       // 小屏钳位：CSS 的 max-height:74vh 在极端窗口高度下仍会顶出屏幕——
       // 内容填完后按实际高度显式重算 top（永不小于 10px），宽度也不超过视口
       try {
