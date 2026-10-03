@@ -1911,29 +1911,62 @@
       window.LZJM.Apps.wechat.showLines();
     },
 
-    // ── 开场白 QR：0 楼=快速切换（借酒馆原生箭头），有楼=把开场白追加为新楼层 ──
-    // 适用场景：换线仪式感——比如大学篇玩够了，把成人篇开场白插一楼层，无缝续写。
+    // ── 开场白 QR ──
+    // 数据源：卡数据 first_mes + alternate_greetings（ST 无开场白名字字段）。显示名走两条路：
+    // ① 卡侧开场白选择页把配置表挂到 window.LZJM_OPENINGS（开场白-第一幕.html 里一行导出）——
+    //    时代分组/标题/IF 线标注全用它，单一事实源；② 读不到就退回"首行取前几字"的文本派生名。
+    // gamestart 占位页（first_mes）永不显示，但它在 swipe 循环里占下标 0，映射要按原始位置算。
+    // 楼层=0：切换=setChatMessages 直跳 swipe_id（缺该函数时退化为连点原生箭头）；插入禁用。
+    // 楼层>0：切换禁用；插入=createChatMessages 追加 char 楼层（永远末楼），配置里带线信息的
+    // 顺带翻世界书条目+记录线——"插入成人篇开场白"就是完整的换线跳跃。
     cardOpenings: function () {
       try {
         var st = window.parent.SillyTavern;
         var ctx = st && st.getContext && st.getContext();
         var ch = ctx && ctx.characters && ctx.characterId != null && ctx.characters[ctx.characterId];
         if (!ch) return [];
-        var out = [];
-        var mk = function (text, label) {
+        var raw = [];
+        var push = function (text, idx) {
           text = String(text || '').trim();
           if (!text) return;
-          // ST 的 alternate_greetings 没有名字字段——用首行前几字当名字，自描述
-          var nm = String(label || '').trim() || text.split('\n')[0].trim().slice(0, 14);
-          out.push({ name: nm, text: text });
+          raw.push({ swipeIdx: idx, text: text, gamestart: /gamestart/i.test(text.slice(0, 40)) });
         };
-        mk(ch.first_mes, ch.first_mes ? ((ch.name || '') + '·开场白') : '');
-        (ch.alternate_greetings || []).forEach(function (g, i) { mk(g, ''); });
-        return out;
+        push(ch.first_mes, 0);
+        (ch.alternate_greetings || []).forEach(function (g, i) { push(g, i + 1); });
+        return raw;
       } catch (e) { return []; }
     },
-    // 当前显示的开场白在列表里的下标（用 chat[0] 与候选前缀互配）
-    openingGreetingIndex: function () {
+    // 卡的配置桥：开场白选择页（regex 脚本，主窗口上下文）挂出 GS_CONFIG
+    openingConfig: function () {
+      try {
+        var cfg = window.parent.LZJM_OPENINGS;
+        if (cfg && Array.isArray(cfg.groups) && cfg.groups.length) return cfg;
+      } catch (e) {}
+      return null;
+    },
+    openingFloors: function () {
+      try { return getChatMessages('0-{{lastMessageId}}').length; } catch (e) { return 0; }
+    },
+    // 弹层列表装配：配置桥在时按时代分组给标题/IF 标注（page==swipeIdx，选择页 jump 公式推得）
+    openingItems: function () {
+      var raw = this.cardOpenings().filter(function (r) { return !r.gamestart; });
+      var cfg = this.openingConfig();
+      var byPage = {};
+      if (cfg) cfg.groups.forEach(function (g) {
+        (g.items || []).forEach(function (it) { byPage[it.page] = { line: g.line, label: g.label, title: it.title, ifName: it.ifName || '', open: it.open || [] }; });
+      });
+      return raw.map(function (r) {
+        var meta = byPage[r.swipeIdx] || {};
+        return {
+          swipeIdx: r.swipeIdx,
+          name: meta.title || r.text.split('\n')[0].trim().slice(0, 14),
+          line: meta.line || '', lineLabel: meta.label || '',
+          ifName: meta.ifName || '', open: meta.open || [],
+          preview: r.text.replace(/\n+/g, ' ').slice(0, 30)
+        };
+      });
+    },
+    openingGreetingIndex: function () { // 退化路径用：当前 0 楼显示的是原始列表里第几个
       try {
         var ctx = window.parent.SillyTavern.getContext();
         var cur = ctx.chat && ctx.chat[0] && String(ctx.chat[0].mes || '');
@@ -1945,47 +1978,73 @@
       } catch (e) {}
       return -1;
     },
-    openingSwipe: function (dir) { // 借酒馆原生箭头切开场白，不逆向它的内部状态
+    // 0 楼切换：优先 setChatMessages 直跳 swipe_id；缺函数/失败退化为连点原生箭头
+    openingJump: async function (swipeIdx) {
       try {
-        var btn = window.parent.document.querySelector('#chat ' + (dir > 0 ? '.swipe_right' : '.swipe_left'));
-        if (btn) btn.click();
+        if (typeof setChatMessages === 'function') {
+          await setChatMessages([{ message_id: 0, swipe_id: swipeIdx }], { refresh: 'all' });
+          return;
+        }
       } catch (e) {}
-    },
-    openingSelect: function (idx) { // 0 楼点选：从当前下标连点右箭头到目标
       var list = this.cardOpenings();
-      if (!list.length) return;
       var cur = this.openingGreetingIndex();
       if (cur < 0) cur = 0;
-      var steps = (idx - cur + list.length) % list.length;
-      for (var i = 0; i < steps; i++) this.openingSwipe(1);
+      var steps = (swipeIdx - cur + list.length) % list.length;
+      for (var i = 0; i < steps; i++) {
+        try {
+          var btn = window.parent.document.querySelector('#chat .swipe_right');
+          if (btn) btn.click();
+        } catch (e) {}
+      }
     },
-    // 有楼插入：普通 char 楼层追加到末尾（用户定：永远最后一楼），入列→渲染→落库
-    openingInsert: async function (idx) {
-      var self = this;
+    // 插入时的条目翻动：开=本项 open + 本线；关=其他所有开场白绑定的 open + 其他线
+    openingLineOps: function (item) {
+      var ops = [];
+      var items = [];
+      var cfg = this.openingConfig();
+      if (cfg) cfg.groups.forEach(function (g) { (g.items || []).forEach(function (it) { items.push(it); }); });
+      var want = {};
+      (item.open || []).forEach(function (k) { want[k] = 1; });
+      items.forEach(function (it) {
+        (it.open || []).forEach(function (k) { if (!want[k]) ops.push({ match: k, enable: false }); });
+      });
+      for (var k in want) ops.push({ match: k, enable: true });
+      return ops.concat(this.lineOps(item.line));
+    },
+    // 有楼插入：普通 char 楼层追加到末尾（永远末楼，用户定）；带线信息=换线插入（翻条目+记线）
+    openingInsert: async function (item) {
+      var W = window.LZJM, self = this;
       try {
-        var list = self.cardOpenings();
-        var o = list[idx];
-        if (!o) return;
-        var ST = (typeof SillyTavern !== 'undefined') ? SillyTavern : window.parent.SillyTavern;
-        var ctx = ST.getContext();
+        var raw = this.cardOpenings().filter(function (r) { return r.swipeIdx === item.swipeIdx; })[0];
+        if (!raw) return;
+        var st = window.parent.SillyTavern;
+        var ctx = st.getContext();
         var cn = ctx.name2 || (ctx.characters[ctx.characterId] || {}).name || '角色';
-        var text = o.text;
-        var mes = {
-          name: cn, is_user: false, is_system: false,
-          send_date: Date.now(), mes: text,
-          extra: { api: 'manual', model: 'lzjm-opening' },
-          swipes: [text], swipe_id: 0
-        };
-        ctx.chat.push(mes);           // 与酒馆原生发送同序：先入列再渲染
-        ST.addOneMessage(mes);
-        await ST.saveChat();
-        self.qrOpenings();            // 关掉弹层
-        try { toastr.success('已追加开场白楼层：' + o.name, '📱 霖州引擎'); } catch (e) {}
+        if (item.line) {
+          try {
+            await W.Worldbook.setEntriesEnabled(self.openingLineOps(item));
+            W.Store.setLine(item.line);
+            await self.refreshStates();
+            self.locateLine();
+          } catch (e0) { console.warn('[霖州引擎] 开场白换线翻条目失败（楼层照插）', e0); }
+        }
+        if (typeof createChatMessages === 'function') {
+          await createChatMessages([{ role: 'assistant', name: cn, message: raw.text, extra: { api: 'manual', model: 'lzjm-opening' } }], { insert_before: 'end', refresh: 'all' });
+        } else {
+          // 退化：与酒馆原生发送同序——先入列再渲染
+          var full = { name: cn, is_user: false, is_system: false, send_date: Date.now(), mes: raw.text, extra: { api: 'manual', model: 'lzjm-opening' }, swipes: [raw.text], swipe_id: 0 };
+          ctx.chat.push(full);
+          var ST2 = (typeof SillyTavern !== 'undefined') ? SillyTavern : st;
+          ST2.addOneMessage(full);
+          if (ST2.saveChat) await ST2.saveChat();
+        }
+        self.qrOpenings();
+        try { toastr.success('已追加开场白楼层：' + item.name + (item.lineLabel ? '（' + item.lineLabel + '）' : ''), '📱 霖州引擎'); } catch (e) {}
       } catch (e) {
         try { toastr.error('插入失败：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
       }
     },
-    // 弹层：父页 DOM，新拟态浅凸起风格；再点 QR 按钮/点空白/✕ 关闭
+    // 弹层：父页 DOM，新拟态浅凸起风；每行 [切换][插入] 按楼层互斥置灰；点空白/✕/再点 QR 关闭
     qrOpenings: function () {
       var self = this;
       var doc = window.parent.document;
@@ -1993,54 +2052,62 @@
         var old = doc.getElementById('lzjm-open-pop');
         if (old) { old.remove(); return; }
       } catch (e) {}
-      var list = self.cardOpenings();
-      if (!list.length) {
-        try { toastr.info('这张卡没有检测到开场白（first_mes / alternate_greetings 均为空）', '📱 霖州引擎'); } catch (e) {}
+      var items = self.openingItems();
+      if (!items.length) {
+        try { toastr.info('这张卡没有检测到可用开场白（first_mes / alternate_greetings 均为空）', '📱 霖州引擎'); } catch (e) {}
         return;
       }
-      var floors = 0;
-      try { floors = getChatMessages('0-{{lastMessageId}}').length; } catch (e) {}
+      var floors = self.openingFloors();
       if (!doc.getElementById('lzjm-open-style')) {
         var css = doc.createElement('style');
         css.id = 'lzjm-open-style';
         css.textContent = [
-          '.lzjm-open-pop{position:fixed;right:16px;bottom:64px;z-index:99999;width:282px;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
+          '.lzjm-open-pop{position:fixed;right:16px;bottom:64px;z-index:99999;width:290px;max-height:70vh;overflow-y:auto;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
           '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px}',
           '.lzjm-open-x{cursor:pointer;opacity:.55;padding:0 4px}',
-          '.lzjm-open-row{display:flex;flex-direction:column;gap:2px;padding:8px 10px;margin:6px 0;border-radius:12px;cursor:pointer;background:#e9ebef;box-shadow:inset 3px 3px 7px #d1d3d9,inset -3px -3px 7px #ffffff}',
-          '.lzjm-open-row:hover{box-shadow:inset 3px 3px 7px #c4c6cd,inset -3px -3px 7px #ffffff}',
+          '.lzjm-open-gh{font-size:11px;color:#8a8f98;margin:8px 2px 2px;letter-spacing:1px}',
+          '.lzjm-open-row{display:flex;flex-direction:column;gap:3px;padding:8px 10px;margin:6px 0;border-radius:12px;background:#e9ebef;box-shadow:inset 3px 3px 7px #d1d3d9,inset -3px -3px 7px #ffffff}',
           '.lzjm-open-row b{font-size:13px}',
           '.lzjm-open-row i{font-style:normal;font-size:11px;color:#8a8f98;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-          '.lzjm-open-tag{align-self:flex-end;font-size:10px;color:#1a73e8;letter-spacing:.5px}',
-          '.lzjm-open-nav{display:flex;gap:12px;justify-content:center;margin-top:8px}',
-          '.lzjm-open-nav button{width:70px;padding:6px 0;border:none;border-radius:10px;background:#e9ebef;box-shadow:4px 4px 8px #c9cbd1,-4px -4px 8px #ffffff;cursor:pointer;font-size:14px;color:#333}',
-          '.lzjm-open-nav button:active{box-shadow:inset 3px 3px 6px #c9cbd1,inset -3px -3px 6px #ffffff}'
+          '.lzjm-open-if{align-self:flex-start;font-size:10px;color:#7a5cff;background:rgba(122,92,255,.1);border-radius:6px;padding:1px 6px}',
+          '.lzjm-open-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:2px}',
+          '.lzjm-open-acts button{border:none;border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;background:#e9ebef;box-shadow:3px 3px 6px #c9cbd1,-3px -3px 6px #ffffff;color:#333}',
+          '.lzjm-open-acts button:disabled{opacity:.35;cursor:not-allowed;box-shadow:inset 2px 2px 4px #d1d3d9,inset -2px -2px 4px #ffffff}'
         ].join('\n');
         doc.head.appendChild(css);
       }
       var pop = doc.createElement('div');
       pop.id = 'lzjm-open-pop';
       pop.className = 'lzjm-open-pop';
-      var rows = list.map(function (o, i) {
-        return '<div class="lzjm-open-row" data-i="' + i + '"><b></b><i></i><span class="lzjm-open-tag">' + (floors === 0 ? '点击切换' : '点击插入') + '</span></div>';
-      }).join('');
-      // 名称与预览用 textContent 填（防注入），HTML 只搭骨架
-      pop.innerHTML = '<div class="lzjm-open-head"><span>开场白 · ' + (floors === 0 ? '0 楼：点选切换' : '插入为新楼层') + '</span><span class="lzjm-open-x">✕</span></div>' +
-        (floors === 0 ? '<div class="lzjm-open-nav"><button data-nav="-1">◀</button><button data-nav="1">▶</button></div>' : '') +
-        '<div class="lzjm-open-list">' + rows + '</div>';
+      var byGroup = [];
+      items.forEach(function (it) {
+        var g = it.lineLabel || '';
+        var last = byGroup[byGroup.length - 1];
+        if (!last || last.label !== g) { last = { label: g, items: [] }; byGroup.push(last); }
+        last.items.push(it);
+      });
+      var html = '<div class="lzjm-open-head"><span>开场白 · ' + (floors === 0 ? '0 楼：选中即切换' : '已开局：插入为新楼层') + '</span><span class="lzjm-open-x">✕</span></div>';
+      byGroup.forEach(function (g, gi) {
+        if (g.label) html += '<div class="lzjm-open-gh">' + g.label + '</div>';
+        g.items.forEach(function (it) { html += '<div class="lzjm-open-row" data-g="' + gi + '"><b></b><i></i>' + (it.ifName ? '<span class="lzjm-open-if"></span>' : '') + '<span class="lzjm-open-acts"><button data-act="jump">切换</button><button data-act="insert">插入</button></span></div>'; });
+      });
+      pop.innerHTML = html;
       var rowEls = pop.querySelectorAll('.lzjm-open-row');
-      list.forEach(function (o, i) {
-        rowEls[i].querySelector('b').textContent = o.name;
-        rowEls[i].querySelector('i').textContent = String(o.text).replace(/\n+/g, ' ').slice(0, 30);
-        rowEls[i].addEventListener('click', function () {
-          if (floors === 0) self.openingSelect(i);
-          else self.openingInsert(i);
-        });
+      var flat = [];
+      byGroup.forEach(function (g) { g.items.forEach(function (it) { flat.push(it); }); });
+      flat.forEach(function (it, i) {
+        var row = rowEls[i];
+        row.querySelector('b').textContent = it.name;
+        row.querySelector('i').textContent = it.preview;
+        if (it.ifName) row.querySelector('.lzjm-open-if').textContent = it.ifName;
+        var bJump = row.querySelector('[data-act="jump"]');
+        var bIns = row.querySelector('[data-act="insert"]');
+        bJump.disabled = floors !== 0;
+        bIns.disabled = floors === 0;
+        bJump.addEventListener('click', function (ev) { ev.stopPropagation(); self.openingJump(it.swipeIdx); });
+        bIns.addEventListener('click', function (ev) { ev.stopPropagation(); self.openingInsert(it); });
       });
       pop.querySelector('.lzjm-open-x').addEventListener('click', function () { pop.remove(); });
-      pop.querySelectorAll('[data-nav]').forEach(function (b) {
-        b.addEventListener('click', function () { self.openingSwipe(parseInt(b.dataset.nav, 10)); });
-      });
       doc.body.appendChild(pop);
       setTimeout(function () {
         try {
@@ -2053,6 +2120,7 @@
         } catch (e) {}
       }, 0);
     },
+
 
     // ── 启动 ──
     init: async function () {
