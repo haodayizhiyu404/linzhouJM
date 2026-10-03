@@ -378,6 +378,8 @@
     '.lzjm-scr-chv .lzjm-calltop{margin-top:8px}',
     '.lzjm-scr-chv .lzjm-appbar{background:transparent;position:relative;z-index:6}',
     '.lzjm-scr-chv .lzjm-appbar .lzjm-back,.lzjm-scr-chv .lzjm-appbar-t{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
+    '.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}', // ICON_BACK 的描边写死在 SVG 里，color 覆不到，必须改 path
+    '.lzjm-scr-chv .lzjm-appbar .lzjm-back{filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}',
     '.lzjm-chatrow .lzjm-ava{cursor:pointer}', // 聊天页点头像 → 对方名片
     /* ── 通话记录列表（callhist）亮色行 ── */
     '.lzjm-chistrow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f0f0f2;cursor:pointer}',

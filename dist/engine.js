@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 20:18
+//  构建时间（本地）：2026-10-03 21:04
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 20:18';
+var __LZJM_BUILD__ = '2026-10-03 21:04';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2368,6 +2368,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-scr-chv .lzjm-calltop{margin-top:8px}',
     '.lzjm-scr-chv .lzjm-appbar{background:transparent;position:relative;z-index:6}',
     '.lzjm-scr-chv .lzjm-appbar .lzjm-back,.lzjm-scr-chv .lzjm-appbar-t{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
+    '.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}', // ICON_BACK 的描边写死在 SVG 里，color 覆不到，必须改 path
+    '.lzjm-scr-chv .lzjm-appbar .lzjm-back{filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}',
     '.lzjm-chatrow .lzjm-ava{cursor:pointer}', // 聊天页点头像 → 对方名片
     /* ── 通话记录列表（callhist）亮色行 ── */
     '.lzjm-chistrow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f0f0f2;cursor:pointer}',
