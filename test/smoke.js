@@ -821,6 +821,7 @@ ctx.getWorldbook = async () => [
   eq('备忘录·重roll先确认再删写', dsrc.includes('reroll') && dsrc.includes('drerollok') && dsrc.indexOf('Engine.diaryDeleteAt(this.diaryNpc, idx)') === -1, true);
   // 拆分保险丝：wechat 只留委托，不得残留备忘录屏幕与样式；esc 单一实现在 uikit
   eq('备忘录·wechat仅委托', wsrc.includes('DiaryApp.render(this)') && wsrc.includes('DiaryApp.bind(ph, UI)') && wsrc.indexOf('lzjm-dread') === -1 && wsrc.indexOf('function esc') === -1, true);
+  eq('通话·最小化按钮', wsrc.includes("'callmin'") && wsrc.includes('lzjm-callmin') && wsrc.indexOf("a === 'callmin'") !== -1, true);
   eq('uikit·共享件在位', usrc.includes('lzjm-scrim') && usrc.includes('lzjm-cbtn') && usrc.includes('function esc') && usrc.includes('ICON_REROLL'), true);
   // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，备忘录不得有自动补写
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);

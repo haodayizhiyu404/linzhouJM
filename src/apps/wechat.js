@@ -353,6 +353,8 @@
     '.lzjm-callbtn i{width:54px;height:54px;font-size:22px}',
     '.lzjm-callbtn.hang i{width:54px;height:54px}',
     '.lzjm-callroll{position:absolute;top:10px;right:12px;z-index:5;color:#fff;opacity:.85;cursor:pointer;padding:4px;line-height:0}',
+    '.lzjm-callmin{position:absolute;top:10px;right:40px;z-index:5;width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:0}',
+    '.lzjm-callmin:hover{background:rgba(255,255,255,.3)}',
     // 说话弹窗 + 删除确认：灰黑半透明面板，贴合通话暗色场景；输入区聚焦保持暗色不刺眼
     '.lzjm-callta{width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;caret-color:#fff;padding:9px 11px;font-size:13.5px;line-height:1.55;resize:none;outline:none !important;margin-bottom:2px;font-family:inherit}',
     '.lzjm-callta::placeholder{color:rgba(255,255,255,.55) !important}', // 个别前端主题会给 placeholder 上奇色，强制柔和白
@@ -370,6 +372,7 @@
     '.lzjm-scr-video .lzjm-calltop{margin-top:22px}',
     '.lzjm-scr-video .lzjm-callava{display:none}',
     '.lzjm-scr-video .lzjm-callroll{right:auto;left:12px}', // 右上角让给 PiP
+    '.lzjm-scr-video .lzjm-callmin{right:auto;left:40px}',
     '.lzjm-callpip{position:absolute;top:48px;right:12px;width:62px;height:84px;border-radius:12px;background:rgba(16,20,24,.8);border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#aeb8c2;z-index:4;box-shadow:0 3px 12px rgba(0,0,0,.35);overflow:hidden}',
     '.lzjm-callpip img{width:100%;height:100%;object-fit:cover;display:block}',
     // 画面旁白：穿插在气泡流中间（说到哪演到哪），靠左淡字，与台词区分开
@@ -489,6 +492,7 @@
   var ICON_MIC = '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#1a1d21" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
   var ICON_HANG = '<svg width="26" height="26" viewBox="0 0 24 24"><path fill="#fff" d="M6.6 3.2c.5-.2 1.1 0 1.4.5l1.8 2.7c.3.5.2 1.1-.2 1.5L8 9.3a12.8 12.8 0 0 0 6.7 6.7l1.4-1.6c.4-.4 1-.5 1.5-.2l2.7 1.8c.5.3.7.9.5 1.4l-.7 2.1c-.2.6-.8 1-1.4.9C9.6 18.9 5.1 14.4 4.6 5.8c0-.6.4-1.2 1-1.4l1-.2z" transform="rotate(135 12 12)"/></svg>';
   var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_MIN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var ICON_WIFI = '<svg width="15" height="11" viewBox="0 0 16 12" fill="#111"><path d="M8 9.9a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM8 6.2c-1.8 0-3.4.7-4.6 1.9l1.5 1.5a4.5 4.5 0 016.2 0l1.5-1.5A6.5 6.5 0 008 6.2zM8 1.4C4.9 1.4 2.1 2.8.2 5l1.5 1.5A9.2 9.2 0 018 3.8c2.5 0 4.8 1 6.3 2.7L15.8 5A11.4 11.4 0 008 1.4z" transform="scale(0.95)"/></svg>';
   // 电池：iPhone 风格——小圆角细描边、电芯近满内腔、右侧圆帽（依用户参考图，深灰 #2c2c2c）
   var ICON_BATT = '<svg width="21" height="12" viewBox="0 0 26 15" fill="#2c2c2c"><rect x="1" y="1.5" width="20.5" height="12" rx="1.2" fill="none" stroke="#2c2c2c" stroke-width="1.2"/><rect x="2.9" y="3.5" width="12.6" height="8"/><rect x="22.3" y="5.4" width="2.2" height="4.2" rx="1.1"/></svg>';
@@ -1682,6 +1686,7 @@
           else if (a === 'hangup') UI.hangup(false);
           else if (a === 'cancelcall') UI.hangup(true);
           else if (a === 'callreroll') UI.callReroll();
+          else if (a === 'callmin') UI.toggle(); // 最小化手机外壳，通话状态保留
           else if (a === 'micpop') { UI.callPop = true; UI.render(); }
           else if (a === 'popok') {
             var ta = ph.querySelector('#lzjm-calltext');
@@ -2075,6 +2080,9 @@
     var roll = (call.phase === 'active' && !call.busy)
       ? '<span class="lzjm-callroll" data-cact="callreroll" title="重说对方上一段">' + ICON_REROLL + '</span>'
       : '';
+    // 最小化：收起手机外壳，通话状态原样保留（等 API 回复时可以翻主线/调设置）；
+    // 重新打开手机（QR 按钮）即回到本通话界面
+    var min = '<button class="lzjm-callmin" data-cact="callmin" title="收起手机，通话继续">' + ICON_MIN + '</button>';
     var btns;
     if (call.phase === 'ringing') {
       btns = '<div class="lzjm-callmid" style="justify-content:center"><button class="lzjm-callbtn hang" data-cact="cancelcall"><i>' + ICON_HANG + '</i><span>取消</span></button></div>';
@@ -2091,7 +2099,7 @@
       ? '<div class="lzjm-scrim"><div class="lzjm-confirm lzjm-callpop"><textarea class="lzjm-callta" id="lzjm-calltext" rows="4" maxlength="500" placeholder="想说什么…（可换行）"></textarea>' +
         '<div class="lzjm-cbtns"><button class="lzjm-cbtn no" data-cact="popcancel">取消</button><button class="lzjm-cbtn yes" data-cact="popok">发送</button></div></div></div>'
       : '';
-    return '<div class="lzjm-callbody">' + roll + pip +
+    return '<div class="lzjm-callbody">' + roll + min + pip +
       '<div class="lzjm-calltop"><div class="lzjm-callava">' + av + '</div>' +
       '<div class="lzjm-callname">' + esc(call.name) + '</div>' +
       '<div class="lzjm-callstatus" id="lzjm-callstatus">' + esc(status) + '</div></div>' +
