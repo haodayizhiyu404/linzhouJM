@@ -1521,11 +1521,12 @@
       var out = [];
       for (var si = 0; si < bounds.length; si++) {
         var seg = hist.slice(bounds[si][0], bounds[si][1]);
-        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true;
+        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
         seg.forEach(function (m) {
           if (m.who === 'sys') {
             var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
             if (dm) { dur = dm[1]; ongoing = false; }
+            else if (/通话中断/.test(String(m.text || ''))) { ongoing = false; interrupted = true; }
             return;
           }
           count++;
@@ -1533,9 +1534,33 @@
           if (!day && m.day) { day = m.day; time = m.time || ''; }
         });
         if (!count) continue;
-        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing });
+        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing, interrupted: interrupted });
       }
       return out;
+    },
+
+    // 孤儿通话收尾：通话中刷新页面，内存里的通话对象没了，详单留下有头无尾的残卷。
+    // 现实里网络中断也很正常——这里不伪造"还原通话"，只把残卷体面地闭合：
+    // 详单补「通话中断」标记（callSessions 据此置 interrupted），聊天记录补一条
+    // 灰泡（谁发起算谁），让聊天与回看都有迹可循；对话内容仍是已发生的事实，
+    // 照常进私聊"今日通话"记忆。每次初始化扫一遍，幂等（已闭合的段不再碰）。
+    closeOrphanCalls: function () {
+      var W = window.LZJM;
+      var sec = this.section();
+      if (!sec) return;
+      var self = this;
+      (sec.contacts || []).forEach(function (c) {
+        if (!c || !c.name) return;
+        var sess = self.callSessions(c.name);
+        for (var i = 0; i < sess.length; i++) {
+          if (!sess[i].ongoing) continue;
+          var key = self.callKey(c.name);
+          W.Store.push(key, [{ who: 'sys', kind: 'sys', text: '通话中断' }], 200);
+          var kindCn = sess[i].mode === 'video' ? '视频通话' : '语音通话';
+          W.Store.push(c.name, [{ who: 'user', kind: 'calllog', mode: sess[i].mode, text: '通话中断' }], 100);
+          try { W.Store.setMeta(c.name, { headline: kindCn + ' · 中断', atMainCount: self.mainCount() }); } catch (e) {}
+        }
+      });
     },
 
     // 拨打邀请：AI 决定接/拒
@@ -1738,6 +1763,8 @@
       await this.load();
 
       this.locateLine();
+      // 刷新丢在半路的通话：残卷补「通话中断」收尾（幂等，已闭合的段不碰）
+      try { this.closeOrphanCalls(); } catch (e) {}
       this.uninstallLegacyQr();
       this.injectQr();
       try { W.Floor.renderAll(); } catch (e) {}

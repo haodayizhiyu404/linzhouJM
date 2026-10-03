@@ -374,18 +374,17 @@
     // 重说/收起保持在右上：PiP 自视窗在 top:48px 起，与 top:10px 的按钮行不相撞
     '.lzjm-callpip{position:absolute;top:48px;right:12px;width:62px;height:84px;border-radius:12px;background:rgba(16,20,24,.8);border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#aeb8c2;z-index:4;box-shadow:0 3px 12px rgba(0,0,0,.35);overflow:hidden}',
     '.lzjm-callpip img{width:100%;height:100%;object-fit:cover;display:block}',
-    /* ── 通话记录回看（callhist 列表 + callview 只读 transcript，亮色屏） ── */
+    /* ── 通话回看详情（callview）：整屏复刻通话氛围（暗底/气泡/画面行与通话屏同款） ── */
+    '.lzjm-scr-chv .lzjm-calltop{margin-top:8px}',
+    '.lzjm-scr-chv .lzjm-appbar{background:transparent;position:relative;z-index:6}',
+    '.lzjm-scr-chv .lzjm-appbar .lzjm-back,.lzjm-scr-chv .lzjm-appbar-t{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
+    /* ── 通话记录列表（callhist）亮色行 ── */
     '.lzjm-chistrow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f0f0f2;cursor:pointer}',
     '.lzjm-chistrow:active{background:#f2f2f4}',
     '.lzjm-chist-ico{width:34px;height:34px;border-radius:9px;background:#f2f3f5;display:flex;align-items:center;justify-content:center;color:#555;flex:none}',
     '.lzjm-chist-main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}',
     '.lzjm-chist-main b{font-size:13.5px;color:#111;font-weight:500}',
     '.lzjm-chist-main i{font-size:11.5px;color:#9aa0a8;font-style:normal}',
-    '.lzjm-chvhead{padding:12px 14px;font-size:12px;color:#8a8f98;background:#fafafa;border-bottom:1px solid #eee;text-align:center;flex:none}',
-    '.lzjm-chvsubs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px 12px}',
-    '.lzjm-chvbub{max-width:80%;align-self:flex-start;font-size:13.5px;line-height:1.5;color:#111;padding:8px 12px;border-radius:12px;background:#fff;border:1px solid #ececf0;white-space:pre-wrap}',
-    '.lzjm-chvbub.me{align-self:flex-end;background:#95ec69;border-color:#8ade5f}',
-    '.lzjm-chvscene{align-self:center;max-width:88%;font-size:12px;color:#9aa0a8;font-style:italic;text-align:center;line-height:1.6;white-space:pre-wrap}',
     // 画面旁白：穿插在气泡流中间（说到哪演到哪），靠左淡字，与台词区分开
     '.lzjm-callscene{position:relative;z-index:1;align-self:flex-start;margin:2px 0 2px 4px;max-width:86%;font-size:12px;line-height:1.55;color:rgba(255,255,255,.66);text-align:left;text-shadow:0 1px 4px rgba(0,0,0,.65);padding:2px 0}',
     // ── 发现页底栏 + 朋友圈 ──
@@ -941,10 +940,18 @@
         ICON_WIFI +
         ICON_BATT + '</span></div>';
 
-      var callBg = '';
-      if (this.call) {
+      // 通话回看（callview）复刻通话屏氛围：视频段铺模糊头像底，暗色气泡同款
+      var cvSess = null;
+      if (!this.call && this.screen === 'callview') {
         try {
-          var cc = eng.findContact(this.call.name) || {};
+          var vs0 = eng.callSessions(this.histName);
+          cvSess = vs0[this.histIdx] || null;
+        } catch (e) {}
+      }
+      var callBg = '';
+      if (this.call || cvSess) {
+        try {
+          var cc = eng.findContact(this.call ? this.call.name : this.histName) || {};
           var cimg = cc.avatar ? esc(W.Worldbook.imgUrl(cc.avatar)) : '';
           callBg = (cimg ? '<img class="lzjm-callfeed" src="' + cimg + '">' : '') + '<div class="lzjm-callshade"></div>';
         } catch (e) { callBg = '<div class="lzjm-callshade"></div>'; }
@@ -1138,8 +1145,8 @@
         if (dSess.length) {
           var lsv = dSess[dSess.length - 1];
           // 列表永远不在通话中被看到（通话锁导航），无结束标记只意味着记录不全
-          // （刷新丢通话/老数据），标「已接通」不标「通话中」
-          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.dur || '已接通');
+          // （刷新丢通话/老数据）——已闭合的中断段标「中断」，其余标「已接通」
+          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.dur || (lsv.interrupted ? '中断' : '已接通'));
         }
         body = '<div class="lzjm-body">' +
           '<div class="lzjm-cdetcard">' + dav + '<div class="lzjm-cdetnm">' + esc(dn) + '</div></div>' +
@@ -1170,7 +1177,7 @@
             .map(function (x) {
               var when = (x.s.day ? relDay(x.s.day, hCurDay) : '') + (x.s.time ? ' ' + x.s.time : '');
               var meta = (mode === 'video' ? '视频通话' : '语音通话') + ' · ' +
-                (x.s.dur || '已接通') + ' · ' + x.s.count + '条';
+                (x.s.dur || (x.s.interrupted ? '中断' : '已接通')) + ' · ' + x.s.count + '条';
               return '<div class="lzjm-chistrow" data-chv="' + x.idx + '">' +
                 '<span class="lzjm-chist-ico">' + (mode === 'video' ? ICON_VCALL : ICON_CALL) + '</span>' +
                 '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><i>' + esc(meta) + '</i></span>' +
@@ -1185,7 +1192,7 @@
           '</div>';
 
       } else if (this.screen === 'callview') {
-        // 只读 transcript：与通话界面同款气泡排版（亮色版），不触发任何生成
+        // 只读 transcript：整屏复刻通话氛围（暗底/头像顶栏/气泡/画面行与通话屏同款），零生成零请求
         var vn = this.histName || '';
         var vSess = [];
         try { vSess = eng.callSessions(vn); } catch (e0) {}
@@ -1193,14 +1200,22 @@
         if (sv) {
           var seg = W.Store.history(eng.callKey(vn)).slice(sv.start, sv.end)
             .filter(function (m) { return m.who !== 'sys'; });
+          var vav = '';
+          try {
+            var vc = eng.findContact(vn) || {};
+            vav = vc.avatar ? '<img src="' + esc(W.Worldbook.imgUrl(vc.avatar)) + '">' : esc(vn.slice(0, 1));
+          } catch (e0) { vav = esc(vn.slice(0, 1)); }
+          var vStatus = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
+            (sv.interrupted ? ' · 中断' : '') + (sv.day ? ' · ' + sv.day : '') + (sv.time ? ' ' + sv.time : '');
           var bub = seg.map(function (m) {
-            if (m.kind === 'scene') return '<div class="lzjm-chvscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
-            return '<div class="lzjm-chvbub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
+            if (m.kind === 'scene') return '<div class="lzjm-callscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
+            return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
-          var vHead = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
-            (sv.day ? ' · ' + sv.day : '');
-          body = '<div class="lzjm-body"><div class="lzjm-chvhead">' + esc(vHead) + '</div>' +
-            '<div class="lzjm-chvsubs">' + bub + '</div></div>';
+          body = '<div class="lzjm-callbody">' +
+            '<div class="lzjm-calltop"><div class="lzjm-callava">' + vav + '</div>' +
+            '<div class="lzjm-callname">' + esc(vn) + '</div>' +
+            '<div class="lzjm-callstatus">' + esc(vStatus) + '</div></div>' +
+            '<div class="lzjm-callsubs">' + bub + '</div></div>';
         } else {
           body = '<div class="lzjm-body"><div class="lzjm-sysrow">记录不存在</div></div>';
         }
@@ -1267,7 +1282,7 @@
       ph.innerHTML =
         '<div class="lzjm-bezel"><span class="lzjm-btn-side lzjm-btn-vol1"></span><span class="lzjm-btn-side lzjm-btn-vol2"></span>' +
         '<span class="lzjm-btn-side lzjm-btn-act"></span><span class="lzjm-btn-side lzjm-btn-pow"></span>' +
-        '<div class="lzjm-screen' + (this.screen === 'home' ? ' lzjm-scr-home' : '') + ((this.screen === 'moments' || this.screen === 'mprofile') ? ' lzjm-scr-moments' : '') + (this.call ? ' lzjm-scr-call' : '') + (this.call && this.call.mode === 'video' ? ' lzjm-scr-video' : '') + '">' + callBg + sbar + appbarHtml(this.screen, disp, this.canReroll() ? 'reroll' : (this.canRetry() ? 'retry' : '')) + body + '<div class="lzjm-homebar"></div>' +
+        '<div class="lzjm-screen' + (this.screen === 'home' ? ' lzjm-scr-home' : '') + ((this.screen === 'moments' || this.screen === 'mprofile') ? ' lzjm-scr-moments' : '') + ((this.call || this.screen === 'callview') ? ' lzjm-scr-call' : '') + (((this.call && this.call.mode === 'video') || (cvSess && cvSess.mode === 'video')) ? ' lzjm-scr-video' : '') + (this.screen === 'callview' ? ' lzjm-scr-chv' : '') + '">' + callBg + sbar + appbarHtml(this.screen, disp, this.canReroll() ? 'reroll' : (this.canRetry() ? 'retry' : '')) + body + '<div class="lzjm-homebar"></div>' +
         (this.confirmDel >= 0 ? '<div class="lzjm-scrim"><div class="lzjm-confirm">删除这条消息？<div class="lzjm-cbtns"><button class="lzjm-cbtn no" data-cact="cancel">取消</button><button class="lzjm-cbtn yes" data-cact="del">删除</button></div></div></div>' : '') +
         (this.tConfirm >= 0 ? (function () {
           var tcm = null;

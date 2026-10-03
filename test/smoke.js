@@ -686,6 +686,19 @@ ctx.getWorldbook = async () => [
   eq('回看·语音段时长与条数', [xSess[1].mode, xSess[1].dur, xSess[1].count, xSess[1].ongoing], ['audio', '05:20', 6, false]);
   eq('回看·画面段判为视频', [xSess[2].mode, xSess[2].dur, xSess[2].count], ['video', '01:02', 2]);
   eq('回看·无记录返回空', LW.Engine.callSessions('查无此人').length, 0);
+  // 孤儿通话（通话中刷新页面）：closeOrphanCalls 补「通话中断」收尾——详单闭合、聊天补灰泡、幂等
+  const wk = LW.Engine.callKey('周言');
+  LW.Store.push(wk, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+  LW.Store.push(wk, [{ who: '周言', kind: 'text', text: '喂喂' }, { who: 'user', kind: 'text', text: '在听' }], 200);
+  const wOrphan = LW.Engine.callSessions('周言');
+  eq('孤儿·收尾前 ongoing', wOrphan[wOrphan.length - 1].ongoing, true);
+  LW.Engine.closeOrphanCalls();
+  const wClosed = LW.Engine.callSessions('周言');
+  const wLast = wClosed[wClosed.length - 1];
+  eq('孤儿·中断标记闭合', [wLast.ongoing, wLast.interrupted, wLast.dur], [false, true, '']);
+  eq('孤儿·聊天记录补灰泡', LW.Store.history('周言').some(function (m) { return m.kind === 'calllog' && m.text === '通话中断'; }), true);
+  LW.Engine.closeOrphanCalls();
+  eq('孤儿·幂等不重复补', LW.Store.history('周言').filter(function (m) { return m.kind === 'calllog' && m.text === '通话中断'; }).length, 1);
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');
@@ -840,6 +853,8 @@ ctx.getWorldbook = async () => [
   eq('备忘录·wechat仅委托', wsrc.includes('DiaryApp.render(this)') && wsrc.includes('DiaryApp.bind(ph, UI)') && wsrc.indexOf('lzjm-dread') === -1 && wsrc.indexOf('function esc') === -1, true);
   eq('通话·最小化按钮', wsrc.includes("'callmin'") && wsrc.includes('lzjm-callmin') && wsrc.indexOf("a === 'callmin'") !== -1, true);
   eq('通话·记录回看入口', wsrc.includes('data-chist') && wsrc.includes("screen === 'callhist'") && wsrc.includes("screen === 'callview'") && wsrc.indexOf('callSessions') !== -1, true);
+  eq('通话·回看复刻通话屏', wsrc.includes('lzjm-scr-chv') && wsrc.indexOf('callscene') !== -1 && wsrc.indexOf("m.kind === 'scene'") !== -1, true);
+  eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('uikit·共享件在位', usrc.includes('lzjm-scrim') && usrc.includes('lzjm-cbtn') && usrc.includes('function esc') && usrc.includes('ICON_REROLL'), true);
   // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，备忘录不得有自动补写
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
