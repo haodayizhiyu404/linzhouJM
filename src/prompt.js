@@ -216,10 +216,11 @@
     // tail = 本轮最新一批用户消息：不混在系统块里，作为最后的 user 轮单独给出
     // userInfo = 机主资料（persona 描述 + 当前线演化层），所有会话统一带上
     // crossGroups = 对方在的群当天记录尾巴（群→私聊跨会话上下文；对方在场，与防开天眼自洽）
-    // callLog = 当日通话尾巴 {kind, dur, lines}：两人今天还在通话里说过的话，双方都记得
+    // callMem = 近三天通话记忆 [{head, text, interrupted}]：正常挂断的带挂断时生成的纪要，
+    // 中断的带完整原文；双方对这些通话都有记忆，承接话题/承诺/玩笑必须一致
     // momentsNote = 近期朋友圈摘要（对方 3 天内发过的动态 + 机主互动痕迹，对方都记得）
     // myNote = 机主自己近 3 天的动态及互动（对方刷得到，可主动提起）
-    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callLog, momentsNote, myNote) {
+    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote) {
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
@@ -244,10 +245,9 @@
         digest ? '（更早的记录已折叠为提要，供接续话题与承诺用：' + digest + '）' : '',
         histText(hist, cfg().histPriv, true, snapshot && snapshot.dateText),
         '',
-        callLog
-          ? '## 今日通话（' + callLog.kind + ' · ' + callLog.dur + ' · 双方已说的话' + (callLog.video ? '与画面' : '') + '）\n' +
-            '（私聊之外，今天两人还在' + callLog.kind + '里说过这些——机主记得，「' + contact.name + '」也记得；承接其中话题、承诺、玩笑时必须一致）\n' +
-            callLog.lines.join('\n')
+        (callMem && callMem.length)
+          ? '## 近期通话（近三天内两人通过电话——机主记得，「' + contact.name + '」也记得；承接其中话题、承诺、玩笑时必须一致。正常通话附纪要，中断的附完整记录）\n' +
+            callMem.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
           : '',
         momentsNote
           ? '## 近期朋友圈（近3天，另附机主互动过的旧动态）\n（对方近几天发过的动态；机主点过赞/留过言的——哪怕是几天前的旧动态——对方一直记得，互动是刚发生的，可自然提起、调侃或耿耿于怀；没互动的也能成为话题）\n' + momentsNote
@@ -293,7 +293,9 @@
     // 接听 → 以 [接听] 开头，其后接接通后的开场（台词与画面交织）。
     // 视频通话的可见状态用 [画面] 行写，插在动作发生的对应位置（可穿插多行，不只开头）。
     // 呼叫页等待期间的一次生成。
-    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups) {
+    // callRefs = 通话记忆 [{head, text}]：聊天记录里出现的通话灰泡对应的通话段（纪要或原文），
+    // 双方都记得——重新拨号时对方接得上"刚才说到哪"
+    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -335,7 +337,12 @@
           : '',
         '',
         '## 聊天记录 · 与' + myName + '的微信对话（通话前的最近消息，供接续话题与语气）',
-        histText(hist || [], 20, true, snapshot && snapshot.dateText),
+        histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
+        '',
+        (callRefs && callRefs.length)
+          ? '## 通话记忆（聊天记录里提到的通话——机主记得，「' + contact.name + '」也记得；接听开场可自然承接其中的话题、约定与未了的事，尤其是刚中断的那通）\n' +
+            callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
+          : '',
         '',
         consistencyRules('「' + contact.name + '」'),
         '',
@@ -353,7 +360,8 @@
 
     // ── 通话轮：通话进行中，机主说了一句（或要求接续），生成对方台词 ──
     // transcript = 「名字：…/机主：…」台词行；userSays = 机主本轮说的话（可空）
-    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays) {
+    // callRefs = 通话记忆 [{head, text}]：私聊记录里出现的通话灰泡对应的通话段（纪要或原文）
+    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -396,7 +404,12 @@
           : '',
         '',
         '## 近期私聊记录（通话之外的消息，供接续话题）',
-        histText(hist || [], 10, true, snapshot && snapshot.dateText),
+        histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
+        '',
+        (callRefs && callRefs.length)
+          ? '## 通话记忆（聊天记录里提到的通话——双方都记得，可自然承接其中的话题与约定）\n' +
+            callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
+          : '',
         '',
         '## 通话记录（' + kind + ' · 双方已说的话' + (mode === 'video' ? '与画面' : '') + '）',
         transcript || '（刚接通）',

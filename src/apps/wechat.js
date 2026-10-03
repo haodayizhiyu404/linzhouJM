@@ -2141,6 +2141,8 @@
         W.Store.push(eng.callKey(call.name), [{ who: 'sys', kind: 'sys', text: '通话结束 · ' + dur }], 200);
         W.Store.push(call.name, [{ who: who, kind: 'calllog', mode: call.mode, text: '通话时长 ' + dur }], 100);
         try { W.Store.setMeta(call.name, { headline: kindCn2 + ' ' + dur, atMainCount: eng.mainCount() }); } catch (e) {}
+        // 静默生成通话纪要（不阻塞挂断；失败或未完成时，各注入处兜底带原文）
+        try { eng.summarizeCall(call.name); } catch (e) {}
       } else if (cancelled) {
         W.Store.push(call.name, [{ who: who, kind: 'calllog', mode: call.mode, text: '已取消' }], 100);
       }

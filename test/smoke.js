@@ -180,13 +180,12 @@ eq('私聊记录带对方名', spN.indexOf('周言：嗯') !== -1, true);
 eq('私聊记录带user名', spN.indexOf('陈默：早') !== -1, true);
 eq('跨天时间标·昨天', spN.indexOf('[昨天 22:00]') !== -1, true);
 eq('跨天时间标·今天', spN.indexOf('[今天 08:00]') !== -1, true);
-// 今日通话尾巴：同故事日的通话记录带进私聊提示词
+// 近期通话记忆：近三天通话（正常带挂断时生成的纪要，中断带完整原文）带进私聊提示词
 const reqCall = LW.Prompt.private({ name: '周言', profile: '' }, [], { dateText: '2034年8月26日 星期五' }, [], null, null, null, null,
-  { kind: '视频通话', dur: '03:24', video: true, lines: ['周言：你那边风好大', '（画面：把镜头对准了江面）', '陈默：看到了'] });
+  [{ head: '视频通话 · 03:24（昨天）', text: '两人谈到项目进度，约定周五交初稿。', interrupted: false }]);
 const spCall = reqCall.ordered_prompts[0].content;
-eq('今日通话段头', spCall.indexOf('## 今日通话（视频通话 · 03:24') !== -1, true);
-eq('通话对白进提示词', spCall.indexOf('你那边风好大') !== -1, true);
-eq('通话画面进提示词', spCall.indexOf('把镜头对准了江面') !== -1, true);
+eq('近期通话段头', spCall.indexOf('## 近期通话') !== -1, true);
+eq('通话记忆进提示词', spCall.indexOf('约定周五交初稿') !== -1, true);
 const greq2 = LW.Prompt.group({ name: '高三（2）班', open: false, style: '有班主任在，发言收敛' }, [{ name: '林溪', profile: '闺蜜' }], [], null);
 eq('群氛围字段', greq2.ordered_prompts[0].content.indexOf('有班主任在，发言收敛') !== -1, true);
 const greq3 = LW.Prompt.group({ name: '霖附吃瓜二手交易市场', open: true, crowd: '类型：校园公共群，超百人。\n风格：信息量大、节奏快。\n特殊规则：可同时存在多个话题，成员不一定会直接回应。' }, [], [], null);
@@ -362,7 +361,11 @@ ctx.getWorldbook = async () => [
   eq('通话·视频邀请画面约定', invVTxt.indexOf('[画面]') !== -1, true);
   eq('通话·视频邀请画面穿插', invVTxt.indexOf('穿插') !== -1, true);
   eq('通话·语音邀请无画面约定', invTxt.indexOf('[画面]') === -1, true);
-  eq('通话·邀请不带通话记录段', invTxt.indexOf('## 通话记录') === -1, true);
+  // 通话记忆跟随灰泡：记录里没有通话泡 → 不带；有 → 注入对应通话段（纪要或原文）
+  eq('通话·邀请无灰泡不带通话记忆', invTxt.indexOf('## 通话记忆') === -1, true);
+  const invR = LW.Prompt.callInvite({ name: '沈锡元', profile: '测试档案' }, invHist, { dateText: '2034年8月26日 星期五', npc: { relation: '竹马' } }, '机主资料', 'audio', [],
+    [{ head: '语音通话 · 02:10（今天）', text: '两人刚谈到一半的话题与约定。' }]);
+  eq('通话·邀请带灰泡对应的通话记忆', invR.ordered_prompts[0].content.indexOf('刚谈到一半的话题') !== -1, true);
   eq('通话·邀请带主线近况', invTxt.indexOf('## 主线近况') !== -1, true);
   eq('通话·邀请带最近私聊', invTxt.indexOf('晚安，睡了') !== -1, true);
   const turn = LW.Prompt.callTurn({ name: '沈锡元', profile: '测试档案' }, '沈锡元：喂\n裴知意：嗯', invHist, { dateText: '2034年8月26日 星期五' }, '机主资料', 'video', [], '你睡了吗');
@@ -646,6 +649,7 @@ ctx.getWorldbook = async () => [
   eq('群名·不建私聊幽灵', LW.Store.history('霖附吃瓜二手交易市场').length, 0);
   delete ctx.getVariables().user;
   // 通话会话边界（bug：新通话界面/API 请求混入旧详单）+ 重roll 弹净超长回复（旧 10 条上限泄漏旁白）
+  global.__msgs = [{ role: 'assistant', message: statusText }]; // 恢复状态栏供自动补日期（后面记忆测试按故事日断言）
   const ck = LW.Engine.callKey('沈锡元');
   LW.Store.push(ck, [{ who: '沈锡元', kind: 'text', text: '上一轮通话的旧台词' }], 200);
   LW.Store.push(ck, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
@@ -706,6 +710,25 @@ ctx.getWorldbook = async () => [
   LW.Store.push(zk, [{ who: 'sys', kind: 'sys', text: '通话结束 · 00:48' }], 200);
   const zSess = LW.Engine.callSessions('张裕民');
   eq('回看·标记落型优先于画面嗅探', [zSess.length, zSess[0].mode, zSess[0].dur], [1, 'video', '00:48']);
+  // 通话记忆注入：三天窗过滤 + 完成带纪要/中断带原文 + 灰泡匹配
+  const zkHist = LW.Store.history(zk);
+  LW.Store.patchAt(zk, zkHist.length - 1, { summary: '两人确认了周末球赛安排与集合时间。' });
+  const ym = LW.Engine.callMemory('周言', 3);
+  eq('记忆·中断通带完整原文', ym.length >= 1 && ym[ym.length - 1].interrupted === true && ym[ym.length - 1].text.indexOf('喂喂') !== -1, true);
+  const zm = LW.Engine.callMemory('张裕民', 3);
+  eq('记忆·完成通带纪要', zm.length === 1 && zm[0].text === '两人确认了周末球赛安排与集合时间。' && zm[0].head.indexOf('视频通话 · 00:48') !== -1, true);
+  // 窗口外不带：给许嘉文造一通 6 天前的完成通话（指定 day 不被自动补日期覆盖）
+  const xk2 = LW.Engine.callKey('许嘉文');
+  LW.Store.push(xk2, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——', mode: 'audio', day: '2034年8月20日 星期六', time: '20:00' }], 200);
+  LW.Store.push(xk2, [{ who: '许嘉文', kind: 'text', text: '上周的事', day: '2034年8月20日 星期六', time: '20:01' }], 200);
+  LW.Store.push(xk2, [{ who: 'sys', kind: 'sys', text: '通话结束 · 10:00', day: '2034年8月20日 星期六', time: '20:30' }], 200);
+  const xmNow = LW.Engine.callMemory('许嘉文', 3);
+  eq('记忆·窗口外通话不带', xmNow.length === 3 && xmNow.every(function (x) { return x.head.indexOf('今天') !== -1; }), true);
+  const wRefs = LW.Engine.sessionsForBubbles('周言', [{ who: 'user', kind: 'calllog', mode: 'audio', day: '2034年8月26日 星期五', text: '通话中断' }]);
+  eq('灰泡·匹配到中断通话段', wRefs.length === 1 && wRefs[0].interrupted === true, true);
+  eq('灰泡·无通话泡返回空', LW.Engine.sessionsForBubbles('周言', [{ who: 'user', kind: 'text', text: '普通消息' }]).length, 0);
+  LW.Engine.summarizeCall('许嘉文'); // 生成失败须静默兜底，不得抛
+  eq('纪要·生成失败静默', true, true);
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');

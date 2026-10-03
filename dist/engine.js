@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 19:40
+//  构建时间（本地）：2026-10-03 20:18
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 19:40';
+var __LZJM_BUILD__ = '2026-10-03 20:18';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1019,10 +1019,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // tail = 本轮最新一批用户消息：不混在系统块里，作为最后的 user 轮单独给出
     // userInfo = 机主资料（persona 描述 + 当前线演化层），所有会话统一带上
     // crossGroups = 对方在的群当天记录尾巴（群→私聊跨会话上下文；对方在场，与防开天眼自洽）
-    // callLog = 当日通话尾巴 {kind, dur, lines}：两人今天还在通话里说过的话，双方都记得
+    // callMem = 近三天通话记忆 [{head, text, interrupted}]：正常挂断的带挂断时生成的纪要，
+    // 中断的带完整原文；双方对这些通话都有记忆，承接话题/承诺/玩笑必须一致
     // momentsNote = 近期朋友圈摘要（对方 3 天内发过的动态 + 机主互动痕迹，对方都记得）
     // myNote = 机主自己近 3 天的动态及互动（对方刷得到，可主动提起）
-    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callLog, momentsNote, myNote) {
+    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote) {
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
@@ -1047,10 +1048,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         digest ? '（更早的记录已折叠为提要，供接续话题与承诺用：' + digest + '）' : '',
         histText(hist, cfg().histPriv, true, snapshot && snapshot.dateText),
         '',
-        callLog
-          ? '## 今日通话（' + callLog.kind + ' · ' + callLog.dur + ' · 双方已说的话' + (callLog.video ? '与画面' : '') + '）\n' +
-            '（私聊之外，今天两人还在' + callLog.kind + '里说过这些——机主记得，「' + contact.name + '」也记得；承接其中话题、承诺、玩笑时必须一致）\n' +
-            callLog.lines.join('\n')
+        (callMem && callMem.length)
+          ? '## 近期通话（近三天内两人通过电话——机主记得，「' + contact.name + '」也记得；承接其中话题、承诺、玩笑时必须一致。正常通话附纪要，中断的附完整记录）\n' +
+            callMem.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
           : '',
         momentsNote
           ? '## 近期朋友圈（近3天，另附机主互动过的旧动态）\n（对方近几天发过的动态；机主点过赞/留过言的——哪怕是几天前的旧动态——对方一直记得，互动是刚发生的，可自然提起、调侃或耿耿于怀；没互动的也能成为话题）\n' + momentsNote
@@ -1096,7 +1096,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 接听 → 以 [接听] 开头，其后接接通后的开场（台词与画面交织）。
     // 视频通话的可见状态用 [画面] 行写，插在动作发生的对应位置（可穿插多行，不只开头）。
     // 呼叫页等待期间的一次生成。
-    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups) {
+    // callRefs = 通话记忆 [{head, text}]：聊天记录里出现的通话灰泡对应的通话段（纪要或原文），
+    // 双方都记得——重新拨号时对方接得上"刚才说到哪"
+    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1138,7 +1140,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           : '',
         '',
         '## 聊天记录 · 与' + myName + '的微信对话（通话前的最近消息，供接续话题与语气）',
-        histText(hist || [], 20, true, snapshot && snapshot.dateText),
+        histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
+        '',
+        (callRefs && callRefs.length)
+          ? '## 通话记忆（聊天记录里提到的通话——机主记得，「' + contact.name + '」也记得；接听开场可自然承接其中的话题、约定与未了的事，尤其是刚中断的那通）\n' +
+            callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
+          : '',
         '',
         consistencyRules('「' + contact.name + '」'),
         '',
@@ -1156,7 +1163,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     // ── 通话轮：通话进行中，机主说了一句（或要求接续），生成对方台词 ──
     // transcript = 「名字：…/机主：…」台词行；userSays = 机主本轮说的话（可空）
-    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays) {
+    // callRefs = 通话记忆 [{head, text}]：私聊记录里出现的通话灰泡对应的通话段（纪要或原文）
+    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1199,7 +1207,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           : '',
         '',
         '## 近期私聊记录（通话之外的消息，供接续话题）',
-        histText(hist || [], 10, true, snapshot && snapshot.dateText),
+        histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
+        '',
+        (callRefs && callRefs.length)
+          ? '## 通话记忆（聊天记录里提到的通话——双方都记得，可自然承接其中的话题与约定）\n' +
+            callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
+          : '',
         '',
         '## 通话记录（' + kind + ' · 双方已说的话' + (mode === 'video' ? '与画面' : '') + '）',
         transcript || '（刚接通）',
@@ -4118,6 +4131,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         W.Store.push(eng.callKey(call.name), [{ who: 'sys', kind: 'sys', text: '通话结束 · ' + dur }], 200);
         W.Store.push(call.name, [{ who: who, kind: 'calllog', mode: call.mode, text: '通话时长 ' + dur }], 100);
         try { W.Store.setMeta(call.name, { headline: kindCn2 + ' ' + dur, atMainCount: eng.mainCount() }); } catch (e) {}
+        // 静默生成通话纪要（不阻塞挂断；失败或未完成时，各注入处兜底带原文）
+        try { eng.summarizeCall(call.name); } catch (e) {}
       } else if (cancelled) {
         W.Store.push(call.name, [{ who: who, kind: 'calllog', mode: call.mode, text: '已取消' }], 100);
       }
@@ -5299,24 +5314,25 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return generateRaw(req);
     },
     // ── 聊天压缩：某会话未折叠的条数超阈值时，把窗口外的旧消息折成提要 ──
-    // 提要留在 Store 里，手机提示词用它接续话题；正文注入用 headline 一行近况。
-    COMPRESS_AT: 60,      // 未折叠超过 60 条触发（窗口 50 + 10 条缓冲）
-    DIGEST_KEEP: 50,      // 提示词直接携带的最近条数
-
+    // 直带窗口跟设置走（histPriv = 提示词直带条数），触发点 = 直带 + 10 条缓冲（防抖动）。
+    // 提要只增不改：每轮折叠追加一段（；分隔），旧提要从不重写——配合单段 300 字上限与
+    // 总长软上限（_digestCap 从最近往早按段保留），宁可新段写细也不丢早期事实。
     compress: async function (chatKey) {
       var W = window.LZJM;
       var hist = W.Store.history(chatKey);
       var meta = W.Store.meta(chatKey);
       var digested = meta.digested || 0;
-      if (hist.length - digested <= this.COMPRESS_AT) return meta.digest || '';
-      var fold = hist.slice(digested, hist.length - this.DIGEST_KEEP);
-      if (!fold.length) return meta.digest || '';
+      var keep = 50;
+      try { keep = W.Store.cfg().histPriv || 50; } catch (e) {}
+      if (hist.length - digested <= keep + 10) return this._digestCap(meta.digest || '');
+      var fold = hist.slice(digested, hist.length - keep);
+      if (!fold.length) return this._digestCap(meta.digest || '');
       var lines = fold.map(function (m) {
         return W.Floor.msgToLine(m, this.userName());
       }, this);
       var raw = await this.gen({
         ordered_prompts: [
-          { role: 'system', content: '把以下微信聊天记录折叠成不超过150字的中文提要。保留：约定/计划、冲突与误会、关系进展、未了的情绪；丢弃：寒暄、重复内容。只输出提要本身。' },
+          { role: 'system', content: '把以下微信聊天记录折叠成中文提要（每段 300 字以内，以说清为准：宁可多保留事实，不可丢约定、误会与承诺）。保留：约定/计划、冲突与误会、关系进展、未了的情绪、重要事实变化；丢弃：寒暄、重复内容。只输出提要本身。' },
           { role: 'user', content: lines.join('\n') }
         ],
         should_silence: true,
@@ -5324,11 +5340,26 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       text = text.trim();
-      if (!text) return meta.digest || '';
+      if (!text) return this._digestCap(meta.digest || '');
       var digest = (meta.digest ? meta.digest + '；' : '') + text;
       W.Store.setMeta(chatKey, { digest: digest, digested: digested + fold.length });
       console.log('[霖州引擎] 聊天记录折叠：' + chatKey + ' 折叠 ' + fold.length + ' 条，累计提要 ' + (digested + fold.length) + ' 条');
-      return digest;
+      return this._digestCap(digest);
+    },
+
+    // 提要总长软上限：按段（；分隔）从最近往早保留，合计超 1200 字截掉最早的段。
+    // 只影响展示/注入，存储里的全文不动。
+    _digestCap: function (digest) {
+      var d = String(digest || '');
+      if (d.length <= 1200) return d;
+      var segs = d.split('；');
+      var out = '';
+      for (var i = segs.length - 1; i >= 0; i--) {
+        var cand = segs[i] + (out ? '；' + out : '');
+        if (cand.length > 1200) break;
+        out = cand;
+      }
+      return out || d.slice(-1200);
     },
 
     // ── 主线楼数（注入判定「多久前聊过」用） ──
@@ -5601,28 +5632,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var tail = [];
         for (var hi = hist.length - 1; hi >= 0 && hist[hi].who === 'user'; hi--) tail.unshift(hist[hi]);
         var rest = hist.slice(0, hist.length - tail.length);
-        // 今日通话尾巴：同一故事日内两人通话里的对白/画面也要带到私聊里（双方都记得）
-        var callLog = null;
-        try {
-          var callDay = snap && snap.dateText;
-          if (callDay) {
-            var chist = W.Store.history(this.callKey(c.name));
-            // 只取最近一次通话（「通话开始」边界之后）；一天两通电话时互不串味
-            var cday = chist.slice(this.callSessionStart(chist)).filter(function (m) { return m.day === callDay; });
-            if (cday.length) {
-              var dur = '';
-              for (var ci = cday.length - 1; ci >= 0; ci--) {
-                var dm = String(cday[ci].text || '').match(/^通话结束 · (.+)$/);
-                if (dm) { dur = dm[1]; break; }
-              }
-              var video = cday.some(function (m) { return m.kind === 'scene'; });
-              var lines = cday.filter(function (m) { return m.who !== 'sys'; })
-                .slice(-20)
-                .map(function (m) { return W.Floor.msgToLine(m, this.userName()); }, this);
-              if (lines.length) callLog = { kind: video ? '视频通话' : '语音通话', dur: dur || '未接通', video: video, lines: lines };
-            }
-          }
-        } catch (e) { callLog = null; }
+        // 近三天通话记忆：正常挂断的带纪要（挂断时静默生成），中断的带完整原文——
+        // 双方对这几天通过电话的内容都有记忆，承接话题/承诺/玩笑必须一致
+        var callMem = [];
+        try { callMem = this.callMemory(c.name, 3); } catch (e) { callMem = []; }
         // 近期朋友圈摘要（近 3 天对方发过的动态 + 机主互动过的旧动态；互动痕迹对方都记得，
         // 聊天时可自然提起；没互动的也能成为话题）
         var momentsNote = '';
@@ -5630,7 +5643,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var myNote = '';
         try { myNote = this.myMomentsNote(snap); } catch (e) { myNote = ''; }
         var req = W.Prompt.private({ name: c.name, profile: profile }, rest, snap, stickerNames, tail, digest, userInfo,
-          this.crossGroups(c.name, snap && snap.dateText), callLog, momentsNote, myNote);
+          this.crossGroups(c.name, snap && snap.dateText), callMem, momentsNote, myNote);
         raw = await this.gen(req);
         title = '与' + c.name + '的私聊';
       } else {
@@ -6261,11 +6274,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       for (var si = 0; si < bounds.length; si++) {
         var seg = hist.slice(bounds[si][0], bounds[si][1]);
         var mode = (bounds[si][2] >= 0 && hist[bounds[si][2]].mode) || '';
-        var dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
+        var dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false, summary = '';
         seg.forEach(function (m) {
           if (m.who === 'sys') {
             var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
-            if (dm) { dur = dm[1]; ongoing = false; }
+            if (dm) { dur = dm[1]; ongoing = false; summary = String(m.summary || ''); }
             else if (/通话中断/.test(String(m.text || ''))) { ongoing = false; interrupted = true; }
             return;
           }
@@ -6275,7 +6288,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         });
         if (!mode) mode = 'audio';
         if (!count) continue;
-        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing, interrupted: interrupted });
+        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing, interrupted: interrupted, summary: summary });
       }
       return out;
     },
@@ -6304,16 +6317,116 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
     },
 
+    // 通话纪要：正常挂断后静默调一次生成（不阻塞界面），纪要落在「通话结束」标记上。
+    // 之后私聊三天窗/通话邀请/每轮对已完成的通话只带纪要；生成失败或未完成则兜底带原文。
+    // 中断的通话不生成纪要——注入时按规则带完整原文。
+    summarizeCall: function (name) {
+      var W = window.LZJM, self = this;
+      try {
+        var sess = this.callSessions(name);
+        if (!sess.length) return;
+        var s = sess[sess.length - 1];
+        if (s.ongoing || s.interrupted || s.summary) return;  // 只补最近一通正常结束的
+        var key = this.callKey(name);
+        var seg = W.Store.history(key).slice(s.start, s.end).filter(function (m) { return m.who !== 'sys'; });
+        if (!seg.length) return;
+        var lines = seg.map(function (m) { return W.Floor.msgToLine(m, self.userName()); });
+        this.gen({
+          ordered_prompts: [
+            { role: 'system', content: '把以下通话记录整理成通话纪要（400 字以内，以说清为准）：本次通话的主题、谈到了什么、发生了什么、约定与承诺、未了的情绪和话题。中立第三人称记述（"两人谈到……"），不评价。只输出纪要本身。' },
+            { role: 'user', content: lines.join('\n') }
+          ],
+          should_silence: true,
+          max_chat_history: 0
+        }).then(function (raw) {
+          var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
+          text = text.trim();
+          if (!text) return;
+          var h = W.Store.history(key);
+          for (var i = s.end - 1; i >= s.start; i--) {
+            var t = String((h[i] && h[i].text) || '');
+            if (h[i] && h[i].who === 'sys' && /^通话结束/.test(t)) {
+              W.Store.patchAt(key, i, { summary: text });
+              console.log('[霖州引擎] 通话纪要已生成：' + name + '（' + text.length + ' 字）');
+              break;
+            }
+          }
+        }).catch(function () {});
+      } catch (e) {}
+    },
+
+    // 近 N 故事日内的通话记忆（私聊注入用）：已完成的带纪要（无纪要兜底原文），中断的带完整原文。
+    callMemory: function (name, days) {
+      var W = window.LZJM;
+      var cur = '';
+      try { cur = W.Status.snapshot(null).dateText; } catch (e) {}
+      var out = [];
+      var sess = this.callSessions(name);
+      for (var i = 0; i < sess.length; i++) {
+        var s = sess[i];
+        if (!s.day || !cur) continue;
+        var dd = dayDiffE(s.day, cur);
+        if (dd == null || dd < 0 || dd > days) continue;
+        out.push(this._memoryItem(name, s, dd));
+      }
+      return out;
+    },
+
+    // 单通记忆的注入形态：头部 = 类型·时长/中断·相对日期；正文 = 纪要优先、原文兜底
+    _memoryItem: function (name, s, dd) {
+      var W = window.LZJM;
+      var rel = dd == null ? '' : dd === 0 ? '今天' : dd === 1 ? '昨天' : dd + '天前';
+      var head = (s.mode === 'video' ? '视频通话' : '语音通话') + (s.dur ? ' · ' + s.dur : '') +
+        (s.interrupted ? ' · 中断' : '') + (rel ? '（' + rel + '）' : '');
+      var body = s.summary;
+      if (!body) {
+        var hist = W.Store.history(this.callKey(name));
+        body = hist.slice(s.start, s.end).filter(function (m) { return m.who !== 'sys'; })
+          .map(function (m) { return W.Floor.msgToLine(m, this.userName()); }, this).join('\n');
+      }
+      return { head: head, text: body, interrupted: !!s.interrupted };
+    },
+
+    // 通话灰泡 → 通话段匹配（通话邀请/每轮注入用）：携带的私聊记录里出现通话记录泡时，
+    // 按（故事日 + 类型）从近到远认领未被分配的一通。灰泡自带 day/mode 字段，零存储改动。
+    sessionsForBubbles: function (name, histSlice) {
+      var sess = this.callSessions(name);
+      var claimed = {};
+      var out = [];
+      (histSlice || []).forEach(function (m) {
+        if (!m || m.kind !== 'calllog') return;
+        for (var i = sess.length - 1; i >= 0; i--) {
+          if (claimed[i]) continue;
+          if (sess[i].day !== m.day) continue;
+          if (m.mode && sess[i].mode !== m.mode) continue;
+          claimed[i] = 1;
+          out.push(sess[i]);
+          break;
+        }
+      });
+      return out;
+    },
+
     // 拨打邀请：AI 决定接/拒
     callInvite: async function (name, mode) {
       var W = window.LZJM;
+      var self = this;
       var c = this.findContact(name);
       if (!c) throw new Error('联系人不在本线通讯录：' + name);
       var profile = this.profileFor(name);
       var snap = W.Status.snapshot(name);
       var userInfo = this.userBlock();
-      var req = W.Prompt.callInvite({ name: c.name, profile: profile }, W.Store.history(name).slice(-30), snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText));
+      // 私聊记录条数跟设置走（histPriv）；记录里出现的通话灰泡 → 对应通话段（纪要或原文）一并带上
+      var sliceN = 50;
+      try { sliceN = W.Store.cfg().histPriv || 50; } catch (e) {}
+      var priv = W.Store.history(name).slice(-sliceN);
+      var cur0 = snap && snap.dateText;
+      var refs = this.sessionsForBubbles(c.name, priv).map(function (s) {
+        var dd = (s.day && cur0) ? dayDiffE(s.day, cur0) : null;
+        return self._memoryItem(c.name, s, dd);
+      });
+      var req = W.Prompt.callInvite({ name: c.name, profile: profile }, priv, snap, userInfo, mode,
+        this.crossGroups(c.name, snap && snap.dateText), refs);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       return text.trim();
@@ -6347,6 +6460,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     callTurn: async function (name, mode, userSays) {
       var W = window.LZJM;
+      var self = this;
       var c = this.findContact(name);
       if (!c) throw new Error('联系人不在本线通讯录：' + name);
       var profile = this.profileFor(name);
@@ -6365,8 +6479,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 避免同一句在提示词里出现两次（userSays 为空 = 重说轮，机主的话是上下文，必须保留）
       if (userSays) while (tail.length && tail[tail.length - 1].who === 'user') tail.pop();
       var lines = tail.map(function (m2) { return W.Floor.msgToLine(m2, this.userName()); }, this);
-      var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), W.Store.history(name).slice(-20), snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), userSays || '');
+      // 私聊记录条数跟设置走（histPriv）；其中的通话灰泡 → 对应通话段（纪要或原文）一并带上
+      var sliceN2 = 50;
+      try { sliceN2 = W.Store.cfg().histPriv || 50; } catch (e) {}
+      var priv2 = W.Store.history(name).slice(-sliceN2);
+      var cur2 = snap && snap.dateText;
+      var refs2 = this.sessionsForBubbles(c.name, priv2).map(function (s) {
+        var dd = (s.day && cur2) ? dayDiffE(s.day, cur2) : null;
+        return self._memoryItem(c.name, s, dd);
+      });
+      var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), priv2, snap, userInfo, mode,
+        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       // 剥注释块防污染（极端情况：AI 在通话里输出主动块）
