@@ -854,6 +854,7 @@ ctx.getWorldbook = async () => [
   eq('通话·最小化按钮', wsrc.includes("'callmin'") && wsrc.includes('lzjm-callmin') && wsrc.indexOf("a === 'callmin'") !== -1, true);
   eq('通话·记录回看入口', wsrc.includes('data-chist') && wsrc.includes("screen === 'callhist'") && wsrc.includes("screen === 'callview'") && wsrc.indexOf('callSessions') !== -1, true);
   eq('通话·回看复刻通话屏', wsrc.includes('lzjm-scr-chv') && wsrc.indexOf('callscene') !== -1 && wsrc.indexOf("m.kind === 'scene'") !== -1, true);
+  eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('uikit·共享件在位', usrc.includes('lzjm-scrim') && usrc.includes('lzjm-cbtn') && usrc.includes('function esc') && usrc.includes('ICON_REROLL'), true);
   // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，备忘录不得有自动补写

@@ -376,8 +376,10 @@
     '.lzjm-callpip img{width:100%;height:100%;object-fit:cover;display:block}',
     /* ── 通话回看详情（callview）：整屏复刻通话氛围（暗底/气泡/画面行与通话屏同款） ── */
     '.lzjm-scr-chv .lzjm-calltop{margin-top:8px}',
+    '.lzjm-scr-chv .lzjm-callava{display:flex}', // 回看不受通话屏"视频藏头像"规则限制，头像即身份
     '.lzjm-scr-chv .lzjm-appbar{background:transparent;position:relative;z-index:6}',
     '.lzjm-scr-chv .lzjm-appbar .lzjm-back,.lzjm-scr-chv .lzjm-appbar-t{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
+    '.lzjm-chatrow .lzjm-ava{cursor:pointer}', // 聊天页点头像 → 对方名片
     /* ── 通话记录列表（callhist）亮色行 ── */
     '.lzjm-chistrow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f0f0f2;cursor:pointer}',
     '.lzjm-chistrow:active{background:#f2f2f4}',
@@ -585,9 +587,10 @@
         : '<div class="lzjm-ava lzjm-ava-me">' + esc(who.slice(0, 1)) + '</div>';
     } else {
       var c = contactMap && contactMap[m.who];
+      // 头像带点名片入口（data-cdet 的点击绑定与通讯录行共用一套）
       avatar = (c && c.avatar)
-        ? '<img class="lzjm-ava" src="' + esc(window.LZJM.Worldbook.imgUrl(c.avatar)) + '">'
-        : '<div class="lzjm-ava">' + esc(who.slice(0, 1)) + '</div>';
+        ? '<img class="lzjm-ava" data-cdet="' + esc(m.who) + '" src="' + esc(window.LZJM.Worldbook.imgUrl(c.avatar)) + '">'
+        : '<div class="lzjm-ava" data-cdet="' + esc(m.who) + '">' + esc(who.slice(0, 1)) + '</div>';
     }
     var bub;
     if (m.kind === 'sticker') {
@@ -1206,14 +1209,14 @@
             vav = vc.avatar ? '<img src="' + esc(W.Worldbook.imgUrl(vc.avatar)) + '">' : esc(vn.slice(0, 1));
           } catch (e0) { vav = esc(vn.slice(0, 1)); }
           var vStatus = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
-            (sv.interrupted ? ' · 中断' : '') + (sv.day ? ' · ' + sv.day : '') + (sv.time ? ' ' + sv.time : '');
+            (sv.interrupted ? ' · 中断' : '');
           var bub = seg.map(function (m) {
             if (m.kind === 'scene') return '<div class="lzjm-callscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
             return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
+          // 头像即身份：不重复大字号名字，状态行只留类型·时长（列表页已有时间）
           body = '<div class="lzjm-callbody">' +
             '<div class="lzjm-calltop"><div class="lzjm-callava">' + vav + '</div>' +
-            '<div class="lzjm-callname">' + esc(vn) + '</div>' +
             '<div class="lzjm-callstatus">' + esc(vStatus) + '</div></div>' +
             '<div class="lzjm-callsubs">' + bub + '</div></div>';
         } else {
