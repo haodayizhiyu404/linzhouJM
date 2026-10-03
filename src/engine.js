@@ -799,7 +799,9 @@
             }
           } catch (e) { console.warn('[霖州引擎] prompt区注入失败', e); }
         }
-        console.log('[霖州引擎] 注入全文 nonce=' + nonce + ' 位置=' + INJECT_POS + ' >>>\n' + fullContent + '\n<<< 注入全文结束');
+        // 全文倾倒曾是排查"已删消息仍被注入"的 debug 手段，稳定后只剩噪音——只报 nonce+长度，要看全文改回下面这行：
+        // console.log('[霖州引擎] 注入全文 nonce=' + nonce + ' 位置=' + INJECT_POS + ' >>>\n' + fullContent + '\n<<< 注入全文结束');
+        console.log('[霖州引擎] 注入摘要 nonce=' + nonce + ' 位置=' + INJECT_POS + ' 长度=' + fullContent.length + '字');
         console.log('[霖州引擎] 注入诊断@' + now + '楼 | ' + (injected ? '★注册注入 nonce=' + nonce : '★注入失败') + ' | ' + blocks.length + ' 块：' +
           cands.slice(0, injCfg().injMax).map(function (c) { return c.key + '(' + root.history(c.key).length + '条)'; }).join('、'));
       } catch (e) { console.warn('[霖州引擎] 手机动态注入失败', e); }
