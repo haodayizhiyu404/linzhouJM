@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 04:15
+//  构建时间（本地）：2026-10-04 04:23
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 04:15';
+var __LZJM_BUILD__ = '2026-10-04 04:23';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -6822,12 +6822,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         return raw;
       } catch (e) { return []; }
     },
-    // 卡的配置桥：开场白选择页（regex 脚本，主窗口上下文）挂出 GS_CONFIG
+    // 卡的配置桥：开场白选择页（regex 脚本，消息渲染时在主窗口上下文 eval）挂出 GS_CONFIG。
+    // 两个可能的位置都探（父页/沙盒窗），并在弹层日志里报命中与否，排查靠它。
     openingConfig: function () {
-      try {
-        var cfg = window.parent.LZJM_OPENINGS;
-        if (cfg && Array.isArray(cfg.groups) && cfg.groups.length) return cfg;
-      } catch (e) {}
+      var cfg = null;
+      try { cfg = window.parent.LZJM_OPENINGS; } catch (e) {}
+      if (!cfg) { try { cfg = window.LZJM_OPENINGS; } catch (e) {} }
+      if (cfg && Array.isArray(cfg.groups) && cfg.groups.length) return cfg;
       return null;
     },
     openingFloors: function () {
@@ -6950,6 +6951,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         if (old) { old.remove(); return; }
       } catch (e) {}
       var items = self.openingItems();
+      try {
+        var _cfg = self.openingConfig();
+        console.log('[霖州引擎] 开场白配置桥：' + (_cfg ? '命中（' + _cfg.groups.length + ' 个时代分组）' : '未命中（退回文本派生名——检查开场白正则是否已更新+刷新页面）'));
+      } catch (e) {}
       if (!items.length) {
         try { toastr.info('这张卡没有检测到可用开场白（first_mes / alternate_greetings 均为空）', '📱 霖州引擎'); } catch (e) {}
         return;
