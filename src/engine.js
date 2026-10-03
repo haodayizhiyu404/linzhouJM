@@ -1919,20 +1919,34 @@
     // 楼层=0：切换=setChatMessages 直跳 swipe_id（缺该函数时退化为连点原生箭头）；插入禁用。
     // 楼层>0：切换禁用；插入=createChatMessages 追加 char 楼层（永远末楼），配置里带线信息的
     // 顺带翻世界书条目+记录线——"插入成人篇开场白"就是完整的换线跳跃。
-    cardOpenings: function () {
+    // 卡数据上下文：优先沙盒原生注入的 SillyTavern 数据对象（酒馆助手直挂 characters/characterId），
+    // 父页 getContext 兜底。v2 卡的 alternate_greetings 嵌在 .data 下（ST script.js 3402/7653 行实证），
+    // first_mes 有顶层镜像——两个位置都要读。
+    openingCtx: function () {
+      try {
+        if (typeof SillyTavern !== 'undefined' && SillyTavern && SillyTavern.characters) return SillyTavern;
+      } catch (e) {}
       try {
         var st = window.parent.SillyTavern;
-        var ctx = st && st.getContext && st.getContext();
-        var ch = ctx && ctx.characters && ctx.characterId != null && ctx.characters[ctx.characterId];
+        var c = st && st.getContext && st.getContext();
+        if (c && c.characters) return c;
+      } catch (e) {}
+      return null;
+    },
+    cardOpenings: function () {
+      try {
+        var ctx = this.openingCtx();
+        var ch = ctx && ctx.characters && ctx.characters[ctx.characterId != null ? ctx.characterId : ctx.this_chid];
         if (!ch) return [];
+        var d = ch.data || {};
         var raw = [];
         var push = function (text, idx) {
           text = String(text || '').trim();
           if (!text) return;
           raw.push({ swipeIdx: idx, text: text, gamestart: /gamestart/i.test(text.slice(0, 40)) });
         };
-        push(ch.first_mes, 0);
-        (ch.alternate_greetings || []).forEach(function (g, i) { push(g, i + 1); });
+        push(ch.first_mes || d.first_mes, 0);
+        (ch.alternate_greetings || d.alternate_greetings || []).forEach(function (g, i) { push(g, i + 1); });
         return raw;
       } catch (e) { return []; }
     },
@@ -1968,7 +1982,7 @@
     },
     openingGreetingIndex: function () { // 退化路径用：当前 0 楼显示的是原始列表里第几个
       try {
-        var ctx = window.parent.SillyTavern.getContext();
+        var ctx = this.openingCtx();
         var cur = ctx.chat && ctx.chat[0] && String(ctx.chat[0].mes || '');
         if (!cur) return -1;
         var list = this.cardOpenings();
@@ -2017,9 +2031,8 @@
       try {
         var raw = this.cardOpenings().filter(function (r) { return r.swipeIdx === item.swipeIdx; })[0];
         if (!raw) return;
-        var st = window.parent.SillyTavern;
-        var ctx = st.getContext();
-        var cn = ctx.name2 || (ctx.characters[ctx.characterId] || {}).name || '角色';
+        var ctx = this.openingCtx();
+        var cn = (ctx && (ctx.name2 || ((ctx.characters || [])[ctx.characterId != null ? ctx.characterId : ctx.this_chid] || {}).name)) || '角色';
         if (item.line) {
           try {
             await W.Worldbook.setEntriesEnabled(self.openingLineOps(item));
@@ -2034,7 +2047,7 @@
           // 退化：与酒馆原生发送同序——先入列再渲染
           var full = { name: cn, is_user: false, is_system: false, send_date: Date.now(), mes: raw.text, extra: { api: 'manual', model: 'lzjm-opening' }, swipes: [raw.text], swipe_id: 0 };
           ctx.chat.push(full);
-          var ST2 = (typeof SillyTavern !== 'undefined') ? SillyTavern : st;
+          var ST2 = (typeof SillyTavern !== 'undefined') ? SillyTavern : window.parent.SillyTavern;
           ST2.addOneMessage(full);
           if (ST2.saveChat) await ST2.saveChat();
         }
