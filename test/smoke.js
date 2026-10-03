@@ -699,6 +699,13 @@ ctx.getWorldbook = async () => [
   eq('孤儿·聊天记录补灰泡', LW.Store.history('周言').some(function (m) { return m.kind === 'calllog' && m.text === '通话中断'; }), true);
   LW.Engine.closeOrphanCalls();
   eq('孤儿·幂等不重复补', LW.Store.history('周言').filter(function (m) { return m.kind === 'calllog' && m.text === '通话中断'; }).length, 1);
+  // 边界标记落型：视频通话全程无 [画面] 行也能判对型（旧逻辑只靠 scene 嗅探会误判成语音）
+  const zk = LW.Engine.callKey('张裕民');
+  LW.Store.push(zk, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——', mode: 'video' }], 200);
+  LW.Store.push(zk, [{ who: '张裕民', kind: 'text', text: '看得见我吗' }, { who: 'user', kind: 'text', text: '看得见' }], 200);
+  LW.Store.push(zk, [{ who: 'sys', kind: 'sys', text: '通话结束 · 00:48' }], 200);
+  const zSess = LW.Engine.callSessions('张裕民');
+  eq('回看·标记落型优先于画面嗅探', [zSess.length, zSess[0].mode, zSess[0].dur], [1, 'video', '00:48']);
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');

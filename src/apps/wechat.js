@@ -2030,8 +2030,9 @@
       this.callMute = false; this.callSpkr = false;
       this.call = { name: name, mode: mode, phase: 'ringing', startAt: Date.now(), busy: false, by: 'user' };
       // 「通话开始」边界在拨号即打（不是接通才打）：响铃期界面/切段就已属于新会话，
-      // 不会把上一通的记录显示在新通话的呼叫页；拒接/取消留下 0 条目的空边界，切段自动跳过
-      W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+      // 不会把上一通的记录显示在新通话的呼叫页；拒接/取消留下 0 条目的空边界，切段自动跳过。
+      // mode 一并落进标记：视频通话若全程无 [画面] 行，靠 scene 嗅探会误判成语音，标记优先。
+      W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——', mode: mode }], 200);
       this.render();
       try {
         var text = await withTimeout(eng.callInvite(name, mode), 90000);

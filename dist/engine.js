@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 19:28
+//  构建时间（本地）：2026-10-03 19:37
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 19:28';
+var __LZJM_BUILD__ = '2026-10-03 19:37';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4007,8 +4007,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       this.callMute = false; this.callSpkr = false;
       this.call = { name: name, mode: mode, phase: 'ringing', startAt: Date.now(), busy: false, by: 'user' };
       // 「通话开始」边界在拨号即打（不是接通才打）：响铃期界面/切段就已属于新会话，
-      // 不会把上一通的记录显示在新通话的呼叫页；拒接/取消留下 0 条目的空边界，切段自动跳过
-      W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+      // 不会把上一通的记录显示在新通话的呼叫页；拒接/取消留下 0 条目的空边界，切段自动跳过。
+      // mode 一并落进标记：视频通话若全程无 [画面] 行，靠 scene 嗅探会误判成语音，标记优先。
+      W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——', mode: mode }], 200);
       this.render();
       try {
         var text = await withTimeout(eng.callInvite(name, mode), 90000);
@@ -6257,18 +6258,20 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var out = [];
       for (var si = 0; si < bounds.length; si++) {
         var seg = hist.slice(bounds[si][0], bounds[si][1]);
-        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
+        var mode = '', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
         seg.forEach(function (m) {
           if (m.who === 'sys') {
             var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
             if (dm) { dur = dm[1]; ongoing = false; }
             else if (/通话中断/.test(String(m.text || ''))) { ongoing = false; interrupted = true; }
+            if (m.mode) mode = m.mode;   // 边界标记落型的通话以标记为准（视频可无画面行）
             return;
           }
           count++;
-          if (m.kind === 'scene') mode = 'video';
+          if (m.kind === 'scene') mode = mode || 'video';
           if (!day && m.day) { day = m.day; time = m.time || ''; }
         });
+        if (!mode) mode = 'audio';
         if (!count) continue;
         out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing, interrupted: interrupted });
       }

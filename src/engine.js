@@ -1521,18 +1521,20 @@
       var out = [];
       for (var si = 0; si < bounds.length; si++) {
         var seg = hist.slice(bounds[si][0], bounds[si][1]);
-        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
+        var mode = '', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
         seg.forEach(function (m) {
           if (m.who === 'sys') {
             var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
             if (dm) { dur = dm[1]; ongoing = false; }
             else if (/通话中断/.test(String(m.text || ''))) { ongoing = false; interrupted = true; }
+            if (m.mode) mode = m.mode;   // 边界标记落型的通话以标记为准（视频可无画面行）
             return;
           }
           count++;
-          if (m.kind === 'scene') mode = 'video';
+          if (m.kind === 'scene') mode = mode || 'video';
           if (!day && m.day) { day = m.day; time = m.time || ''; }
         });
+        if (!mode) mode = 'audio';
         if (!count) continue;
         out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing, interrupted: interrupted });
       }
