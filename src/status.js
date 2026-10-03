@@ -105,6 +105,10 @@
       if (npcName && p.characters[npcName]) {
         npc = p.characters[npcName];
         npc.name = npcName;
+      } else if (npcName && p.relations[npcName]) {
+        // 角色不在场、没有自己的小块时（通话对象最常见），关系只存在于关系总览——
+        // 退回总览取关系，情境字段留空。否则"关系基调后置"等依赖 relation 的注入全静默失效
+        npc = { name: npcName, outfit: '', posture: '', place: '', relation: p.relations[npcName] };
       }
       return {
         time: p.time,

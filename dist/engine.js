@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 01:12
+//  构建时间（本地）：2026-10-04 01:20
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 01:12';
+var __LZJM_BUILD__ = '2026-10-04 01:20';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -356,6 +356,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (npcName && p.characters[npcName]) {
         npc = p.characters[npcName];
         npc.name = npcName;
+      } else if (npcName && p.relations[npcName]) {
+        // 角色不在场、没有自己的小块时（通话对象最常见），关系只存在于关系总览——
+        // 退回总览取关系，情境字段留空。否则"关系基调后置"等依赖 relation 的注入全静默失效
+        npc = { name: npcName, outfit: '', posture: '', place: '', relation: p.relations[npcName] };
       }
       return {
         time: p.time,
@@ -1435,8 +1439,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       try {
         var st0 = window.LZJM.Status.parseLatest();
         var chars0 = (st0 && st0.characters) || {};
+        var rels0 = (st0 && st0.relations) || {};   // 总览行——不在场成员的关系只在这里
         members.forEach(function (m) {
-          if (chars0[m.name] && chars0[m.name].relation) relMap[m.name] = chars0[m.name].relation;
+          var rc = chars0[m.name] && chars0[m.name].relation;
+          if (!rc && rels0[m.name]) rc = rels0[m.name];
+          if (rc) relMap[m.name] = rc;
         });
       } catch (e) {}
       var voices = members.map(function (m) {

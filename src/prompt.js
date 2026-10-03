@@ -626,8 +626,11 @@
       try {
         var st0 = window.LZJM.Status.parseLatest();
         var chars0 = (st0 && st0.characters) || {};
+        var rels0 = (st0 && st0.relations) || {};   // 总览行——不在场成员的关系只在这里
         members.forEach(function (m) {
-          if (chars0[m.name] && chars0[m.name].relation) relMap[m.name] = chars0[m.name].relation;
+          var rc = chars0[m.name] && chars0[m.name].relation;
+          if (!rc && rels0[m.name]) rc = rels0[m.name];
+          if (rc) relMap[m.name] = rc;
         });
       } catch (e) {}
       var voices = members.map(function (m) {
