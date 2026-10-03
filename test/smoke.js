@@ -904,6 +904,8 @@ ctx.getWorldbook = async () => [
   eq('通话·记录回看入口', wsrc.includes('data-chist') && wsrc.includes("screen === 'callhist'") && wsrc.includes("screen === 'callview'") && wsrc.indexOf('callSessions') !== -1, true);
   eq('通话·回看复刻通话屏', wsrc.includes('lzjm-scr-chv') && wsrc.indexOf('callscene') !== -1 && wsrc.indexOf("m.kind === 'scene'") !== -1, true);
   eq('通话·回看返回键反白', wsrc.indexOf('.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}') !== -1, true); // SVG 描边写死，color 覆不到
+  eq('通话·换行以完整句子为单位', psrc.indexOf('换行以完整句子为单位') !== -1 && psrc.indexOf('砍成多行') !== -1, true);
+  eq('通话·单轮上限放宽并留痕', esrc.indexOf('callCap') !== -1 && wsrc.indexOf('eng.callCap') !== -1, true);
   eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('通话·边界标记仅拨号打一次', (wsrc.match(/—— 通话开始 ——/g) || []).length, 1); // 前移后接通处不得再打，否则响铃期界面错位复发

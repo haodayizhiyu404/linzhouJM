@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 22:58
+//  构建时间（本地）：2026-10-04 00:41
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 22:58';
+var __LZJM_BUILD__ = '2026-10-04 00:41';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1114,13 +1114,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 接听：第一行以 [接听] 开头；其后是接通后的开场——台词与画面交织，每行要么是「' + contact.name + '」的口语台词，要么是以 [画面] 开头的一行可见状态（在哪、姿势、表情、衣着、手上动作；只写看得见的东西，就写在该动作发生的对应位置，可穿插多行：一边说一边做的事要插在对应台词旁边）',
         '- 拒绝：第一行以 [拒绝] 开头，其后可附一句简短说明（如「在忙，晚点回」），也可不附',
         '- [接听]/[拒绝]/[画面] 是程序解析用的标记，只输出标记本身，不要给标记加引号或其他说明',
-        '- 台词口语化：短句、停顿感、可有语气词；不要引号、动作描写、心理括号、时间戳（动作只写进 [画面] 行）',
+        '- 换行以完整句子为单位：一句话说完才换行，省略号与紧随的短句并入同一句（「……清楚。」占一行）；不要为营造停顿感把一句话砍成多行',
+        '- 台词口语化：短句优先但说完整，可有语气词；不要引号、动作描写、心理括号、时间戳（动作只写进 [画面] 行）',
         '- 决定须符合上方「关系」阶段与当前情境（深夜/工作时间/在群里刚聊过等）'
       ].join('\n') : [
         '## 输出要求（严格遵守，二选一）',
         '- 接听：第一行以 [接听] 开头，其后接 1~3 行口语台词，像真人打电话的开场',
         '- 拒绝：第一行以 [拒绝] 开头，其后可附一句简短说明（如「在忙，晚点回」），也可不附',
         '- [接听]/[拒绝] 是程序解析用的标记，只输出标记本身，不要给标记加引号或其他说明',
+        '- 换行以完整句子为单位：一句话说完才换行，省略号与紧随的短句并入同一句；不要为营造停顿感把一句话砍成多行',
         '- 不得输出引号、动作描写、心理括号、时间戳',
         '- 决定须符合上方「关系」阶段与当前情境（深夜/工作时间/在群里刚聊过等）'
       ].join('\n');
@@ -1180,14 +1182,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '## 输出要求',
         '- 输出 = 「' + contact.name + '」的台词与画面交织流：每行要么是台词，要么是以 [画面] 开头的一行可见状态（在哪、姿势、表情、衣着、手上的动作；只写看得见的东西）',
         '- [画面] 行穿插在台词中间、写在该动作发生的时刻——他一边说一边做的事（吃了片薯片、抬头看镜头、擦了把汗）就插在对应台词旁边，不要全堆在开头或结尾',
-        '- 台词行数随情境自然决定（聊得热络可以多说，无事可说就少），口语化：短句、停顿感、可有语气词，不要书面腔',
+        '- 换行以完整句子为单位：一句话说完才换行——省略号与紧随的短句并入同一句（「……清楚。」「名字，你存心的。」各占一行），只有话题转换或动作切换才新起一行；不要为营造停顿感把一句话砍成多行',
+        '- 台词行数随情境自然决定（聊得热络可以多说，无事可说就少），口语化：短句优先但说完整，可有语气词，不要书面腔',
         '- 每行独立，不要引号、动作描写、心理括号、时间戳（动作只写进 [画面] 行）',
         '- 情感与态度符合上方「关系」阶段；吵架、撒娇、汇报都按当前关系该有度',
         '- 不要复述机主刚说的话'
       ].join('\n') : [
         '## 输出要求',
         '- 只输出「' + contact.name + '」的台词，1~5 行，按情绪与话题自然增减（激动时可更多）',
-        '- 口语化，像真人打电话：短句、停顿感、可有语气词；不要书面腔',
+        '- 换行以完整句子为单位：一句话说完才换行，省略号与紧随的短句并入同一句；不要为营造停顿感把一句话砍成多行',
+        '- 口语化，像真人打电话：短句优先但说完整，可有语气词；不要书面腔',
         '- 每行独立，不要引号、动作描写、心理括号、时间戳',
         '- 情感与态度符合上方「关系」阶段；吵架、撒娇、汇报都按当前关系该有度',
         '- 不要复述机主刚说的话'
@@ -4047,13 +4051,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         //   会话边界已在拨号时打过，开场白直接落在本段内）
         text = text.replace(/^\[接听\]\s*/, '').replace(/^接听[：:]\s*/, '').trim();
         var entries = [];
+        var cap0 = eng.callCap(mode);
         if (mode === 'video') {
-          eng.splitCallOutput(text).slice(0, 12).forEach(function (en) {
+          var sp0 = eng.splitCallOutput(text);
+          if (sp0.length > cap0) console.warn('[霖州引擎] 开场输出 ' + sp0.length + ' 条，超上限截为 ' + cap0 + ' 条');
+          sp0.slice(0, cap0).forEach(function (en) {
             entries.push({ who: name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
           });
         } else {
-          text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).slice(0, 8)
-            .forEach(function (l) { entries.push({ who: name, kind: 'text', text: l }); });
+          var vl0 = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+          if (vl0.length > cap0) console.warn('[霖州引擎] 开场输出 ' + vl0.length + ' 条，超上限截为 ' + cap0 + ' 条');
+          vl0.slice(0, cap0).forEach(function (l) { entries.push({ who: name, kind: 'text', text: l }); });
         }
         if (entries.length) W.Store.push(eng.callKey(name), entries, 200);
         this.call.phase = 'active';
@@ -6468,6 +6476,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return entries;
     },
 
+    // 单轮通话输出的条目上限：只防模型失控刷几百行，正常戏剧化输出到不了这个数。
+    // 超出即截断并 console.warn 留痕——用户能分清是模型超量还是程序丢条。
+    callCap: function (mode) { return mode === 'video' ? 40 : 30; },
+
     callTurn: async function (name, mode, userSays) {
       var W = window.LZJM;
       var self = this;
@@ -6506,11 +6518,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       text = text.replace(/<!--" + BS + "s*phone" + BS + "s*([" + BS + "s" + BS + "S]*?)-->/gi, '');
       // 视频通话拆成保序条目流：[画面] 行与台词行按出现顺序交织（音频永远无画面）
       var entries = [];
+      var cap = this.callCap(mode);
       if (mode === 'video') {
-        this.splitCallOutput(text).slice(0, 16).forEach(function (en) { entries.push(en); });
+        var sp = this.splitCallOutput(text);
+        if (sp.length > cap) console.warn('[霖州引擎] 通话单轮输出 ' + sp.length + ' 条，超上限截为 ' + cap + ' 条');
+        sp.slice(0, cap).forEach(function (en) { entries.push(en); });
       } else {
-        text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).slice(0, 12)
-          .forEach(function (l) { entries.push({ kind: 'line', text: l }); });
+        var vl = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+        if (vl.length > cap) console.warn('[霖州引擎] 通话单轮输出 ' + vl.length + ' 条，超上限截为 ' + cap + ' 条');
+        vl.slice(0, cap).forEach(function (l) { entries.push({ kind: 'line', text: l }); });
       }
       return { entries: entries };
     },

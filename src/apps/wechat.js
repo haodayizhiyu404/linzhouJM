@@ -2058,13 +2058,17 @@
         //   会话边界已在拨号时打过，开场白直接落在本段内）
         text = text.replace(/^\[接听\]\s*/, '').replace(/^接听[：:]\s*/, '').trim();
         var entries = [];
+        var cap0 = eng.callCap(mode);
         if (mode === 'video') {
-          eng.splitCallOutput(text).slice(0, 12).forEach(function (en) {
+          var sp0 = eng.splitCallOutput(text);
+          if (sp0.length > cap0) console.warn('[霖州引擎] 开场输出 ' + sp0.length + ' 条，超上限截为 ' + cap0 + ' 条');
+          sp0.slice(0, cap0).forEach(function (en) {
             entries.push({ who: name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
           });
         } else {
-          text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).slice(0, 8)
-            .forEach(function (l) { entries.push({ who: name, kind: 'text', text: l }); });
+          var vl0 = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+          if (vl0.length > cap0) console.warn('[霖州引擎] 开场输出 ' + vl0.length + ' 条，超上限截为 ' + cap0 + ' 条');
+          vl0.slice(0, cap0).forEach(function (l) { entries.push({ who: name, kind: 'text', text: l }); });
         }
         if (entries.length) W.Store.push(eng.callKey(name), entries, 200);
         this.call.phase = 'active';
