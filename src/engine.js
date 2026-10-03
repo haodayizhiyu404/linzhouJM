@@ -1961,6 +1961,10 @@
     openingFloors: function () {
       try { return getChatMessages('0-{{lastMessageId}}').length; } catch (e) { return 0; }
     },
+    // 0 楼判定：聊天里只有 GameStart 那条招呼消息时也算"选开场白阶段"（它占第 1 楼）
+    openingPicking: function () {
+      return this.openingFloors() <= 1;
+    },
     // 弹层列表装配：配置桥在时按时代分组给标题/IF 标注（page==swipeIdx，选择页 jump 公式推得）
     openingItems: function () {
       var raw = this.cardOpenings().filter(function (r) { return !r.gamestart; });
@@ -1992,18 +1996,30 @@
       } catch (e) {}
       return -1;
     },
-    // 0 楼切换：优先 setChatMessages 直跳 swipe_id；缺函数/失败退化为连点原生箭头
-    openingJump: async function (swipeIdx) {
+    // 切换/插入共用的换线联动：配置带线信息时翻世界书条目（本项 open+本线开，其余关）+ 记线归位。
+    // 与 GameStart 选择页行为对齐——用户不需要懂「世界线」QR，选开场白即完成整套换线。
+    openingLineSync: async function (item) {
+      var W = window.LZJM, self = this;
+      if (!item || !item.line) return;
+      await W.Worldbook.setEntriesEnabled(self.openingLineOps(item));
+      W.Store.setLine(item.line);
+      await self.refreshStates();
+      self.locateLine();
+    },
+    // 0 楼切换：先换线联动（带配置时），再直跳 swipe_id；缺函数/失败退化为连点原生箭头
+    openingJump: async function (item) {
+      var self = this;
+      try { await self.openingLineSync(item); } catch (e0) { console.warn('[霖州引擎] 开场白切换换线失败（开场照切）', e0); }
       try {
         if (typeof setChatMessages === 'function') {
-          await setChatMessages([{ message_id: 0, swipe_id: swipeIdx }], { refresh: 'all' });
+          await setChatMessages([{ message_id: 0, swipe_id: item.swipeIdx }], { refresh: 'all' });
           return;
         }
       } catch (e) {}
       var list = this.cardOpenings();
       var cur = this.openingGreetingIndex();
       if (cur < 0) cur = 0;
-      var steps = (swipeIdx - cur + list.length) % list.length;
+      var steps = (item.swipeIdx - cur + list.length) % list.length;
       for (var i = 0; i < steps; i++) {
         try {
           var btn = window.parent.document.querySelector('#chat .swipe_right');
@@ -2034,12 +2050,8 @@
         var ctx = this.openingCtx();
         var cn = (ctx && (ctx.name2 || ((ctx.characters || [])[ctx.characterId != null ? ctx.characterId : ctx.this_chid] || {}).name)) || '角色';
         if (item.line) {
-          try {
-            await W.Worldbook.setEntriesEnabled(self.openingLineOps(item));
-            W.Store.setLine(item.line);
-            await self.refreshStates();
-            self.locateLine();
-          } catch (e0) { console.warn('[霖州引擎] 开场白换线翻条目失败（楼层照插）', e0); }
+          try { await self.openingLineSync(item); }
+          catch (e0) { console.warn('[霖州引擎] 开场白换线翻条目失败（楼层照插）', e0); }
         }
         if (typeof createChatMessages === 'function') {
           await createChatMessages([{ role: 'assistant', name: cn, message: raw.text, extra: { api: 'manual', model: 'lzjm-opening' } }], { insert_before: 'end', refresh: 'all' });
@@ -2071,11 +2083,12 @@
         return;
       }
       var floors = self.openingFloors();
+      var picking = self.openingPicking();
       if (!doc.getElementById('lzjm-open-style')) {
         var css = doc.createElement('style');
         css.id = 'lzjm-open-style';
         css.textContent = [
-          '.lzjm-open-pop{position:fixed;right:16px;bottom:64px;z-index:99999;width:290px;max-height:70vh;overflow-y:auto;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
+          '.lzjm-open-pop{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;width:320px;max-height:74vh;overflow-y:auto;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
           '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px}',
           '.lzjm-open-x{cursor:pointer;opacity:.55;padding:0 4px}',
           '.lzjm-open-gh{font-size:11px;color:#8a8f98;margin:8px 2px 2px;letter-spacing:1px}',
@@ -2099,12 +2112,16 @@
         if (!last || last.label !== g) { last = { label: g, items: [] }; byGroup.push(last); }
         last.items.push(it);
       });
-      var html = '<div class="lzjm-open-head"><span>开场白 · ' + (floors === 0 ? '0 楼：选中即切换' : '已开局：插入为新楼层') + '</span><span class="lzjm-open-x">✕</span></div>';
+      var headTxt = picking
+        ? '开场白 · 点「切换」选用该开场（世界书随开场自动切换）'
+        : '开场白 · 点「插入」把该开场追加为新楼层（世界书随开场自动切换）';
+      var html = '<div class="lzjm-open-head"><span></span><span class="lzjm-open-x">✕</span></div>';
       byGroup.forEach(function (g, gi) {
         if (g.label) html += '<div class="lzjm-open-gh">' + g.label + '</div>';
         g.items.forEach(function (it) { html += '<div class="lzjm-open-row" data-g="' + gi + '"><b></b><i></i>' + (it.ifName ? '<span class="lzjm-open-if"></span>' : '') + '<span class="lzjm-open-acts"><button data-act="jump">切换</button><button data-act="insert">插入</button></span></div>'; });
       });
       pop.innerHTML = html;
+      pop.querySelector('.lzjm-open-head span').textContent = headTxt;
       var rowEls = pop.querySelectorAll('.lzjm-open-row');
       var flat = [];
       byGroup.forEach(function (g) { g.items.forEach(function (it) { flat.push(it); }); });
@@ -2115,9 +2132,9 @@
         if (it.ifName) row.querySelector('.lzjm-open-if').textContent = it.ifName;
         var bJump = row.querySelector('[data-act="jump"]');
         var bIns = row.querySelector('[data-act="insert"]');
-        bJump.disabled = floors !== 0;
-        bIns.disabled = floors === 0;
-        bJump.addEventListener('click', function (ev) { ev.stopPropagation(); self.openingJump(it.swipeIdx); });
+        bJump.disabled = !picking;
+        bIns.disabled = picking;
+        bJump.addEventListener('click', function (ev) { ev.stopPropagation(); self.openingJump(it); });
         bIns.addEventListener('click', function (ev) { ev.stopPropagation(); self.openingInsert(it); });
       });
       pop.querySelector('.lzjm-open-x').addEventListener('click', function () { pop.remove(); });
