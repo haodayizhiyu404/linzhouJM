@@ -1682,8 +1682,14 @@
         var dd = (s.day && cur0) ? dayDiffE(s.day, cur0) : null;
         return self._memoryItem(c.name, s, dd);
       });
+      // 记忆对齐：私聊有的（提要/朋友圈/近三天其他通话）通话也要有
+      var ex1 = await this._callExtras(c.name, snap);
+      var seen1 = {};
+      refs.forEach(function (r) { seen1[r.head] = 1; });
+      ex1.otherCalls.forEach(function (r) { if (!seen1[r.head]) { seen1[r.head] = 1; refs.push(r); } });
       var req = W.Prompt.callInvite({ name: c.name, profile: profile }, priv, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()));
+        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()),
+        ex1.digest, ex1.momentsNote, ex1.myNote);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       return text.trim();
@@ -1719,6 +1725,28 @@
     // 超出即截断并 console.warn 留痕——用户能分清是模型超量还是程序丢条。
     callCap: function (mode) { return mode === 'video' ? 40 : 30; },
 
+    // 通话的记忆对齐：与私聊同配置——压缩提要 / 朋友圈互动（对方+机主）/ 近三天其他通话
+    // （排除本会话，本会话由 transcript 全量携带）。私聊里有的记忆通话不该缺席，
+    // 否则电话那头的他总是"不认识你"——冷漠感不是错觉，是这套配置差异的直接结果。
+    _callExtras: async function (name, snap) {
+      var self = this;
+      var out = { digest: '', momentsNote: '', myNote: '', otherCalls: [] };
+      try { out.digest = await this.compress(name); } catch (e) {}
+      try { out.momentsNote = this.momentsNoteFor(name, snap); } catch (e) {}
+      try { out.myNote = this.myMomentsNote(snap); } catch (e) {}
+      try {
+        var curDay = snap && snap.dateText;
+        var curStart = this.callSessionStart(window.LZJM.Store.history(this.callKey(name)));
+        out.otherCalls = this.callSessions(name).filter(function (s) {
+          if (s.start === curStart) return false;
+          if (!s.day || !curDay) return false;
+          var dd = dayDiffE(s.day, curDay);
+          return dd != null && dd >= 0 && dd <= 3;
+        }).map(function (s) { return self._memoryItem(name, s, dayDiffE(s.day, curDay)); });
+      } catch (e) {}
+      return out;
+    },
+
     callTurn: async function (name, mode, userSays) {
       var W = window.LZJM;
       var self = this;
@@ -1749,8 +1777,14 @@
         var dd = (s.day && cur2) ? dayDiffE(s.day, cur2) : null;
         return self._memoryItem(c.name, s, dd);
       });
+      // 记忆对齐：私聊有的（提要/朋友圈/近三天其他通话）通话也要有
+      var ex2 = await this._callExtras(c.name, snap);
+      var seen2 = {};
+      refs2.forEach(function (r) { seen2[r.head] = 1; });
+      ex2.otherCalls.forEach(function (r) { if (!seen2[r.head]) { seen2[r.head] = 1; refs2.push(r); } });
       var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), priv2, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()));
+        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()),
+        ex2.digest, ex2.momentsNote, ex2.myNote);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       // 剥注释块防污染（极端情况：AI 在通话里输出主动块）

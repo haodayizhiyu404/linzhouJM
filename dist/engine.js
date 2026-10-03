@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 00:41
+//  构建时间（本地）：2026-10-04 01:12
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 00:41';
+var __LZJM_BUILD__ = '2026-10-04 01:12';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1106,7 +1106,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 视频通话的可见状态用 [画面] 行写，插在动作发生的对应位置（可穿插多行，不只开头）。
     // 呼叫页等待期间的一次生成。
     // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
-    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs, lore) {
+    // digest/momentsNote/myNote = 记忆对齐：与私聊同配置（折叠提要/对方与机主的朋友圈互动）
+    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs, lore, digest, momentsNote, myNote) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1150,6 +1151,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           : '',
         '',
         '## 聊天记录 · 与' + myName + '的微信对话（通话前的最近消息，供接续话题与语气）',
+        digest ? '（更早的记录已折叠为提要，供接续话题与承诺用：' + digest + '）' : '',
         histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
         '',
         (callRefs && callRefs.length)
@@ -1157,7 +1159,23 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
           : '',
         '',
+        momentsNote
+          ? '## 近期朋友圈（近3天，另附机主互动过的旧动态）\n（对方近几天发过的动态；机主点过赞/留过言的——哪怕是几天前的旧动态——对方一直记得，互动是刚发生的，可自然提起、调侃或耿耿于怀；没互动的也能成为话题）\n' + momentsNote
+          : '',
+        '',
+        myNote
+          ? '## 机主发过的朋友圈（近3天）\n（机主这几天发的动态，对方都刷得到、看得见谁点了赞；可自然提起、接梗、调侃或已读不回）\n' + myNote
+          : '',
+        '',
+        (snapshot && snapshot.npc && snapshot.npc.relation)
+          ? '## 本次' + kind + '基调\n机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
+          : '',
+        '',
         consistencyRules('「' + contact.name + '」'),
+        '',
+        (snapshot && snapshot.npc && snapshot.npc.relation)
+          ? '## 本次' + kind + '基调\n机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
+          : '',
         '',
         outReq
       ].filter(function (s2) { return s2 !== ''; }).join('\n');
@@ -1174,8 +1192,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // ── 通话轮：通话进行中，机主说了一句（或要求接续），生成对方台词 ──
     // transcript = 「名字：…/机主：…」台词行；userSays = 机主本轮说的话（可空）
     // callRefs = 通话记忆 [{head, text}]：私聊记录里出现的通话灰泡对应的通话段（纪要或原文）
-    // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
-    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs, lore) {
+    // lore = 本线 DLC 背景；digest/momentsNote/myNote = 记忆对齐（与私聊同配置）
+    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs, lore, digest, momentsNote, myNote) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1220,6 +1238,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           : '',
         '',
         '## 近期私聊记录（通话之外的消息，供接续话题）',
+        digest ? '（更早的记录已折叠为提要，供接续话题与承诺用：' + digest + '）' : '',
         histText(hist || [], cfg().histPriv, true, snapshot && snapshot.dateText),
         '',
         (callRefs && callRefs.length)
@@ -1227,10 +1246,23 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             callRefs.map(function (s2) { return '◆ ' + s2.head + '\n' + s2.text; }).join('\n\n')
           : '',
         '',
+        momentsNote
+          ? '## 近期朋友圈（近3天，另附机主互动过的旧动态）\n（对方近几天发过的动态；机主点过赞/留过言的——哪怕是几天前的旧动态——对方一直记得，互动是刚发生的，可自然提起、调侃或耿耿于怀；没互动的也能成为话题）\n' + momentsNote
+          : '',
+        '',
+        myNote
+          ? '## 机主发过的朋友圈（近3天）\n（机主这几天发的动态，对方都刷得到、看得见谁点了赞；可自然提起、接梗、调侃或已读不回）\n' + myNote
+          : '',
+        '',
+        '',
         '## 通话记录（' + kind + ' · 双方已说的话' + (mode === 'video' ? '与画面' : '') + '）',
         transcript || '（刚接通）',
         '',
         consistencyRules('「' + contact.name + '」'),
+        '',
+        (snapshot && snapshot.npc && snapshot.npc.relation)
+          ? '## 本次' + kind + '基调\n机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
+          : '',
         '',
         outReq
       ].filter(function (s2) { return s2 !== ''; }).join('\n');
@@ -1397,6 +1429,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var tailLines2 = (tail && tail.length) ? histText(tail, 8, true) : '';
       var nameList = members.map(function (m) { return m.name; });
       var crowdTxt = Array.isArray(group.crowd) ? group.crowd.join('\n') : (group.crowd || '');
+      // 成员与机主的当前关系（状态栏快照）：挂在成员档案行首——群聊里关系是 per-member 的，
+      // 同样存在"埋在长上下文里被忽略"的问题，但群不适合尾巴基调行，跟在名字后最显眼
+      var relMap = {};
+      try {
+        var st0 = window.LZJM.Status.parseLatest();
+        var chars0 = (st0 && st0.characters) || {};
+        members.forEach(function (m) {
+          if (chars0[m.name] && chars0[m.name].relation) relMap[m.name] = chars0[m.name].relation;
+        });
+      } catch (e) {}
       var voices = members.map(function (m) {
         var brief = m.profile ? String(m.profile).trim() : '（无档案）';
         var priv = crossPriv && crossPriv[m.name];
@@ -1404,7 +1446,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           brief += '\n※ 仅 ' + m.name + ' 本人知晓：机主今日与 ' + m.name + ' 的私聊——\n'
             + histText(priv, cfg().crossLines, true, snapshot && snapshot.dateText);
         }
-        return '- ' + m.name + '：\n' + brief;
+        return '- ' + m.name + (relMap[m.name] ? '（与机主：' + relMap[m.name] + '）' : '') + '：\n' + brief;
       });
 
       var p = [
@@ -1520,6 +1562,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '- 时间线锚定已发生的剧情，可以引用、回想、甚至曲解白天的事——尤其是 Ta 对 ' + myName + ' 相关事件的私人解读（若 ' + myName + ' 近期没出场，也允许完全不提，但提起来就必须是旧知的口气）。',
       '- 文体是备忘录：允许不完整句、允许戛然而止、允许只有一段。但这是一个人深夜对自己说话的声音，不是散文连载——不要警句式金句、不要对仗修辞、不要纯写景撑意境；情感可以直接说出口，不必事事靠侧写绕。整体要有小作文的完成度——读完像窥见了一页真实的人生。',
       '- 严禁：本人不知道的任何信息（包括 ' + myName + ' 的真实想法与内心）、对未来的预言式感叹、总结中心思想、任何元叙述（"作为……""本章……"）。',
+      (snapshot && snapshot.npc && snapshot.npc.relation)
+        ? '- 关系基调：机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
+        : '',
       '- ※完※ 之后不再输出任何文字。'
     ].filter(function (s) { return s !== ''; }).join('\n');
 
@@ -6443,8 +6488,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var dd = (s.day && cur0) ? dayDiffE(s.day, cur0) : null;
         return self._memoryItem(c.name, s, dd);
       });
+      // 记忆对齐：私聊有的（提要/朋友圈/近三天其他通话）通话也要有
+      var ex1 = await this._callExtras(c.name, snap);
+      var seen1 = {};
+      refs.forEach(function (r) { seen1[r.head] = 1; });
+      ex1.otherCalls.forEach(function (r) { if (!seen1[r.head]) { seen1[r.head] = 1; refs.push(r); } });
       var req = W.Prompt.callInvite({ name: c.name, profile: profile }, priv, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()));
+        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()),
+        ex1.digest, ex1.momentsNote, ex1.myNote);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       return text.trim();
@@ -6480,6 +6531,28 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 超出即截断并 console.warn 留痕——用户能分清是模型超量还是程序丢条。
     callCap: function (mode) { return mode === 'video' ? 40 : 30; },
 
+    // 通话的记忆对齐：与私聊同配置——压缩提要 / 朋友圈互动（对方+机主）/ 近三天其他通话
+    // （排除本会话，本会话由 transcript 全量携带）。私聊里有的记忆通话不该缺席，
+    // 否则电话那头的他总是"不认识你"——冷漠感不是错觉，是这套配置差异的直接结果。
+    _callExtras: async function (name, snap) {
+      var self = this;
+      var out = { digest: '', momentsNote: '', myNote: '', otherCalls: [] };
+      try { out.digest = await this.compress(name); } catch (e) {}
+      try { out.momentsNote = this.momentsNoteFor(name, snap); } catch (e) {}
+      try { out.myNote = this.myMomentsNote(snap); } catch (e) {}
+      try {
+        var curDay = snap && snap.dateText;
+        var curStart = this.callSessionStart(window.LZJM.Store.history(this.callKey(name)));
+        out.otherCalls = this.callSessions(name).filter(function (s) {
+          if (s.start === curStart) return false;
+          if (!s.day || !curDay) return false;
+          var dd = dayDiffE(s.day, curDay);
+          return dd != null && dd >= 0 && dd <= 3;
+        }).map(function (s) { return self._memoryItem(name, s, dayDiffE(s.day, curDay)); });
+      } catch (e) {}
+      return out;
+    },
+
     callTurn: async function (name, mode, userSays) {
       var W = window.LZJM;
       var self = this;
@@ -6510,8 +6583,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var dd = (s.day && cur2) ? dayDiffE(s.day, cur2) : null;
         return self._memoryItem(c.name, s, dd);
       });
+      // 记忆对齐：私聊有的（提要/朋友圈/近三天其他通话）通话也要有
+      var ex2 = await this._callExtras(c.name, snap);
+      var seen2 = {};
+      refs2.forEach(function (r) { seen2[r.head] = 1; });
+      ex2.otherCalls.forEach(function (r) { if (!seen2[r.head]) { seen2[r.head] = 1; refs2.push(r); } });
       var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), priv2, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()));
+        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()),
+        ex2.digest, ex2.momentsNote, ex2.myNote);
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       // 剥注释块防污染（极端情况：AI 在通话里输出主动块）
