@@ -295,7 +295,7 @@ ctx.getWorldbook = async () => [
   eq('通话轮·线背景段', loreTurn.ordered_prompts[0].content.indexOf('【测试背景】') !== -1, true);
   // FICTION 标题不重复：构建器不再自带独立标题行（旧版数组首行 + FICTION 内部标题 = 出现两遍）
   const ficTxt = loreTurn.ordered_prompts[0].content;
-  eq('FICTION·标题只出现一次', ficTxt.indexOf('# 虚构沙盒') === ficTxt.lastIndexOf('# 虚构沙盒'), true);
+  eq('FICTION·标题只出现一次', ficTxt.indexOf('# Narrative Sandbox') === ficTxt.lastIndexOf('# Narrative Sandbox'), true);
   // 关系盲区回归：通话对象不在场（状态栏无其小块）、关系只在关系总览时，snapshot 必须退回总览取关系——
   // 否则"关系基调后置"在真实通话场景静默失效（用户实测发现）
   global.__msgs = [{ role: 'assistant', message: '<status>\n<环境>\n2034年8月26日 星期五|22:49|天禧城3幢901室|阴\n</环境>\n\n<关系总览>\n蒋默：前资助对象/地下情人\n</关系总览>\n</status>' }];
