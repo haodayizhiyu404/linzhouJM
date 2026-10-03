@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 05:19
+//  构建时间（本地）：2026-10-04 05:25
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 05:19';
+var __LZJM_BUILD__ = '2026-10-04 05:25';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -7114,6 +7114,21 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
       pop.querySelector('.lzjm-open-x').addEventListener('click', function () { pop.remove(); });
       doc.body.appendChild(pop);
+      // 小屏钳位：CSS 的 max-height:74vh 在极端窗口高度下仍会顶出屏幕——
+      // 内容填完后按实际高度显式重算 top（永不小于 10px），宽度也不超过视口
+      try {
+        var win = window.parent;
+        var vh = win.innerHeight || 800;
+        var vw = win.innerWidth || 400;
+        pop.style.maxHeight = Math.round(vh * 0.78) + 'px';
+        pop.style.maxWidth = Math.max(240, Math.min(320, vw - 24)) + 'px';
+        (win.requestAnimationFrame || function (f) { return setTimeout(f, 0); })(function () {
+          if (!pop.parentNode) return;
+          var h = pop.offsetHeight;
+          pop.style.top = Math.max(10, Math.round((vh - h) / 2)) + 'px';
+          pop.style.transform = 'translate(-50%, 0)';
+        });
+      } catch (e) {}
       setTimeout(function () {
         try {
           doc.addEventListener('click', function h(ev) {
