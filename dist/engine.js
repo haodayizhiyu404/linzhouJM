@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 04:23
+//  构建时间（本地）：2026-10-04 05:06
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 04:23';
+var __LZJM_BUILD__ = '2026-10-04 05:06';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -218,6 +218,20 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!name || name === this.line()) return;
       var r = readRoot();
       r.line = name;
+      writeRoot(r);
+    },
+
+    // IF 线记录（时代记录的搭档）：IF 条目开关是世界书全局态，不随聊天走——
+    // 不记录的话，A 聊天开的 IF 会染到 B 聊天（成人聊天挂着高中 IF 的元凶）。
+    // 存 IF 条目标题名（LINE_IFS.entry），空串=本线无 IF/清除记录。
+    lineIf: function () {
+      var r = readRoot();
+      return r.lineIf || '';
+    },
+    setLineIf: function (name) {
+      var r = readRoot();
+      if (name) r.lineIf = name;
+      else delete r.lineIf;
       writeRoot(r);
     },
 
@@ -3002,6 +3016,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       try {
         await W.Worldbook.setEntriesEnabled(eng.lineIfOps(line, ifEntry || null));
         W.Store.setLine(line);
+        W.Store.setLineIf(ifEntry || ''); // IF 进聊天记录——跨聊天归位时时代+IF 一起对账
         await eng.refreshStates(); // 重读真实开关（含IF条目）——快照不含IF翻动的乐观更新，菜单高亮靠它
         eng.locateLine(); // 记录与开关已一致，只归位内部状态，不会二次写条目，也不会打开手机
         try {
@@ -5320,12 +5335,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var switchHit = this.lineBySwitch();
 
       if (savedOk) {
-        if (!(switchHit.known && switchHit.line === saved)) this.reconcileLine(saved, switchHit);
+        this.reconcileLine(saved, switchHit); // 时代+IF 对记录，内部自判是否需要翻动
         this.applyLine(saved, '聊天记录');
         return;
       }
       if (switchHit.known && switchHit.line) {
-        if (record) W.Store.setLine(switchHit.line);
+        if (record) { W.Store.setLine(switchHit.line); W.Store.setLineIf(''); } // 新记录从"无 IF"起步，防残留
         this.applyLine(switchHit.line, '主条目开关');
         return;
       }
@@ -5342,22 +5357,47 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
     // 世界书开关归位到记录中的线（异步写条目；调用前已比对，一致不会走到这）。
     // 写入只影响下一次注入评估——正在进行的生成，注入在开头就定好了，改不动也不该改。
+    // 聊天记录归位：时代+IF 一把翻（lineIfOps 同时盖两类条目）。
+    // 旧版只翻时代且仅在时代不一致时触发——时代恰好一致/只脏 IF 时完全不动，
+    // IF 条目是世界书全局开关，跨聊天互染（成人聊天挂着高中 IF）即由此而来。
+    // 时代与 IF 都对得上记录时不写入（不动用户中途的手动翻开关）。
     reconcileLine: function (target, switchHit) {
       if (this._reconciling) return; // 写入是异步的，防重入
-      this._reconciling = true;
       var self = this;
+      var W = window.LZJM;
+      var savedIf = '';
+      try { savedIf = W.Store.lineIf(); } catch (e) {}
+      var eraOk = !!(switchHit.known && switchHit.line === target);
+      if (eraOk && this.ifStateMatches(target, savedIf)) return;
       var why = switchHit.known
-        ? ('开关当前在【' + (switchHit.line || '全部关闭') + '】')
+        ? ('开关当前在【' + (switchHit.line || '全部关闭') + '】' + (savedIf ? '，IF 记录【' + savedIf + '】' : ''))
         : ('开关读不出：' + (switchHit.note || '条目缺失'));
-      window.LZJM.Worldbook.setEntriesEnabled(this.lineOps(target)).then(function () {
-        self.noteLineEntries(target);
-        console.log('[霖州引擎] 世界书已按聊天记录归位到【' + target + '】（' + why + '）');
-        try { toastr.info('已按该聊天记录切换到【' + target + '】（世界书条目已代劳开关）', '📱 霖州引擎'); } catch (e) {}
+      this._reconciling = true;
+      W.Worldbook.setEntriesEnabled(this.lineIfOps(target, savedIf || null)).then(function () {
+        return self.refreshStates();
+      }).then(function () {
+        console.log('[霖州引擎] 世界书已按聊天记录归位到【' + target + '】' + (savedIf ? '·【' + savedIf + '】' : '') + '（' + why + '）');
+        try { toastr.info('已按该聊天记录切换到【' + target + '】' + (savedIf ? '·【' + savedIf + '】' : '') + '（世界书条目已代劳开关）', '📱 霖州引擎'); } catch (e) {}
       }, function (e) {
         console.warn('[霖州引擎] 世界书归位写入失败', e);
         try { toastr.warning('世界书归位失败：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
       }).then(function () { self._reconciling = false; },
               function () { self._reconciling = false; });
+    },
+
+    // 当前 IF 开关是否与记录一致（标题包含匹配，与 setEntriesEnabled 同规则；条目不存在不算不一致）
+    ifStateMatches: function (line, ifName) {
+      var list = LINE_IFS[line] || [];
+      var st = state.entryStates;
+      for (var i = 0; i < list.length; i++) {
+        var found = false, on = false;
+        for (var k in st) {
+          if (k.indexOf(list[i].entry) !== -1) { found = true; on = st[k] !== false; break; }
+        }
+        if (!found) continue;
+        if (on !== (list[i].entry === ifName)) return false;
+      }
+      return true;
     },
 
     // 写完条目后把内存里的开关快照同步成目标状态：省一次重读，也防连续误判重复写。
@@ -5411,6 +5451,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var ln = W.Worldbook.matchDlcLine(title);
         if (ln) {
           W.Store.setLine(ln);
+          W.Store.setLineIf(''); // 广播只定时代，IF 从无起步
           this.applyLine(ln, '世界书激活广播');
           return;
         }
@@ -6876,6 +6917,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!item || !item.line) return;
       await W.Worldbook.setEntriesEnabled(self.openingLineOps(item));
       W.Store.setLine(item.line);
+      W.Store.setLineIf((item.open || [])[0] || ''); // IF 随开场白记录，跨聊天归位靠它
       await self.refreshStates();
       self.locateLine();
     },

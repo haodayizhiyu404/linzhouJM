@@ -941,6 +941,14 @@ ctx.getWorldbook = async () => [
   eq('通话轮·NSFW不重复', (function () { var s = memTxt; return s.indexOf('[亲密场合叙事风格指引]') === s.lastIndexOf('[亲密场合叙事风格指引]'); })(), true);
   eq('通话·新内容自动滚底', wsrc.indexOf('_callNew') !== -1 && wsrc.indexOf('meRow.offsetTop') !== -1, true); // 锚定机主末条，非粗暴滚到底
   eq('开场白QR·四件套在位', esrc.indexOf('qrOpenings') !== -1 && esrc.indexOf('openingInsert') !== -1 && esrc.indexOf('lzjm-open-pop') !== -1 && esrc.indexOf('alternate_greetings') !== -1 && esrc.indexOf('/gamestart/i') !== -1 && esrc.indexOf('createChatMessages') !== -1 && esrc.indexOf('LZJM_OPENINGS') !== -1, true);
+  // IF 线记录（时代+IF 双记录，跨聊天归位对账——成人聊天挂高中 IF 的互染修复）
+  eq('IF线·记录读写清', (function () {
+    LW.Store.setLineIf('高中·新城的月亮');
+    var a = LW.Store.lineIf();
+    LW.Store.setLineIf('');
+    return a === '高中·新城的月亮' && LW.Store.lineIf() === '';
+  })(), true);
+  eq('IF线·归位机制在位', esrc.indexOf('ifStateMatches') !== -1 && esrc.indexOf('lineIfOps(target, savedIf || null)') !== -1 && wsrc.indexOf('setLineIf') !== -1, true);
   eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('通话·边界标记仅拨号打一次', (wsrc.match(/—— 通话开始 ——/g) || []).length, 1); // 前移后接通处不得再打，否则响铃期界面错位复发

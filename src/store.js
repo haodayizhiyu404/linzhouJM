@@ -212,6 +212,20 @@
       writeRoot(r);
     },
 
+    // IF 线记录（时代记录的搭档）：IF 条目开关是世界书全局态，不随聊天走——
+    // 不记录的话，A 聊天开的 IF 会染到 B 聊天（成人聊天挂着高中 IF 的元凶）。
+    // 存 IF 条目标题名（LINE_IFS.entry），空串=本线无 IF/清除记录。
+    lineIf: function () {
+      var r = readRoot();
+      return r.lineIf || '';
+    },
+    setLineIf: function (name) {
+      var r = readRoot();
+      if (name) r.lineIf = name;
+      else delete r.lineIf;
+      writeRoot(r);
+    },
+
     markRendered: function (mesid) {
       var r = readRoot();
       r.rendered = r.rendered || [];

@@ -913,6 +913,7 @@
       try {
         await W.Worldbook.setEntriesEnabled(eng.lineIfOps(line, ifEntry || null));
         W.Store.setLine(line);
+        W.Store.setLineIf(ifEntry || ''); // IF 进聊天记录——跨聊天归位时时代+IF 一起对账
         await eng.refreshStates(); // 重读真实开关（含IF条目）——快照不含IF翻动的乐观更新，菜单高亮靠它
         eng.locateLine(); // 记录与开关已一致，只归位内部状态，不会二次写条目，也不会打开手机
         try {
