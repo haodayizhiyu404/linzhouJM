@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 05:26
+//  构建时间（本地）：2026-10-04 05:30
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 05:26';
+var __LZJM_BUILD__ = '2026-10-04 05:30';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -7065,9 +7065,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var css = doc.createElement('style');
         css.id = 'lzjm-open-style';
         css.textContent = [
-          '.lzjm-open-pop{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;width:320px;max-height:74vh;overflow-y:auto;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
-          '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px}',
+          '.lzjm-open-pop{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:99999;width:320px;max-height:74vh;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit;display:flex;flex-direction:column;overflow:hidden}',
+          '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px;flex:none}',
           '.lzjm-open-x{cursor:pointer;opacity:.55;padding:0 4px}',
+          '.lzjm-open-list{flex:1;min-height:0;overflow-y:auto;padding-right:2px}',
+          '.lzjm-open-list::-webkit-scrollbar{width:4px}',
+          '.lzjm-open-list::-webkit-scrollbar-track{background:transparent}',
+          '.lzjm-open-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:2px}',
+          '@supports not selector(::-webkit-scrollbar){.lzjm-open-list{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.18) transparent}}',
           '.lzjm-open-gh{font-size:11px;color:#8a8f98;margin:8px 2px 2px;letter-spacing:1px}',
           '.lzjm-open-row{display:flex;flex-direction:column;gap:3px;padding:8px 10px;margin:6px 0;border-radius:12px;background:#e9ebef;box-shadow:inset 3px 3px 7px #d1d3d9,inset -3px -3px 7px #ffffff}',
           '.lzjm-open-row b{font-size:13px}',
@@ -7092,11 +7097,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var headTxt = picking
         ? '开场白 · 点「切换」选用该开场（世界书随开场自动切换）'
         : '开场白 · 点「插入」把该开场追加为新楼层（世界书随开场自动切换）';
-      var html = '<div class="lzjm-open-head"><span></span><span class="lzjm-open-x">✕</span></div>';
+      var html = '<div class="lzjm-open-head"><span></span><span class="lzjm-open-x">✕</span></div><div class="lzjm-open-list">';
       byGroup.forEach(function (g, gi) {
         if (g.label) html += '<div class="lzjm-open-gh">' + g.label + '</div>';
         g.items.forEach(function (it) { html += '<div class="lzjm-open-row" data-g="' + gi + '"><b></b><i></i>' + (it.ifName ? '<span class="lzjm-open-if"></span>' : '') + '<span class="lzjm-open-acts"><button data-act="jump">切换</button><button data-act="insert">插入</button></span></div>'; });
       });
+      html += '</div>';
       pop.innerHTML = html;
       pop.querySelector('.lzjm-open-head span').textContent = headTxt;
       var rowEls = pop.querySelectorAll('.lzjm-open-row');
