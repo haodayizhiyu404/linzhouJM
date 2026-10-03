@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-02 15:29
+//  构建时间（本地）：2026-10-03 15:40
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-02 15:29';
+var __LZJM_BUILD__ = '2026-10-03 15:40';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -3910,7 +3910,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         }
         // 接听：剥掉 [接听] 标记（兼容笨 AI 的「接听：」写法），正文按保序流进通话记录
         // （视频 = [画面] 行与台词行交织；splitCallOutput 兼容旧式 --- 块）
+        // 先打「通话开始」边界：新通话的界面/生成提示词只认本会话，旧详单不再混入
         text = text.replace(/^\[接听\]\s*/, '').replace(/^接听[：:]\s*/, '').trim();
+        W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
         var entries = [];
         if (mode === 'video') {
           eng.splitCallOutput(text).slice(0, 12).forEach(function (en) {
@@ -3954,7 +3956,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (this.call === call) { call.busy = false; this.render(); }
     },
 
-    // 重说：弹掉对方最近一段台词，原地重生（带着机主最后一句的语境）
+    // 重说：弹掉对方最近一段台词，原地重生（带着机主最后一句的语境）。
+    // 弹栈不设条数上限——视频一轮最多 16 条，旧上限 10 会把旧回复的前几条留在
+    // transcript 里喂给重生请求（旁白泄漏）；遇机主消息/「通话开始」边界即停。
     callReroll: async function () {
       var W = window.LZJM, eng = W.Engine;
       var call = this.call;
@@ -3962,7 +3966,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var key = eng.callKey(call.name);
       var h = W.Store.history(key);
       var n = 0;
-      for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys' && n < 10; i--) n++;
+      for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
       if (!n) return;
       W.Store.popLast(key, n);
       call.busy = true;
@@ -4024,7 +4028,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var imgUrl = c.avatar ? esc(W.Worldbook.imgUrl(c.avatar)) : '';
       av = imgUrl ? '<img src="' + imgUrl + '">' : esc(call.name.slice(0, 1));
     } catch (e) { av = esc(call.name.slice(0, 1)); }
-    var hist = W.Store.history(eng.callKey(call.name));
+    var raw = W.Store.history(eng.callKey(call.name));
+    // 只渲染本会话（最近一个「通话开始」边界之后）；data-cdel 用全量下标，删除才能对上位
+    var base = eng.callSessionStart(raw);
+    var hist = raw.slice(base);
     // PiP 自视窗：优先 persona 头像（同聊天页"我"的气泡头像来源），没有则退名首字
     var pip = '';
     if (call.mode === 'video' && call.phase === 'active') {
@@ -4035,9 +4042,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 视频的画面条目穿插在气泡流中间：说第一句时吃薯片、说第二句时抬头看镜头……
     var subs = hist.map(function (m, i) {
       if (m.who === 'sys') return '';
-      if (m.kind === 'scene') return '<div class="lzjm-callscene" data-cdel="' + i + '">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
+      if (m.kind === 'scene') return '<div class="lzjm-callscene" data-cdel="' + (base + i) + '">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
       var isMe = m.who === 'user';
-      return '<div class="lzjm-sub' + (isMe ? ' me' : '') + '" data-cdel="' + i + '">' + esc(m.text || '') + '</div>';
+      return '<div class="lzjm-sub' + (isMe ? ' me' : '') + '" data-cdel="' + (base + i) + '">' + esc(m.text || '') + '</div>';
     }).join('');
     var status = call.phase === 'ringing'
       ? '正在呼叫…'
@@ -5476,7 +5483,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           var callDay = snap && snap.dateText;
           if (callDay) {
             var chist = W.Store.history(this.callKey(c.name));
-            var cday = chist.filter(function (m) { return m.day === callDay; });
+            // 只取最近一次通话（「通话开始」边界之后）；一天两通电话时互不串味
+            var cday = chist.slice(this.callSessionStart(chist)).filter(function (m) { return m.day === callDay; });
             if (cday.length) {
               var dur = '';
               for (var ci = cday.length - 1; ci >= 0; ci--) {
@@ -6093,6 +6101,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 进 transcript 直接接通。通话轮 = 「机主说一句 → 对方回台词」循环。
     callKey: function (name) { return 'call:' + name; },
 
+    // 通话详单里最近一次「通话开始」边界之后的首个下标。新通话的界面展示与生成提示词
+    // 都只认本会话内容（打标记之前的旧详单只作私聊"今日通话"记忆素材，不进新通话）；
+    // 无边界（旧数据）返回 0 = 全量，兼容老记录。
+    callSessionStart: function (hist) {
+      for (var i = (hist || []).length - 1; i >= 0; i--) {
+        if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) return i + 1;
+      }
+      return 0;
+    },
+
     // 拨打邀请：AI 决定接/拒
     callInvite: async function (name, mode) {
       var W = window.LZJM;
@@ -6143,7 +6161,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var userInfo = this.userBlock();
       var hist = W.Store.history(this.callKey(name));
       var tail = [];
-      for (var i = Math.max(0, hist.length - 30); i < hist.length; i++) {
+      // 只带本会话（最近一个「通话开始」边界之后）；旧通话详单不进新通话的请求
+      for (var i = Math.max(this.callSessionStart(hist), hist.length - 30); i < hist.length; i++) {
         var m = hist[i];
         if (m.who === 'sys') continue;
         tail.push(m);

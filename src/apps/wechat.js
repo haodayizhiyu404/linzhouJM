@@ -1933,7 +1933,9 @@
         }
         // 接听：剥掉 [接听] 标记（兼容笨 AI 的「接听：」写法），正文按保序流进通话记录
         // （视频 = [画面] 行与台词行交织；splitCallOutput 兼容旧式 --- 块）
+        // 先打「通话开始」边界：新通话的界面/生成提示词只认本会话，旧详单不再混入
         text = text.replace(/^\[接听\]\s*/, '').replace(/^接听[：:]\s*/, '').trim();
+        W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
         var entries = [];
         if (mode === 'video') {
           eng.splitCallOutput(text).slice(0, 12).forEach(function (en) {
@@ -1977,7 +1979,9 @@
       if (this.call === call) { call.busy = false; this.render(); }
     },
 
-    // 重说：弹掉对方最近一段台词，原地重生（带着机主最后一句的语境）
+    // 重说：弹掉对方最近一段台词，原地重生（带着机主最后一句的语境）。
+    // 弹栈不设条数上限——视频一轮最多 16 条，旧上限 10 会把旧回复的前几条留在
+    // transcript 里喂给重生请求（旁白泄漏）；遇机主消息/「通话开始」边界即停。
     callReroll: async function () {
       var W = window.LZJM, eng = W.Engine;
       var call = this.call;
@@ -1985,7 +1989,7 @@
       var key = eng.callKey(call.name);
       var h = W.Store.history(key);
       var n = 0;
-      for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys' && n < 10; i--) n++;
+      for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
       if (!n) return;
       W.Store.popLast(key, n);
       call.busy = true;
@@ -2047,7 +2051,10 @@
       var imgUrl = c.avatar ? esc(W.Worldbook.imgUrl(c.avatar)) : '';
       av = imgUrl ? '<img src="' + imgUrl + '">' : esc(call.name.slice(0, 1));
     } catch (e) { av = esc(call.name.slice(0, 1)); }
-    var hist = W.Store.history(eng.callKey(call.name));
+    var raw = W.Store.history(eng.callKey(call.name));
+    // 只渲染本会话（最近一个「通话开始」边界之后）；data-cdel 用全量下标，删除才能对上位
+    var base = eng.callSessionStart(raw);
+    var hist = raw.slice(base);
     // PiP 自视窗：优先 persona 头像（同聊天页"我"的气泡头像来源），没有则退名首字
     var pip = '';
     if (call.mode === 'video' && call.phase === 'active') {
@@ -2058,9 +2065,9 @@
     // 视频的画面条目穿插在气泡流中间：说第一句时吃薯片、说第二句时抬头看镜头……
     var subs = hist.map(function (m, i) {
       if (m.who === 'sys') return '';
-      if (m.kind === 'scene') return '<div class="lzjm-callscene" data-cdel="' + i + '">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
+      if (m.kind === 'scene') return '<div class="lzjm-callscene" data-cdel="' + (base + i) + '">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
       var isMe = m.who === 'user';
-      return '<div class="lzjm-sub' + (isMe ? ' me' : '') + '" data-cdel="' + i + '">' + esc(m.text || '') + '</div>';
+      return '<div class="lzjm-sub' + (isMe ? ' me' : '') + '" data-cdel="' + (base + i) + '">' + esc(m.text || '') + '</div>';
     }).join('');
     var status = call.phase === 'ringing'
       ? '正在呼叫…'

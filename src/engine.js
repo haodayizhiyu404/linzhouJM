@@ -870,7 +870,8 @@
           var callDay = snap && snap.dateText;
           if (callDay) {
             var chist = W.Store.history(this.callKey(c.name));
-            var cday = chist.filter(function (m) { return m.day === callDay; });
+            // 只取最近一次通话（「通话开始」边界之后）；一天两通电话时互不串味
+            var cday = chist.slice(this.callSessionStart(chist)).filter(function (m) { return m.day === callDay; });
             if (cday.length) {
               var dur = '';
               for (var ci = cday.length - 1; ci >= 0; ci--) {
@@ -1487,6 +1488,16 @@
     // 进 transcript 直接接通。通话轮 = 「机主说一句 → 对方回台词」循环。
     callKey: function (name) { return 'call:' + name; },
 
+    // 通话详单里最近一次「通话开始」边界之后的首个下标。新通话的界面展示与生成提示词
+    // 都只认本会话内容（打标记之前的旧详单只作私聊"今日通话"记忆素材，不进新通话）；
+    // 无边界（旧数据）返回 0 = 全量，兼容老记录。
+    callSessionStart: function (hist) {
+      for (var i = (hist || []).length - 1; i >= 0; i--) {
+        if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) return i + 1;
+      }
+      return 0;
+    },
+
     // 拨打邀请：AI 决定接/拒
     callInvite: async function (name, mode) {
       var W = window.LZJM;
@@ -1537,7 +1548,8 @@
       var userInfo = this.userBlock();
       var hist = W.Store.history(this.callKey(name));
       var tail = [];
-      for (var i = Math.max(0, hist.length - 30); i < hist.length; i++) {
+      // 只带本会话（最近一个「通话开始」边界之后）；旧通话详单不进新通话的请求
+      for (var i = Math.max(this.callSessionStart(hist), hist.length - 30); i < hist.length; i++) {
         var m = hist[i];
         if (m.who === 'sys') continue;
         tail.push(m);

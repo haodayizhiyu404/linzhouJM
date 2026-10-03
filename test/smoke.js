@@ -257,6 +257,7 @@ ctx.getWorldbook = async () => [
 
   // ── 8.5 引擎线作用域：拼装、串线隔离、user 宏替换 ──
   console.log('[引擎·线档案]');
+  var realAppsBak = LW.Apps;   // 8.5 起 Apps 换最小桩躲 DOM；通话交互测试处凭此引用换回真身
   LW.Apps = { wechat: { inject() {}, render() {}, remove() {} } };
   LW.Engine.userName = () => '陈默';
   ctx.getPersona = undefined;   // 模拟旧版酒馆助手：无 getPersona，走父页 powerUserSettings
@@ -644,6 +645,30 @@ ctx.getWorldbook = async () => [
   eq('群名·路由进群键', LW.Store.history('group:霖附吃瓜二手交易市场').some(function (m) { return m.text.indexOf('球赛定了') !== -1; }), true);
   eq('群名·不建私聊幽灵', LW.Store.history('霖附吃瓜二手交易市场').length, 0);
   delete ctx.getVariables().user;
+  // 通话会话边界（bug：新通话界面/API 请求混入旧详单）+ 重roll 弹净超长回复（旧 10 条上限泄漏旁白）
+  const ck = LW.Engine.callKey('沈锡元');
+  LW.Store.push(ck, [{ who: '沈锡元', kind: 'text', text: '上一轮通话的旧台词' }], 200);
+  LW.Store.push(ck, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+  LW.Store.push(ck, [{ who: 'user', kind: 'text', text: '喂？' }], 200);
+  const oldReply = [];
+  for (let vi = 0; vi < 16; vi++) oldReply.push({ who: '沈锡元', kind: vi % 2 ? 'scene' : 'text', text: '旧回复第' + vi + '条' });
+  LW.Store.push(ck, oldReply, 200);
+  const ckHist = LW.Store.history(ck);
+  eq('通话·边界定位在最近标记后', LW.Engine.callSessionStart(ckHist), ckHist.length - 17);
+  // 8.5 节把 Apps.wechat 换成了最小桩，这里凭 realAppsBak 临时换回真身做通话交互测试
+  const stubApps = LW.Apps;
+  LW.Apps = realAppsBak;
+  LW.Apps.wechat.render = function () {};
+  LW.Apps.wechat.call = { name: '沈锡元', mode: 'video', phase: 'active', busy: false };
+  await LW.Apps.wechat.callReroll();
+  const afterRoll = LW.Store.history(ck);
+  const sess0 = LW.Engine.callSessionStart(afterRoll);
+  eq('重roll·弹净16条旧回复', afterRoll.slice(sess0).filter(function (m) { return m.who === '沈锡元'; }).length, 0);
+  eq('重roll·不越边界咬上一会话', afterRoll.slice(0, sess0).some(function (m) { return m.text === '上一轮通话的旧台词'; }), true);
+  eq('重roll·机主行与边界保留', afterRoll.length, 3);
+  LW.Apps.wechat.call = null;
+  LW.Apps = stubApps;   // 恢复最小桩，后续测试环境不变
+  eq('通话·无边界旧数据全量', LW.Engine.callSessionStart([{ who: 'user', kind: 'text', text: 'x' }]), 0);
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');
