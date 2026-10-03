@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 22:48
+//  构建时间（本地）：2026-10-03 22:54
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 22:48';
+var __LZJM_BUILD__ = '2026-10-03 22:54';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -826,16 +826,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
   }
 
-  // 用户自定义前置文本（设置页粘贴的破限/风格词）：手机生成不走酒馆预设，预设里的
-  // 破限到不了手机——这里留一个口子，所有手机生成统一注入；留空则不注入。
-  function customPre() {
-    try {
-      var p = window.LZJM.Store.settings().preamble;
-      if (p && String(p).trim()) return String(p).trim();
-    } catch (e) {}
-    return '';
-  }
-
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
   //    所以这里自己解析（与 engine.js userName() 同一套回退）。──
   function me() {    try {
@@ -1042,10 +1032,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -1134,10 +1121,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 决定须符合上方「关系」阶段与当前情境（深夜/工作时间/在群里刚聊过等）'
       ].join('\n');
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · ' + kind + '邀请',
         '',
@@ -1205,10 +1189,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 不要复述机主刚说的话'
       ].join('\n');
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · ' + kind + (mode === 'video' ? ' · 画面与台词' : '') + '进行中',
         '',
@@ -1264,10 +1245,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   momentsFill: function (people, snapshot, userInfo) {
     var myName = me();
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈动态生成',
       '',
@@ -1318,10 +1296,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return (c.replyTo ? c.who + ' 回复 ' + c.replyTo : c.who) + '：' + c.text;
     });
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈评论回复',
       '',
@@ -1367,10 +1342,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   momentsReact: function (post, people, snapshot, userInfo, recentPriv, recentGrp) {
     var myName = me();
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈回应',
       '',
@@ -1428,10 +1400,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
 
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -1503,10 +1472,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var myName = me();
     // 上下文（system，chat_history 之前）：任务说明、档案、机主、情境、微信记录
     var ctx = [
-      '# 虚构沙盒',
-      '',
       FICTION,
-      customPre(),
       '',
       '# 数字世界 · 备忘录生成',
       '',
@@ -2431,7 +2397,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
-    '.lzjm-setpre{resize:vertical;line-height:1.55;min-height:76px;font-family:inherit}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
     '.lzjm-setpick span{padding:4px 9px;background:#f0f1f3;border-radius:20px;font-size:12px;color:#1a1d21;cursor:pointer}',
@@ -3428,10 +3393,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             try { localStorage.setItem('lzjm_phone_apikey', el.value); } catch (e) {}
           };
         });
-        // 自定义前置文本（破限/风格）：即时存进聊天变量设置，所有手机生成统一注入
-        ph.querySelectorAll('[data-pre]').forEach(function (el) {
-          el.onchange = function () { window.LZJM.Store.setSettings({ preamble: el.value }); };
-        });
         ph.querySelectorAll('[data-afetch]').forEach(function (el) {
           el.onclick = async function () {
             try {
@@ -4420,16 +4381,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
-    var pre0 = '';
-    try { pre0 = W.Store.settings().preamble || ''; } catch (e) {}
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
       '<div class="lzjm-setsec">正文生成 · 手机注入（正文 AI 对手机的知情度）</div><div class="lzjm-setcard">' + numsInj + '</div>' +
-      '<div class="lzjm-setsec">自定义前置文本（破限/风格，所有手机生成统一注入）</div><div class="lzjm-setcard">' +
-      '<textarea class="lzjm-settxt lzjm-setpre" data-pre="1" rows="5" placeholder="手机生成不走酒馆预设——预设里的破限到不了手机。把破限/风格词粘在这里（留空则不注入），私聊/群聊/通话/备忘录的每次生成都会带上。">' + esc(pre0) + '</textarea></div>' +
       '<div class="lzjm-setnote">跨会话：生成私聊时，顺带带对方今天在的群的记录；生成群时，顺带带成员今天与机主的私聊，让对方接得上别处的梗。</div>' +
       '<div class="lzjm-setnote">数值改动立即生效；API 改动作用于之后的每次手机生成。携带量与 API 配置（含自定义预设，密钥除外）随聊天变量保存（明文、随卡走）；密钥按预设名各存一份，只留在本机浏览器。</div>' +
       '</div></div>';

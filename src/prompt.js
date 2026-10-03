@@ -17,16 +17,6 @@
     return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
   }
 
-  // 用户自定义前置文本（设置页粘贴的破限/风格词）：手机生成不走酒馆预设，预设里的
-  // 破限到不了手机——这里留一个口子，所有手机生成统一注入；留空则不注入。
-  function customPre() {
-    try {
-      var p = window.LZJM.Store.settings().preamble;
-      if (p && String(p).trim()) return String(p).trim();
-    } catch (e) {}
-    return '';
-  }
-
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
   //    所以这里自己解析（与 engine.js userName() 同一套回退）。──
   function me() {    try {
@@ -233,10 +223,7 @@
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -325,10 +312,7 @@
         '- 决定须符合上方「关系」阶段与当前情境（深夜/工作时间/在群里刚聊过等）'
       ].join('\n');
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · ' + kind + '邀请',
         '',
@@ -396,10 +380,7 @@
         '- 不要复述机主刚说的话'
       ].join('\n');
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · ' + kind + (mode === 'video' ? ' · 画面与台词' : '') + '进行中',
         '',
@@ -455,10 +436,7 @@
   momentsFill: function (people, snapshot, userInfo) {
     var myName = me();
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈动态生成',
       '',
@@ -509,10 +487,7 @@
       return (c.replyTo ? c.who + ' 回复 ' + c.replyTo : c.who) + '：' + c.text;
     });
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈评论回复',
       '',
@@ -558,10 +533,7 @@
   momentsReact: function (post, people, snapshot, userInfo, recentPriv, recentGrp) {
     var myName = me();
     var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
       '# 数字世界 · 朋友圈回应',
       '',
@@ -619,10 +591,7 @@
       });
 
       var p = [
-        '# 虚构沙盒',
-        '',
         FICTION,
-        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -694,10 +663,7 @@
     var myName = me();
     // 上下文（system，chat_history 之前）：任务说明、档案、机主、情境、微信记录
     var ctx = [
-      '# 虚构沙盒',
-      '',
       FICTION,
-      customPre(),
       '',
       '# 数字世界 · 备忘录生成',
       '',
