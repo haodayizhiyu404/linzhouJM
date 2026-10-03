@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 19:37
+//  构建时间（本地）：2026-10-03 19:40
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 19:37';
+var __LZJM_BUILD__ = '2026-10-03 19:40';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -6246,29 +6246,31 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       for (var i = 0; i < hist.length; i++) {
         if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) begins.push(i);
       }
-      // 段界：首个边界标记之前的头部（无边界老数据）也算一段，之后每标记到下一边界各一段
+      // 段界：首个边界标记之前的头部（无边界老数据）也算一段，之后每标记到下一边界各一段。
+      // 第三元 = 本段的边界标记下标（-1=无标记的老数据段）：mode 落进边界标记，
+      // 而段内容本身不含标记行，须从 hist 里按标记下标读。
       var bounds = [];
-      if (!begins.length) bounds.push([0, hist.length]);
+      if (!begins.length) bounds.push([0, hist.length, -1]);
       else {
-        if (begins[0] > 0) bounds.push([0, begins[0]]);
+        if (begins[0] > 0) bounds.push([0, begins[0], -1]);
         for (var b2 = 0; b2 < begins.length; b2++) {
-          bounds.push([begins[b2] + 1, b2 + 1 < begins.length ? begins[b2 + 1] : hist.length]);
+          bounds.push([begins[b2] + 1, b2 + 1 < begins.length ? begins[b2 + 1] : hist.length, begins[b2]]);
         }
       }
       var out = [];
       for (var si = 0; si < bounds.length; si++) {
         var seg = hist.slice(bounds[si][0], bounds[si][1]);
-        var mode = '', dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
+        var mode = (bounds[si][2] >= 0 && hist[bounds[si][2]].mode) || '';
+        var dur = '', day = '', time = '', count = 0, ongoing = true, interrupted = false;
         seg.forEach(function (m) {
           if (m.who === 'sys') {
             var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
             if (dm) { dur = dm[1]; ongoing = false; }
             else if (/通话中断/.test(String(m.text || ''))) { ongoing = false; interrupted = true; }
-            if (m.mode) mode = m.mode;   // 边界标记落型的通话以标记为准（视频可无画面行）
             return;
           }
           count++;
-          if (m.kind === 'scene') mode = mode || 'video';
+          if (m.kind === 'scene') mode = mode || 'video';   // 老数据无标记可读，退回画面嗅探
           if (!day && m.day) { day = m.day; time = m.time || ''; }
         });
         if (!mode) mode = 'audio';
