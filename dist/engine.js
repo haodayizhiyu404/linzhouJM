@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 02:52
+//  构建时间（本地）：2026-10-04 02:54
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 02:52';
+var __LZJM_BUILD__ = '2026-10-04 02:54';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -3416,12 +3416,21 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           if (t) UI.momentsSendComment(UI.mCmt, t);
         }
       });
-      // 通话字幕区：有新内容到达（机主发送/对方回复/开场）自动滚到底——停在旧位置时
-      // 新回复在屏外，用户没注意到已经收到；无新内容（如仅计时刷新）保持原滚动位置
+      // 通话字幕区：有新内容到达（机主发送/对方回复/开场）自动定位——锚定机主最后一条，
+      // 把它顶到可视区顶部，对方的整轮回复从开头顺读；不回到底（底 anchoring 只露长回复的
+      // 末尾，被迫上滑再下滑）；无新内容（如仅计时刷新）保持原滚动位置，翻历史不被打断
       if (this.call) {
         var cs = ph.querySelector('.lzjm-callsubs');
         if (cs) {
-          if (this._callNew) { this._callNew = false; cs.scrollTop = cs.scrollHeight; }
+          if (this._callNew) {
+            this._callNew = false;
+            var meRow = null;
+            for (var ri = cs.children.length - 1; ri >= 0; ri--) {
+              var el2 = cs.children[ri];
+              if (el2.classList && el2.classList.contains('me')) { meRow = el2; break; }
+            }
+            cs.scrollTop = meRow ? Math.max(0, meRow.offsetTop - 10) : cs.scrollHeight;
+          }
           else cs.scrollTop = (prevSubs < 0) ? cs.scrollHeight : Math.min(prevSubs, cs.scrollHeight);
         }
       }

@@ -939,7 +939,7 @@ ctx.getWorldbook = async () => [
   const tReply = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '裴知意：喂', [], null, '', 'video', [], '嗯，在听', [], '');
   eq('通话轮·回应任务描述', tReply.ordered_prompts[1].content.indexOf('说：「嗯，在听」') !== -1, true);
   eq('通话轮·NSFW不重复', (function () { var s = memTxt; return s.indexOf('[亲密场合叙事风格指引]') === s.lastIndexOf('[亲密场合叙事风格指引]'); })(), true);
-  eq('通话·新内容自动滚底', wsrc.indexOf('_callNew') !== -1 && wsrc.indexOf('cs.scrollTop = cs.scrollHeight') !== -1, true);
+  eq('通话·新内容自动滚底', wsrc.indexOf('_callNew') !== -1 && wsrc.indexOf('meRow.offsetTop') !== -1, true); // 锚定机主末条，非粗暴滚到底
   eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('通话·边界标记仅拨号打一次', (wsrc.match(/—— 通话开始 ——/g) || []).length, 1); // 前移后接通处不得再打，否则响铃期界面错位复发
