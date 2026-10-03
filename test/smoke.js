@@ -924,6 +924,7 @@ ctx.getWorldbook = async () => [
   eq('通话·回看复刻通话屏', wsrc.includes('lzjm-scr-chv') && wsrc.indexOf('callscene') !== -1 && wsrc.indexOf("m.kind === 'scene'") !== -1, true);
   eq('通话·回看返回键反白', wsrc.indexOf('.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}') !== -1, true); // SVG 描边写死，color 覆不到
   eq('朋友圈·热度与虚构人物条款', psrc.indexOf('至多 12 人') !== -1 && psrc.indexOf('可虚构次要人物') !== -1, true);
+  eq('朋友圈·身份号召力标度', psrc.indexOf('动态分量 × 发动态者的号召力') !== -1 && psrc.indexOf('动态分量 × 号召力') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
   eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);
