@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 01:20
+//  构建时间（本地）：2026-10-04 02:00
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 01:20';
+var __LZJM_BUILD__ = '2026-10-04 02:00';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -397,6 +397,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var MARK_STICKER = '霖州蒋默::表情包';
   var MARK_STICKER_ALIAS = ['媒体与表情包_StickerData'];   // 卡组既有条目，直接兼容
   var MARK_PROFILE = '霖州蒋默::人设::';
+  var MARK_NSFW = '霖州蒋默::NSFW';   // 卡的亲密文风指引：口味层由卡维护，引擎只负责注入提示词
 
   // ── 适配层：世界书列表与条目 ──
   async function bookNames() {
@@ -624,7 +625,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
     // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [] };
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '' };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -679,6 +680,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             var prev = result.profiles[who];
             result.profiles[who] = prev ? prev + '\n' + contentOf(es[i]) : contentOf(es[i]);
           }
+        } else if (t === MARK_NSFW) {
+          result.nsfwRaw = result.nsfwRaw ? result.nsfwRaw + '\n\n' + contentOf(es[i]) : contentOf(es[i]);
         } else {
           // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
           var dlcLn = matchDlcLine(t);
@@ -828,6 +831,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   function cfg() {
     try { return window.LZJM.Store.cfg(); } catch (e) {}
     return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
+  }
+
+  // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
+  // 位置在输出要求之前——靠后，口味压过内置默认语气；卡里没有该条目则不注入。
+  function nsfwBlock() {
+    try {
+      var t = window.LZJM.Engine.nsfwText();
+      if (t && String(t).trim()) return '## 亲密场合叙事风格（本卡文风设定，覆盖上方默认语气）\n' + t;
+    } catch (e) {}
+    return '';
   }
 
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
@@ -1080,6 +1093,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         consistencyRules('「' + contact.name + '」'),
         '',
         '## 输出要求',
+        nsfwBlock(),
         '- 只输出「' + contact.name + '」发来的新消息，1~5 条，按情绪与话题自然增减，必要时可超出（如情绪激动）',
         '- 每条独立成行，只写消息内容；不要前缀、时间戳、动作描写、括号心理',
         '- 每条不超过 35 字，像真人打字，不重复对方刚说过的话',
@@ -1128,6 +1142,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '- 拒绝：第一行以 [拒绝] 开头，其后可附一句简短说明（如「在忙，晚点回」），也可不附',
         '- [接听]/[拒绝] 是程序解析用的标记，只输出标记本身，不要给标记加引号或其他说明',
         '- 换行以完整句子为单位：一句话说完才换行，省略号与紧随的短句并入同一句；不要为营造停顿感把一句话砍成多行',
+        '- 情欲场景不套用通用色情腔：台词忠于人物档案（寡言的寡言、嘴碎的碎、会调情的才调情）；粗口与喊话仅当人设本身就粗。禁止千人一面的默认色情嗓音',
         '- 不得输出引号、动作描写、心理括号、时间戳',
         '- 决定须符合上方「关系」阶段与当前情境（深夜/工作时间/在群里刚聊过等）'
       ].join('\n');
@@ -1181,6 +1196,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           ? '## 本次' + kind + '基调\n机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
           : '',
         '',
+        nsfwBlock(),
+        '',
         outReq
       ].filter(function (s2) { return s2 !== ''; }).join('\n');
       return {
@@ -1202,17 +1219,22 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
         '## 输出要求',
+        nsfwBlock(),
         '- 输出 = 「' + contact.name + '」的台词与画面交织流：每行要么是台词，要么是以 [画面] 开头的一行可见状态（在哪、姿势、表情、衣着、手上的动作；只写看得见的东西）',
         '- [画面] 行穿插在台词中间、写在该动作发生的时刻——他一边说一边做的事（吃了片薯片、抬头看镜头、擦了把汗）就插在对应台词旁边，不要全堆在开头或结尾',
         '- 换行以完整句子为单位：一句话说完才换行——省略号与紧随的短句并入同一句（「……清楚。」「名字，你存心的。」各占一行），只有话题转换或动作切换才新起一行；不要为营造停顿感把一句话砍成多行',
+        '- 情欲场景不套用通用色情腔：此刻的台词忠于人物档案——寡言的保持寡言，嘴碎的才碎，会调情的才调情；粗口与喊话仅当人设本身就粗时才有。禁止千人一面的默认色情嗓音',
+        '- [画面] 行不限于功能性速写：体温、呼吸、肌理、光线与留白都可以写进画面行——它是情欲内容里文学性描写的合法位置',
         '- 台词行数随情境自然决定（聊得热络可以多说，无事可说就少），口语化：短句优先但说完整，可有语气词，不要书面腔',
         '- 每行独立，不要引号、动作描写、心理括号、时间戳（动作只写进 [画面] 行）',
         '- 情感与态度符合上方「关系」阶段；吵架、撒娇、汇报都按当前关系该有度',
         '- 不要复述机主刚说的话'
       ].join('\n') : [
         '## 输出要求',
+        nsfwBlock(),
         '- 只输出「' + contact.name + '」的台词，1~5 行，按情绪与话题自然增减（激动时可更多）',
         '- 换行以完整句子为单位：一句话说完才换行，省略号与紧随的短句并入同一句；不要为营造停顿感把一句话砍成多行',
+        '- 情欲场景不套用通用色情腔：台词忠于人物档案（寡言的寡言、嘴碎的碎、会调情的才调情）；粗口与喊话仅当人设本身就粗。禁止千人一面的默认色情嗓音',
         '- 口语化，像真人打电话：短句优先但说完整，可有语气词；不要书面腔',
         '- 每行独立，不要引号、动作描写、心理括号、时间戳',
         '- 情感与态度符合上方「关系」阶段；吵架、撒娇、汇报都按当前关系该有度',
@@ -1268,6 +1290,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           ? '## 本次' + kind + '基调\n机主与「' + contact.name + '」现为【' + snapshot.npc.relation + '】——语气亲疏、称呼、分寸以此为据；关系阶段以正文剧情为准。'
           : '',
         '',
+        nsfwBlock(),
+        '',
         outReq
       ].filter(function (s2) { return s2 !== ''; }).join('\n');
       return {
@@ -1306,6 +1330,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       people.map(function (pp) { return '- ' + pp.name + '：\n' + (pp.profile ? String(pp.profile).trim() : '（无档案）'); }).join('\n'),
       '',
       '## 输出要求（严格遵守）',
+      nsfwBlock(),
       '- 每位各输出一条动态，按发布时间从早到晚排列（最早的最先输出）',
       '- 格式严格为：[动态:名字:动态文字]（单行，标记外不要任何其他内容）',
       '- 每条动态后紧跟一行发布时间：[时间:M月D日 HH:MM]（24 小时制；以当前情境时间为准，不得晚于当前时刻；几条动态的时刻彼此拉开，昨天到今天为主，个别可早到几天前的白天）',
@@ -1363,6 +1388,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       myName + '：' + userSays,
       '',
       '## 输出要求（严格遵守）',
+      nsfwBlock(),
       '- 生成 0~3 条接话评论，每条一行，格式严格为：[评论:名字:评论内容]',
       '- 回复机主时格式为：[评论:名字@' + myName + ':评论内容]；回复其他评论者同理 @ 对方名字',
       '- 朋友圈口吻：短（≤25 字）、轻松、可玩梗可阴阳，但须符合各人与机主的关系阶段',
@@ -1408,6 +1434,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       people.map(function (pp) { return '- ' + pp.name + '：\n' + (pp.profile ? String(pp.profile).trim() : '（无档案）'); }).join('\n'),
       '',
       '## 输出要求（严格遵守）',
+      nsfwBlock(),
       '- 针对机主刚发的那条动态（最后一条用户消息里给出）生成反应',
       '- 生成 1~4 个 [赞:名字] 行，再生成 0~2 条 [评论:名字:评论内容] 行；每人只许出现一次（要么赞要么评论）',
       '- 谁会有反应由动态内容与人设决定：关系近的、爱玩梗的更容易冒泡；有人完全无感、没人评论也正常',
@@ -1489,6 +1516,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
               : ''),
         '',
         '## 输出要求',
+        nsfwBlock(),
         '- 输出 3~8 条群消息，每条一行，格式严格为「成员名：消息」',
         '- 谁接得上这句谁说，不必人人开口；可以互相接梗、拆台',
         '- 每条不超过 35 字，口语',
@@ -1550,6 +1578,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 不被几百楼历史稀释。引用聊天记录的规则写"上方记录"仍然成立。
     var reqs = [
       '## 输出要求（严格遵守）',
+      nsfwBlock(),
       '- 格式（独占标记行，一字不改）：',
       '  第一行：※备忘录※|日期|标题',
       '  中间：正文（可多段）',
@@ -4936,6 +4965,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
+    // 全文原样（{{user}} 宏在注入时 deref）。
+    nsfwText: function () {
+      return this.deref(state.nsfwRaw || '');
+    },
     LINES: LINES.slice(0),
     LINE_META: LINE_META,
     LINE_IFS: LINE_IFS,
@@ -5153,6 +5187,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 线作用域档案归线：NPC（…）/ 主角人设（…）里的块按括号里的线名分派，
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
+      state.nsfwRaw = data.nsfwRaw || '';
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {

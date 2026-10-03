@@ -17,6 +17,7 @@
   var MARK_STICKER = '霖州蒋默::表情包';
   var MARK_STICKER_ALIAS = ['媒体与表情包_StickerData'];   // 卡组既有条目，直接兼容
   var MARK_PROFILE = '霖州蒋默::人设::';
+  var MARK_NSFW = '霖州蒋默::NSFW';   // 卡的亲密文风指引：口味层由卡维护，引擎只负责注入提示词
 
   // ── 适配层：世界书列表与条目 ──
   async function bookNames() {
@@ -244,7 +245,7 @@
     // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
     // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [] };
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '' };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -299,6 +300,8 @@
             var prev = result.profiles[who];
             result.profiles[who] = prev ? prev + '\n' + contentOf(es[i]) : contentOf(es[i]);
           }
+        } else if (t === MARK_NSFW) {
+          result.nsfwRaw = result.nsfwRaw ? result.nsfwRaw + '\n\n' + contentOf(es[i]) : contentOf(es[i]);
         } else {
           // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
           var dlcLn = matchDlcLine(t);

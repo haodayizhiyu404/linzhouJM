@@ -220,7 +220,8 @@ ctx.getWorldbook = async () => [
   { comment: 'NPC（DLC·成人-破镜重圆）', enabled: true, content: '# I. 核心配角独立档案\n林溪、陆飞从高中时代起，与周言、沈锡元、{{user}}成为好友，关系密切，共同构筑了一个五人的核心小团体。\n\n[NPC·林溪]\n性别: 女。\n身份: 设计师（破镜重圆线）。\n\n[NPC·陆飞]\n性别: 男。\n身份: 运动康复师（破镜重圆线）。\n\n# II. 其他NPC档案\n\n[NPC·许嘉文]\n性别: 男。\n身份: 双面人（破镜重圆线）。' },
   { comment: '主角人设（DLC·成人-同路而行）', enabled: true, content: '# II. 角色演化档案\n\n[MAIN·周言·演化后]\n- 已婚设定（同路线）。\n\n[MAIN·{{user}}·演化后]\n- 与周言同居（同路线）。' },
   { comment: 'DLC扩展：大学篇', enabled: true, content: '本模块为大学阶段扩展资料库。\n\n---\n\n一、 既往因果\n- 大一时两人曾因误会冷战半年。\n\n二、 周言·角色叠加演化档案\n1. 身份变化：法学院学生，住校内宿舍。' },
-  { comment: '霖州蒋默::人设::林溪', enabled: true, content: '林溪的手机专用档案' }
+  { comment: '霖州蒋默::人设::林溪', enabled: true, content: '林溪的手机专用档案' },
+  { comment: '霖州蒋默::NSFW', enabled: true, content: '[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，情欲描写以克制与留白为先。' }
 ];
 (async () => {
   const wb = await LW.Worldbook.load();
@@ -302,6 +303,13 @@ ctx.getWorldbook = async () => [
   eq('关系总览·无小块也取到关系', ovSnap.npc && ovSnap.npc.relation, '前资助对象/地下情人');
   const greqRel = LW.Prompt.group({ name: '高三（2）班', open: false }, [{ name: '蒋默', profile: '测试档案' }], [], null);
   eq('群聊·总览关系挂名', greqRel.ordered_prompts[0].content.indexOf('蒋默（与机主：前资助对象/地下情人）') !== -1, true);
+  // 卡的 NSFW 文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，注入所有叙事类生成、位置靠后
+  eq('NSFW·条目读取', LW.Engine.nsfwText().indexOf('克制与留白') !== -1, true);
+  const nsfwReq = LW.Prompt.private({ name: '周言', profile: '' }, [], null, [], null, null, null, null, [], '', '', '');
+  const nsfwTxt = nsfwReq.ordered_prompts[0].content;
+  eq('NSFW·注入私聊且在输出要求后', nsfwTxt.indexOf('[亲密场合叙事风格指引]') > nsfwTxt.indexOf('## 输出要求'), true);
+  const nsfwTurn = LW.Prompt.callTurn({ name: '沈锡元', profile: '' }, '', [], null, '', 'video', [], '', [], '');
+  eq('NSFW·注入通话轮', nsfwTurn.ordered_prompts[0].content.indexOf('[亲密场合叙事风格指引]') !== -1, true);
   global.__msgs = [{ role: 'assistant', message: statusText }];
   LW.Engine.applyLine('DLC·高中', '测试归位');
   LW.Engine.applyLine('DLC·高中', '测试');
@@ -916,6 +924,7 @@ ctx.getWorldbook = async () => [
   eq('通话·单轮上限放宽并留痕', esrc.indexOf('callCap') !== -1 && wsrc.indexOf('eng.callCap') !== -1, true);
   eq('通话·记忆对齐三件套', esrc.indexOf('_callExtras') !== -1 && psrc.indexOf('机主发过的朋友圈（近3天）') !== -1, true);
   eq('通话·关系基调后置', psrc.indexOf('基调\\n机主与「') !== -1 && psrc.indexOf('关系基调：机主与「') !== -1, true);
+  eq('通话·反色情腔机制条款', psrc.indexOf('通用色情腔') !== -1 && psrc.indexOf('功能性速写') !== -1, true);
   eq('群聊·成员关系挂名', psrc.indexOf('（与机主：') !== -1, true);
   // 记忆对齐与基调后置的行为断言：digest 进通话轮提示词、关系基调落在末位
   const memTurn = LW.Prompt.callTurn({ name: '沈锡元', profile: '' }, '', [], { dateText: '2034年8月26日 星期五', npc: { relation: '地下情人' } }, '', 'audio', [], '', [], '', '提要测试内容', '', '');

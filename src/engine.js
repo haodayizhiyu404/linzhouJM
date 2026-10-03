@@ -123,6 +123,11 @@
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
+    // 全文原样（{{user}} 宏在注入时 deref）。
+    nsfwText: function () {
+      return this.deref(state.nsfwRaw || '');
+    },
     LINES: LINES.slice(0),
     LINE_META: LINE_META,
     LINE_IFS: LINE_IFS,
@@ -340,6 +345,7 @@
       // 线作用域档案归线：NPC（…）/ 主角人设（…）里的块按括号里的线名分派，
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
+      state.nsfwRaw = data.nsfwRaw || '';
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
