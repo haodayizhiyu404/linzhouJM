@@ -376,7 +376,6 @@
     '.lzjm-callpip img{width:100%;height:100%;object-fit:cover;display:block}',
     /* ── 通话回看详情（callview）：整屏复刻通话氛围（暗底/气泡/画面行与通话屏同款） ── */
     '.lzjm-scr-chv .lzjm-calltop{margin-top:8px}',
-    '.lzjm-scr-chv .lzjm-callava{display:flex}', // 回看不受通话屏"视频藏头像"规则限制，头像即身份
     '.lzjm-scr-chv .lzjm-appbar{background:transparent;position:relative;z-index:6}',
     '.lzjm-scr-chv .lzjm-appbar .lzjm-back,.lzjm-scr-chv .lzjm-appbar-t{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55)}',
     '.lzjm-chatrow .lzjm-ava{cursor:pointer}', // 聊天页点头像 → 对方名片
@@ -1214,9 +1213,12 @@
             if (m.kind === 'scene') return '<div class="lzjm-callscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
             return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
-          // 头像即身份：不重复大字号名字，状态行只留类型·时长（列表页已有时间）
+          // 与通话界面同构：音频=头像即身份；视频=头像化作背景大图，保留名字
           body = '<div class="lzjm-callbody">' +
-            '<div class="lzjm-calltop"><div class="lzjm-callava">' + vav + '</div>' +
+            '<div class="lzjm-calltop">' +
+            (sv.mode === 'video'
+              ? '<div class="lzjm-callname">' + esc(vn) + '</div>'
+              : '<div class="lzjm-callava">' + vav + '</div>') +
             '<div class="lzjm-callstatus">' + esc(vStatus) + '</div></div>' +
             '<div class="lzjm-callsubs">' + bub + '</div></div>';
         } else {
@@ -2027,6 +2029,9 @@
       this.panel = null;
       this.callMute = false; this.callSpkr = false;
       this.call = { name: name, mode: mode, phase: 'ringing', startAt: Date.now(), busy: false, by: 'user' };
+      // 「通话开始」边界在拨号即打（不是接通才打）：响铃期界面/切段就已属于新会话，
+      // 不会把上一通的记录显示在新通话的呼叫页；拒接/取消留下 0 条目的空边界，切段自动跳过
+      W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
       this.render();
       try {
         var text = await withTimeout(eng.callInvite(name, mode), 90000);
@@ -2046,10 +2051,9 @@
           return;
         }
         // 接听：剥掉 [接听] 标记（兼容笨 AI 的「接听：」写法），正文按保序流进通话记录
-        // （视频 = [画面] 行与台词行交织；splitCallOutput 兼容旧式 --- 块）
-        // 先打「通话开始」边界：新通话的界面/生成提示词只认本会话，旧详单不再混入
+        // （视频 = [画面] 行与台词行交织；splitCallOutput 兼容旧式 --- 块；
+        //   会话边界已在拨号时打过，开场白直接落在本段内）
         text = text.replace(/^\[接听\]\s*/, '').replace(/^接听[：:]\s*/, '').trim();
-        W.Store.push(eng.callKey(name), [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
         var entries = [];
         if (mode === 'video') {
           eng.splitCallOutput(text).slice(0, 12).forEach(function (en) {
