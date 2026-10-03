@@ -1855,9 +1855,10 @@
             // 古代线（无手机世界线）不显示手机按钮，只留世界线入口（靠它切回现代线）
             var wantPhone = !!W.Engine.section();
             var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder; }));
-            if (alive && (self._qrBtns.length === 2) === wantPhone) return;
+            if (alive && (self._qrBtns.length === (wantPhone ? 3 : 2))) return;
             if (self._qrBtns) self._qrBtns.forEach(function (b) { if (b.parentNode) b.remove(); });
-            var btns = [mkBtn('\uD83E\uDDED世界线', '切换 IF 世界线（五条线选一，代劳开关世界书并记入本聊天）', function () { W.Engine.qrLines(); })];
+            var btns = [mkBtn('\uD83E\uDDED世界线', '切换 IF 世界线（五条线选一，代劳开关世界书并记入本聊天）', function () { W.Engine.qrLines(); }),
+              mkBtn('🔖开场白', '开场白：0 楼快速切换 / 故事开始后追加插入为新楼层', function () { W.Engine.qrOpenings(); })];
             if (wantPhone) btns.unshift(mkBtn('\uD83D\uDCF1手机', '霖州·数字世界（再点一次关闭）', function () { W.Engine.qrToggle(); }));
             btns.forEach(function (b) { holder.appendChild(b); });
             self._qrBtns = btns;
@@ -1908,6 +1909,149 @@
     qrLines: async function () {
       await this.refreshStates();
       window.LZJM.Apps.wechat.showLines();
+    },
+
+    // ── 开场白 QR：0 楼=快速切换（借酒馆原生箭头），有楼=把开场白追加为新楼层 ──
+    // 适用场景：换线仪式感——比如大学篇玩够了，把成人篇开场白插一楼层，无缝续写。
+    cardOpenings: function () {
+      try {
+        var st = window.parent.SillyTavern;
+        var ctx = st && st.getContext && st.getContext();
+        var ch = ctx && ctx.characters && ctx.characterId != null && ctx.characters[ctx.characterId];
+        if (!ch) return [];
+        var out = [];
+        var mk = function (text, label) {
+          text = String(text || '').trim();
+          if (!text) return;
+          // ST 的 alternate_greetings 没有名字字段——用首行前几字当名字，自描述
+          var nm = String(label || '').trim() || text.split('\n')[0].trim().slice(0, 14);
+          out.push({ name: nm, text: text });
+        };
+        mk(ch.first_mes, ch.first_mes ? ((ch.name || '') + '·开场白') : '');
+        (ch.alternate_greetings || []).forEach(function (g, i) { mk(g, ''); });
+        return out;
+      } catch (e) { return []; }
+    },
+    // 当前显示的开场白在列表里的下标（用 chat[0] 与候选前缀互配）
+    openingGreetingIndex: function () {
+      try {
+        var ctx = window.parent.SillyTavern.getContext();
+        var cur = ctx.chat && ctx.chat[0] && String(ctx.chat[0].mes || '');
+        if (!cur) return -1;
+        var list = this.cardOpenings();
+        for (var i = 0; i < list.length; i++) {
+          if (cur.indexOf(list[i].text.slice(0, 40)) === 0 || list[i].text.indexOf(cur.slice(0, 40)) === 0) return i;
+        }
+      } catch (e) {}
+      return -1;
+    },
+    openingSwipe: function (dir) { // 借酒馆原生箭头切开场白，不逆向它的内部状态
+      try {
+        var btn = window.parent.document.querySelector('#chat ' + (dir > 0 ? '.swipe_right' : '.swipe_left'));
+        if (btn) btn.click();
+      } catch (e) {}
+    },
+    openingSelect: function (idx) { // 0 楼点选：从当前下标连点右箭头到目标
+      var list = this.cardOpenings();
+      if (!list.length) return;
+      var cur = this.openingGreetingIndex();
+      if (cur < 0) cur = 0;
+      var steps = (idx - cur + list.length) % list.length;
+      for (var i = 0; i < steps; i++) this.openingSwipe(1);
+    },
+    // 有楼插入：普通 char 楼层追加到末尾（用户定：永远最后一楼），入列→渲染→落库
+    openingInsert: async function (idx) {
+      var self = this;
+      try {
+        var list = self.cardOpenings();
+        var o = list[idx];
+        if (!o) return;
+        var ST = (typeof SillyTavern !== 'undefined') ? SillyTavern : window.parent.SillyTavern;
+        var ctx = ST.getContext();
+        var cn = ctx.name2 || (ctx.characters[ctx.characterId] || {}).name || '角色';
+        var text = o.text;
+        var mes = {
+          name: cn, is_user: false, is_system: false,
+          send_date: Date.now(), mes: text,
+          extra: { api: 'manual', model: 'lzjm-opening' },
+          swipes: [text], swipe_id: 0
+        };
+        ctx.chat.push(mes);           // 与酒馆原生发送同序：先入列再渲染
+        ST.addOneMessage(mes);
+        await ST.saveChat();
+        self.qrOpenings();            // 关掉弹层
+        try { toastr.success('已追加开场白楼层：' + o.name, '📱 霖州引擎'); } catch (e) {}
+      } catch (e) {
+        try { toastr.error('插入失败：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
+      }
+    },
+    // 弹层：父页 DOM，新拟态浅凸起风格；再点 QR 按钮/点空白/✕ 关闭
+    qrOpenings: function () {
+      var self = this;
+      var doc = window.parent.document;
+      try {
+        var old = doc.getElementById('lzjm-open-pop');
+        if (old) { old.remove(); return; }
+      } catch (e) {}
+      var list = self.cardOpenings();
+      if (!list.length) {
+        try { toastr.info('这张卡没有检测到开场白（first_mes / alternate_greetings 均为空）', '📱 霖州引擎'); } catch (e) {}
+        return;
+      }
+      var floors = 0;
+      try { floors = getChatMessages('0-{{lastMessageId}}').length; } catch (e) {}
+      if (!doc.getElementById('lzjm-open-style')) {
+        var css = doc.createElement('style');
+        css.id = 'lzjm-open-style';
+        css.textContent = [
+          '.lzjm-open-pop{position:fixed;right:16px;bottom:64px;z-index:99999;width:282px;background:#e9ebef;border-radius:16px;padding:12px;box-shadow:8px 8px 16px #c9cbd1,-8px -8px 16px #ffffff;font-size:13px;color:#333;font-family:inherit}',
+          '.lzjm-open-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:8px}',
+          '.lzjm-open-x{cursor:pointer;opacity:.55;padding:0 4px}',
+          '.lzjm-open-row{display:flex;flex-direction:column;gap:2px;padding:8px 10px;margin:6px 0;border-radius:12px;cursor:pointer;background:#e9ebef;box-shadow:inset 3px 3px 7px #d1d3d9,inset -3px -3px 7px #ffffff}',
+          '.lzjm-open-row:hover{box-shadow:inset 3px 3px 7px #c4c6cd,inset -3px -3px 7px #ffffff}',
+          '.lzjm-open-row b{font-size:13px}',
+          '.lzjm-open-row i{font-style:normal;font-size:11px;color:#8a8f98;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+          '.lzjm-open-tag{align-self:flex-end;font-size:10px;color:#1a73e8;letter-spacing:.5px}',
+          '.lzjm-open-nav{display:flex;gap:12px;justify-content:center;margin-top:8px}',
+          '.lzjm-open-nav button{width:70px;padding:6px 0;border:none;border-radius:10px;background:#e9ebef;box-shadow:4px 4px 8px #c9cbd1,-4px -4px 8px #ffffff;cursor:pointer;font-size:14px;color:#333}',
+          '.lzjm-open-nav button:active{box-shadow:inset 3px 3px 6px #c9cbd1,inset -3px -3px 6px #ffffff}'
+        ].join('\n');
+        doc.head.appendChild(css);
+      }
+      var pop = doc.createElement('div');
+      pop.id = 'lzjm-open-pop';
+      pop.className = 'lzjm-open-pop';
+      var rows = list.map(function (o, i) {
+        return '<div class="lzjm-open-row" data-i="' + i + '"><b></b><i></i><span class="lzjm-open-tag">' + (floors === 0 ? '点击切换' : '点击插入') + '</span></div>';
+      }).join('');
+      // 名称与预览用 textContent 填（防注入），HTML 只搭骨架
+      pop.innerHTML = '<div class="lzjm-open-head"><span>开场白 · ' + (floors === 0 ? '0 楼：点选切换' : '插入为新楼层') + '</span><span class="lzjm-open-x">✕</span></div>' +
+        (floors === 0 ? '<div class="lzjm-open-nav"><button data-nav="-1">◀</button><button data-nav="1">▶</button></div>' : '') +
+        '<div class="lzjm-open-list">' + rows + '</div>';
+      var rowEls = pop.querySelectorAll('.lzjm-open-row');
+      list.forEach(function (o, i) {
+        rowEls[i].querySelector('b').textContent = o.name;
+        rowEls[i].querySelector('i').textContent = String(o.text).replace(/\n+/g, ' ').slice(0, 30);
+        rowEls[i].addEventListener('click', function () {
+          if (floors === 0) self.openingSelect(i);
+          else self.openingInsert(i);
+        });
+      });
+      pop.querySelector('.lzjm-open-x').addEventListener('click', function () { pop.remove(); });
+      pop.querySelectorAll('[data-nav]').forEach(function (b) {
+        b.addEventListener('click', function () { self.openingSwipe(parseInt(b.dataset.nav, 10)); });
+      });
+      doc.body.appendChild(pop);
+      setTimeout(function () {
+        try {
+          doc.addEventListener('click', function h(ev) {
+            if (!pop.parentNode) { doc.removeEventListener('click', h); return; }
+            if (pop.contains(ev.target)) return;
+            pop.remove();
+            doc.removeEventListener('click', h);
+          });
+        } catch (e) {}
+      }, 0);
     },
 
     // ── 启动 ──
