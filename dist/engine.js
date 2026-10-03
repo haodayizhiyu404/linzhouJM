@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 21:04
+//  构建时间（本地）：2026-10-03 22:48
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 21:04';
+var __LZJM_BUILD__ = '2026-10-03 22:48';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -503,13 +503,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
   function parseDlcEntry(text) {
     var src = String(text || '');
-    var out = { mainName: '', main: '', evol: {}, fresh: {} };
+    var out = { mainName: '', main: '', evol: {}, fresh: {}, lore: '' };
     // 切段：「## 一、 xxx」或「一、 xxx」（# 可有可无）
     var secRe = /^#{0,6}\s*([一二三四五六七八九十]+)、\s*(.+)$/gm;
     var secs = [], sm;
     while ((sm = secRe.exec(src))) {
       secs.push({ title: sm[2].trim(), start: secRe.lastIndex, headStart: sm.index });
     }
+    // lore = 模块前言（首个段头之前的文字）+ 未匹配进档案的段落（既往因果/时代切片等），
+    // 原样保留进提示词当线背景——这些是"对所有人成立的时代设定"，丢掉 NPC 就不知情
+    var loreParts = [];
     for (var i = 0; i < secs.length; i++) {
       var end = (i + 1 < secs.length) ? secs[i + 1].headStart : src.length;
       var body = src.slice(secs[i].start, end).trim();
@@ -519,8 +522,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (mainM) { out.mainName = mainM[1].trim(); out.main = body; continue; }
       if (/既有NPC/i.test(title) && /演化/.test(title)) { splitDlcItems(body, out.evol); continue; }
       if (/新增/.test(title) && /NPC/i.test(title)) { splitDlcItems(body, out.fresh); continue; }
-      // 其余段落（时代切片/既往因果/现状格局等）不设档案，正文提示词暂不注入
+      loreParts.push('## ' + title + '\n' + body);
     }
+    var intro = (secs.length ? src.slice(0, secs[0].headStart) : src).trim()
+      .replace(/\n?[-–—]{3,}\s*\n?/g, '\n'); // 去掉 --- 分隔线，段落结构保留
+    out.lore = [intro].concat(loreParts).filter(Boolean).join('\n\n');
     return out;
   }
 
@@ -820,10 +826,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
   }
 
+  // 用户自定义前置文本（设置页粘贴的破限/风格词）：手机生成不走酒馆预设，预设里的
+  // 破限到不了手机——这里留一个口子，所有手机生成统一注入；留空则不注入。
+  function customPre() {
+    try {
+      var p = window.LZJM.Store.settings().preamble;
+      if (p && String(p).trim()) return String(p).trim();
+    } catch (e) {}
+    return '';
+  }
+
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
   //    所以这里自己解析（与 engine.js userName() 同一套回退）。──
-  function me() {
-    try {
+  function me() {    try {
       var W = window.LZJM;
       if (W && W.Engine && W.Engine.userName) {
         var n = W.Engine.userName();
@@ -1023,13 +1038,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 中断的带完整原文；双方对这些通话都有记忆，承接话题/承诺/玩笑必须一致
     // momentsNote = 近期朋友圈摘要（对方 3 天内发过的动态 + 机主互动痕迹，对方都记得）
     // myNote = 机主自己近 3 天的动态及互动（对方刷得到，可主动提起）
-    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote) {
+    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote, lore) {
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -1038,6 +1054,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '## 人物档案 · ' + contact.name + '\n（暂无档案，依据对话上下文自然演绎）',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n（微信这头的人，与「' + contact.name + '」对话的主角）\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -1096,9 +1114,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 接听 → 以 [接听] 开头，其后接接通后的开场（台词与画面交织）。
     // 视频通话的可见状态用 [画面] 行写，插在动作发生的对应位置（可穿插多行，不只开头）。
     // 呼叫页等待期间的一次生成。
-    // callRefs = 通话记忆 [{head, text}]：聊天记录里出现的通话灰泡对应的通话段（纪要或原文），
-    // 双方都记得——重新拨号时对方接得上"刚才说到哪"
-    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs) {
+    // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
+    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs, lore) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1120,6 +1137,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · ' + kind + '邀请',
         '',
@@ -1128,6 +1146,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -1164,7 +1184,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // ── 通话轮：通话进行中，机主说了一句（或要求接续），生成对方台词 ──
     // transcript = 「名字：…/机主：…」台词行；userSays = 机主本轮说的话（可空）
     // callRefs = 通话记忆 [{head, text}]：私聊记录里出现的通话灰泡对应的通话段（纪要或原文）
-    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs) {
+    // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
+    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs, lore) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -1187,6 +1208,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · ' + kind + (mode === 'video' ? ' · 画面与台词' : '') + '进行中',
         '',
@@ -1195,6 +1217,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -1243,6 +1267,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈动态生成',
       '',
@@ -1296,6 +1321,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈评论回复',
       '',
@@ -1344,6 +1370,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈回应',
       '',
@@ -1404,6 +1431,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -1478,6 +1506,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '# 虚构沙盒',
       '',
       FICTION,
+      customPre(),
       '',
       '# 数字世界 · 备忘录生成',
       '',
@@ -2402,6 +2431,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
+    '.lzjm-setpre{resize:vertical;line-height:1.55;min-height:76px;font-family:inherit}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
     '.lzjm-setpick span{padding:4px 9px;background:#f0f1f3;border-radius:20px;font-size:12px;color:#1a1d21;cursor:pointer}',
@@ -3398,6 +3428,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             try { localStorage.setItem('lzjm_phone_apikey', el.value); } catch (e) {}
           };
         });
+        // 自定义前置文本（破限/风格）：即时存进聊天变量设置，所有手机生成统一注入
+        ph.querySelectorAll('[data-pre]').forEach(function (el) {
+          el.onchange = function () { window.LZJM.Store.setSettings({ preamble: el.value }); };
+        });
         ph.querySelectorAll('[data-afetch]').forEach(function (el) {
           el.onclick = async function () {
             try {
@@ -4386,12 +4420,16 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
+    var pre0 = '';
+    try { pre0 = W.Store.settings().preamble || ''; } catch (e) {}
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
       '<div class="lzjm-setsec">正文生成 · 手机注入（正文 AI 对手机的知情度）</div><div class="lzjm-setcard">' + numsInj + '</div>' +
+      '<div class="lzjm-setsec">自定义前置文本（破限/风格，所有手机生成统一注入）</div><div class="lzjm-setcard">' +
+      '<textarea class="lzjm-settxt lzjm-setpre" data-pre="1" rows="5" placeholder="手机生成不走酒馆预设——预设里的破限到不了手机。把破限/风格词粘在这里（留空则不注入），私聊/群聊/通话/备忘录的每次生成都会带上。">' + esc(pre0) + '</textarea></div>' +
       '<div class="lzjm-setnote">跨会话：生成私聊时，顺带带对方今天在的群的记录；生成群时，顺带带成员今天与机主的私聊，让对方接得上别处的梗。</div>' +
       '<div class="lzjm-setnote">数值改动立即生效；API 改动作用于之后的每次手机生成。携带量与 API 配置（含自定义预设，密钥除外）随聊天变量保存（明文、随卡走）；密钥按预设名各存一份，只留在本机浏览器。</div>' +
       '</div></div>';
@@ -4850,6 +4888,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     npcLine: {},       // {线: {名字: 档案文本}}　线专属 NPC 档案（重写，只读它）
     evolLine: {},      // {线: {名字: 演化文本}}　[MAIN·名字·演化后]，叠加在基础人设后
     userEvol: {},      // {线: 文本}　[MAIN·{{user}}·演化后]，用户段的线增量
+    dlcLore: {},       // {线: 文本}　DLC 长文条目的非档案段落（模块前言/既往因果等），进提示词当线背景
     entryStates: {},   // {条目标题: 是否勾选开启}
     line: null,        // 当前世界线（主条目名）
     lineSource: null,  // 这条线是怎么定出来的（日志用）
@@ -4872,6 +4911,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     stickers: function () { return state.stickers; },
     profiles: function () { return state.profiles; },
     line: function () { return state.line; },
+    // 本线 DLC 背景（既往因果/时代设定等非档案段落）：对所有人成立，私聊/通话生成时带上
+    lineLore: function () {
+      return (state.line && state.dlcLore[state.line]) || '';
+    },
     LINES: LINES.slice(0),
     LINE_META: LINE_META,
     LINE_IFS: LINE_IFS,
@@ -5088,7 +5131,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       state.entryStates = data.states || {};
       // 线作用域档案归线：NPC（…）/ 主角人设（…）里的块按括号里的线名分派，
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
-      state.npcLine = {}; state.evolLine = {}; state.userEvol = {};
+      state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
@@ -5129,6 +5172,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         for (var en2 in (d.evol || {})) {
           state.evolLine[dline] = state.evolLine[dline] || {};
           if (!(en2 in state.evolLine[dline])) state.evolLine[dline][en2] = d.evol[en2];
+        }
+        // 非档案段落（模块前言/既往因果等）留作线背景，私聊/通话生成时注入
+        if (d.lore) {
+          state.dlcLore[dline] = state.dlcLore[dline] ? state.dlcLore[dline] + '\n\n' + d.lore : d.lore;
         }
       }
       state.ready = true;
@@ -5645,7 +5692,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var myNote = '';
         try { myNote = this.myMomentsNote(snap); } catch (e) { myNote = ''; }
         var req = W.Prompt.private({ name: c.name, profile: profile }, rest, snap, stickerNames, tail, digest, userInfo,
-          this.crossGroups(c.name, snap && snap.dateText), callMem, momentsNote, myNote);
+          this.crossGroups(c.name, snap && snap.dateText), callMem, momentsNote, myNote, this.deref(this.lineLore()));
         raw = await this.gen(req);
         title = '与' + c.name + '的私聊';
       } else {
@@ -6428,7 +6475,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         return self._memoryItem(c.name, s, dd);
       });
       var req = W.Prompt.callInvite({ name: c.name, profile: profile }, priv, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), refs);
+        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()));
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       return text.trim();
@@ -6491,7 +6538,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         return self._memoryItem(c.name, s, dd);
       });
       var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), priv2, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2);
+        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()));
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       // 剥注释块防污染（极端情况：AI 在通话里输出主动块）

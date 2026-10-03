@@ -127,13 +127,16 @@
 
   function parseDlcEntry(text) {
     var src = String(text || '');
-    var out = { mainName: '', main: '', evol: {}, fresh: {} };
+    var out = { mainName: '', main: '', evol: {}, fresh: {}, lore: '' };
     // 切段：「## 一、 xxx」或「一、 xxx」（# 可有可无）
     var secRe = /^#{0,6}\s*([一二三四五六七八九十]+)、\s*(.+)$/gm;
     var secs = [], sm;
     while ((sm = secRe.exec(src))) {
       secs.push({ title: sm[2].trim(), start: secRe.lastIndex, headStart: sm.index });
     }
+    // lore = 模块前言（首个段头之前的文字）+ 未匹配进档案的段落（既往因果/时代切片等），
+    // 原样保留进提示词当线背景——这些是"对所有人成立的时代设定"，丢掉 NPC 就不知情
+    var loreParts = [];
     for (var i = 0; i < secs.length; i++) {
       var end = (i + 1 < secs.length) ? secs[i + 1].headStart : src.length;
       var body = src.slice(secs[i].start, end).trim();
@@ -143,8 +146,11 @@
       if (mainM) { out.mainName = mainM[1].trim(); out.main = body; continue; }
       if (/既有NPC/i.test(title) && /演化/.test(title)) { splitDlcItems(body, out.evol); continue; }
       if (/新增/.test(title) && /NPC/i.test(title)) { splitDlcItems(body, out.fresh); continue; }
-      // 其余段落（时代切片/既往因果/现状格局等）不设档案，正文提示词暂不注入
+      loreParts.push('## ' + title + '\n' + body);
     }
+    var intro = (secs.length ? src.slice(0, secs[0].headStart) : src).trim()
+      .replace(/\n?[-–—]{3,}\s*\n?/g, '\n'); // 去掉 --- 分隔线，段落结构保留
+    out.lore = [intro].concat(loreParts).filter(Boolean).join('\n\n');
     return out;
   }
 

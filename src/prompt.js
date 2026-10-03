@@ -17,10 +17,19 @@
     return { plotFloors: 8, plotCap: 1000, histPriv: 50, histGroup: 50, crossMax: 3, crossLines: 20, injRecent: 4, injMention: 4, injMax: 3, injRounds: 40 };
   }
 
+  // 用户自定义前置文本（设置页粘贴的破限/风格词）：手机生成不走酒馆预设，预设里的
+  // 破限到不了手机——这里留一个口子，所有手机生成统一注入；留空则不注入。
+  function customPre() {
+    try {
+      var p = window.LZJM.Store.settings().preamble;
+      if (p && String(p).trim()) return String(p).trim();
+    } catch (e) {}
+    return '';
+  }
+
   // ── persona 真名。generateRaw 不做宏替换，{{user}} 会原文进提示词，
   //    所以这里自己解析（与 engine.js userName() 同一套回退）。──
-  function me() {
-    try {
+  function me() {    try {
       var W = window.LZJM;
       if (W && W.Engine && W.Engine.userName) {
         var n = W.Engine.userName();
@@ -220,13 +229,14 @@
     // 中断的带完整原文；双方对这些通话都有记忆，承接话题/承诺/玩笑必须一致
     // momentsNote = 近期朋友圈摘要（对方 3 天内发过的动态 + 机主互动痕迹，对方都记得）
     // myNote = 机主自己近 3 天的动态及互动（对方刷得到，可主动提起）
-    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote) {
+    private: function (contact, hist, snapshot, stickerNames, tail, digest, userInfo, crossGroups, callMem, momentsNote, myNote, lore) {
       var myName = me();
       var tailLines = (tail && tail.length) ? histText(tail, 8, false) : '';
       var p = [
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -235,6 +245,8 @@
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '## 人物档案 · ' + contact.name + '\n（暂无档案，依据对话上下文自然演绎）',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n（微信这头的人，与「' + contact.name + '」对话的主角）\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -293,9 +305,8 @@
     // 接听 → 以 [接听] 开头，其后接接通后的开场（台词与画面交织）。
     // 视频通话的可见状态用 [画面] 行写，插在动作发生的对应位置（可穿插多行，不只开头）。
     // 呼叫页等待期间的一次生成。
-    // callRefs = 通话记忆 [{head, text}]：聊天记录里出现的通话灰泡对应的通话段（纪要或原文），
-    // 双方都记得——重新拨号时对方接得上"刚才说到哪"
-    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs) {
+    // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
+    callInvite: function (contact, hist, snapshot, userInfo, mode, crossGroups, callRefs, lore) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -317,6 +328,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · ' + kind + '邀请',
         '',
@@ -325,6 +337,8 @@
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -361,7 +375,8 @@
     // ── 通话轮：通话进行中，机主说了一句（或要求接续），生成对方台词 ──
     // transcript = 「名字：…/机主：…」台词行；userSays = 机主本轮说的话（可空）
     // callRefs = 通话记忆 [{head, text}]：私聊记录里出现的通话灰泡对应的通话段（纪要或原文）
-    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs) {
+    // lore = 本线 DLC 背景（既往因果/时代设定等，对所有人成立）
+    callTurn: function (contact, transcript, hist, snapshot, userInfo, mode, crossGroups, userSays, callRefs, lore) {
       var myName = me();
       var kind = mode === 'video' ? '视频通话' : '语音通话';
       var outReq = mode === 'video' ? [
@@ -384,6 +399,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · ' + kind + (mode === 'video' ? ' · 画面与台词' : '') + '进行中',
         '',
@@ -392,6 +408,8 @@
         contact.profile ? '## 人物档案 · ' + contact.name + '\n' + contact.profile : '',
         '',
         userInfo ? '## 机主资料 · ' + myName + '\n' + userInfo : '',
+        '',
+        lore ? '## 本线背景与既往（当前时间线 DLC 设定，对所有人成立）\n' + lore : '',
         '',
         situationBlock(snapshot) ? '## 当前情境\n' + situationBlock(snapshot) : '',
         '',
@@ -440,6 +458,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈动态生成',
       '',
@@ -493,6 +512,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈评论回复',
       '',
@@ -541,6 +561,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
       '# 数字世界 · 朋友圈回应',
       '',
@@ -601,6 +622,7 @@
         '# 虚构沙盒',
         '',
         FICTION,
+        customPre(),
         '',
         '# 数字世界 · 回应生成',
         '',
@@ -675,6 +697,7 @@
       '# 虚构沙盒',
       '',
       FICTION,
+      customPre(),
       '',
       '# 数字世界 · 备忘录生成',
       '',

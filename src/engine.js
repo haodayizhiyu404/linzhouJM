@@ -96,6 +96,7 @@
     npcLine: {},       // {线: {名字: 档案文本}}　线专属 NPC 档案（重写，只读它）
     evolLine: {},      // {线: {名字: 演化文本}}　[MAIN·名字·演化后]，叠加在基础人设后
     userEvol: {},      // {线: 文本}　[MAIN·{{user}}·演化后]，用户段的线增量
+    dlcLore: {},       // {线: 文本}　DLC 长文条目的非档案段落（模块前言/既往因果等），进提示词当线背景
     entryStates: {},   // {条目标题: 是否勾选开启}
     line: null,        // 当前世界线（主条目名）
     lineSource: null,  // 这条线是怎么定出来的（日志用）
@@ -118,6 +119,10 @@
     stickers: function () { return state.stickers; },
     profiles: function () { return state.profiles; },
     line: function () { return state.line; },
+    // 本线 DLC 背景（既往因果/时代设定等非档案段落）：对所有人成立，私聊/通话生成时带上
+    lineLore: function () {
+      return (state.line && state.dlcLore[state.line]) || '';
+    },
     LINES: LINES.slice(0),
     LINE_META: LINE_META,
     LINE_IFS: LINE_IFS,
@@ -334,7 +339,7 @@
       state.entryStates = data.states || {};
       // 线作用域档案归线：NPC（…）/ 主角人设（…）里的块按括号里的线名分派，
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
-      state.npcLine = {}; state.evolLine = {}; state.userEvol = {};
+      state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
@@ -375,6 +380,10 @@
         for (var en2 in (d.evol || {})) {
           state.evolLine[dline] = state.evolLine[dline] || {};
           if (!(en2 in state.evolLine[dline])) state.evolLine[dline][en2] = d.evol[en2];
+        }
+        // 非档案段落（模块前言/既往因果等）留作线背景，私聊/通话生成时注入
+        if (d.lore) {
+          state.dlcLore[dline] = state.dlcLore[dline] ? state.dlcLore[dline] + '\n\n' + d.lore : d.lore;
         }
       }
       state.ready = true;
@@ -891,7 +900,7 @@
         var myNote = '';
         try { myNote = this.myMomentsNote(snap); } catch (e) { myNote = ''; }
         var req = W.Prompt.private({ name: c.name, profile: profile }, rest, snap, stickerNames, tail, digest, userInfo,
-          this.crossGroups(c.name, snap && snap.dateText), callMem, momentsNote, myNote);
+          this.crossGroups(c.name, snap && snap.dateText), callMem, momentsNote, myNote, this.deref(this.lineLore()));
         raw = await this.gen(req);
         title = '与' + c.name + '的私聊';
       } else {
@@ -1674,7 +1683,7 @@
         return self._memoryItem(c.name, s, dd);
       });
       var req = W.Prompt.callInvite({ name: c.name, profile: profile }, priv, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), refs);
+        this.crossGroups(c.name, snap && snap.dateText), refs, this.deref(this.lineLore()));
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       return text.trim();
@@ -1737,7 +1746,7 @@
         return self._memoryItem(c.name, s, dd);
       });
       var req = W.Prompt.callTurn({ name: c.name, profile: profile }, lines.join('\n'), priv2, snap, userInfo, mode,
-        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2);
+        this.crossGroups(c.name, snap && snap.dateText), userSays || '', refs2, this.deref(this.lineLore()));
       var raw = await this.gen(req);
       var text = (typeof raw === 'string') ? raw : String((raw && (raw.text || raw.message)) || '');
       // 剥注释块防污染（极端情况：AI 在通话里输出主动块）

@@ -412,6 +412,7 @@
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
+    '.lzjm-setpre{resize:vertical;line-height:1.55;min-height:76px;font-family:inherit}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
     '.lzjm-setpick span{padding:4px 9px;background:#f0f1f3;border-radius:20px;font-size:12px;color:#1a1d21;cursor:pointer}',
@@ -1408,6 +1409,10 @@
             try { localStorage.setItem('lzjm_phone_apikey', el.value); } catch (e) {}
           };
         });
+        // 自定义前置文本（破限/风格）：即时存进聊天变量设置，所有手机生成统一注入
+        ph.querySelectorAll('[data-pre]').forEach(function (el) {
+          el.onchange = function () { window.LZJM.Store.setSettings({ preamble: el.value }); };
+        });
         ph.querySelectorAll('[data-afetch]').forEach(function (el) {
           el.onclick = async function () {
             try {
@@ -2396,12 +2401,16 @@
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
     var numsInj = numrow('injRecent', '聊过几楼内就注入') + numrow('injMention', '点名几楼内就注入') +
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
+    var pre0 = '';
+    try { pre0 = W.Store.settings().preamble || ''; } catch (e) {}
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
       '<div class="lzjm-setsec">正文生成 · 手机注入（正文 AI 对手机的知情度）</div><div class="lzjm-setcard">' + numsInj + '</div>' +
+      '<div class="lzjm-setsec">自定义前置文本（破限/风格，所有手机生成统一注入）</div><div class="lzjm-setcard">' +
+      '<textarea class="lzjm-settxt lzjm-setpre" data-pre="1" rows="5" placeholder="手机生成不走酒馆预设——预设里的破限到不了手机。把破限/风格词粘在这里（留空则不注入），私聊/群聊/通话/备忘录的每次生成都会带上。">' + esc(pre0) + '</textarea></div>' +
       '<div class="lzjm-setnote">跨会话：生成私聊时，顺带带对方今天在的群的记录；生成群时，顺带带成员今天与机主的私聊，让对方接得上别处的梗。</div>' +
       '<div class="lzjm-setnote">数值改动立即生效；API 改动作用于之后的每次手机生成。携带量与 API 配置（含自定义预设，密钥除外）随聊天变量保存（明文、随卡走）；密钥按预设名各存一份，只留在本机浏览器。</div>' +
       '</div></div>';
