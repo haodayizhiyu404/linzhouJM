@@ -482,7 +482,9 @@
           { role: 'user', content: userSays
               ? '（' + myName + '在' + kind + '里说：「' + userSays + '」。请生成「' + contact.name + '」的台词。）'
               : (transcript
-                  ? '（机主刚说了上面记录中最后的话。请重新生成「' + contact.name + '」的回应——不是重复旧话，是换一个相当的新反应。）'
+                  // 重说轮：旧回复在请求前已弹栈，模型从未见过它——这就是全新生成任务，
+                  // 与正常回应同义描述（机主的话在 transcript 末行），不提"重新/旧话"
+                  ? '（' + myName + '刚在' + kind + '里说了上面记录中最后的话。请生成「' + contact.name + '」的台词。）'
                   : '（' + myName + '刚刚拨通了「' + contact.name + '」的' + kind + '，对方已接听。请生成「' + contact.name + '」接通后的开场' + (mode === 'video' ? '画面与台词' : '台词') + '。）') }
         ],
         should_silence: true,

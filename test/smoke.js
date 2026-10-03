@@ -935,7 +935,7 @@ ctx.getWorldbook = async () => [
   const tOpen = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '', [], null, '', 'video', [], '', [], '');
   eq('通话轮·开场任务描述', tOpen.ordered_prompts[1].content.indexOf('刚刚拨通了') !== -1 && tOpen.ordered_prompts[1].content.indexOf('开场') !== -1, true);
   const tReroll = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '裴知意：喂', [], null, '', 'video', [], '', [], '');
-  eq('通话轮·重说任务描述', tReroll.ordered_prompts[1].content.indexOf('重新生成') !== -1, true);
+  eq('通话轮·重说任务描述', tReroll.ordered_prompts[1].content.indexOf('上面记录中最后的话') !== -1 && tReroll.ordered_prompts[1].content.indexOf('重新') === -1, true);
   const tReply = LW.Prompt.callTurn({ name: '蒋默', profile: '' }, '裴知意：喂', [], null, '', 'video', [], '嗯，在听', [], '');
   eq('通话轮·回应任务描述', tReply.ordered_prompts[1].content.indexOf('说：「嗯，在听」') !== -1, true);
   eq('通话轮·NSFW不重复', (function () { var s = memTxt; return s.indexOf('[亲密场合叙事风格指引]') === s.lastIndexOf('[亲密场合叙事风格指引]'); })(), true);
