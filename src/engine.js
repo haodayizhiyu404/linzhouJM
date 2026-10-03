@@ -1498,6 +1498,46 @@
       return 0;
     },
 
+    // 通话详单切段，供「通话记录」回看：每个「通话开始」边界到下一边界/末尾为一通。
+    // mode 由画面条目判定（scene 只存在于视频通话）；dur 取段尾「通话结束 · X」；
+    // 无内容段（接通即挂断）跳过；无边界的老数据整体算一通（可能混合多通旧通话）。
+    // 拒接/未接不进详单（那些落在聊天记录里），本列表只列接通过的。
+    callSessions: function (name) {
+      var W = window.LZJM;
+      var hist = W.Store.history(this.callKey(name));
+      var begins = [];
+      for (var i = 0; i < hist.length; i++) {
+        if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) begins.push(i);
+      }
+      // 段界：首个边界标记之前的头部（无边界老数据）也算一段，之后每标记到下一边界各一段
+      var bounds = [];
+      if (!begins.length) bounds.push([0, hist.length]);
+      else {
+        if (begins[0] > 0) bounds.push([0, begins[0]]);
+        for (var b2 = 0; b2 < begins.length; b2++) {
+          bounds.push([begins[b2] + 1, b2 + 1 < begins.length ? begins[b2 + 1] : hist.length]);
+        }
+      }
+      var out = [];
+      for (var si = 0; si < bounds.length; si++) {
+        var seg = hist.slice(bounds[si][0], bounds[si][1]);
+        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true;
+        seg.forEach(function (m) {
+          if (m.who === 'sys') {
+            var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
+            if (dm) { dur = dm[1]; ongoing = false; }
+            return;
+          }
+          count++;
+          if (m.kind === 'scene') mode = 'video';
+          if (!day && m.day) { day = m.day; time = m.time || ''; }
+        });
+        if (!count) continue;
+        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing });
+      }
+      return out;
+    },
+
     // 拨打邀请：AI 决定接/拒
     callInvite: async function (name, mode) {
       var W = window.LZJM;

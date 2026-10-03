@@ -669,6 +669,23 @@ ctx.getWorldbook = async () => [
   LW.Apps.wechat.call = null;
   LW.Apps = stubApps;   // 恢复最小桩，后续测试环境不变
   eq('通话·无边界旧数据全量', LW.Engine.callSessionStart([{ who: 'user', kind: 'text', text: 'x' }]), 0);
+  // 通话记录回看：详单按「通话开始」切段（视频/语音分节、时长、通话中标记）
+  const xk = LW.Engine.callKey('许嘉文');
+  LW.Store.push(xk, [{ who: '许嘉文', kind: 'text', text: '无边界老数据台词' }], 200);
+  LW.Store.push(xk, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+  LW.Store.push(xk, [{ who: '许嘉文', kind: 'text', text: '喂' }, { who: '许嘉文', kind: 'text', text: '听得见吗' }], 200);
+  LW.Store.push(xk, [{ who: 'user', kind: 'text', text: '嗯' }], 200);
+  LW.Store.push(xk, [{ who: '许嘉文', kind: 'text', text: '那就好' }, { who: '许嘉文', kind: 'text', text: '说正事' }, { who: '许嘉文', kind: 'text', text: '完了' }], 200);
+  LW.Store.push(xk, [{ who: 'sys', kind: 'sys', text: '通话结束 · 05:20' }], 200);
+  LW.Store.push(xk, [{ who: 'sys', kind: 'sys', text: '—— 通话开始 ——' }], 200);
+  LW.Store.push(xk, [{ who: '许嘉文', kind: 'scene', text: '[她拿起手机]' }, { who: '许嘉文', kind: 'text', text: '视频里见' }], 200);
+  LW.Store.push(xk, [{ who: 'sys', kind: 'sys', text: '通话结束 · 01:02' }], 200);
+  const xSess = LW.Engine.callSessions('许嘉文');
+  eq('回看·三段会话', xSess.length, 3);
+  eq('回看·老数据算一通且未结束', xSess[0].mode === 'audio' && xSess[0].ongoing === true, true);
+  eq('回看·语音段时长与条数', [xSess[1].mode, xSess[1].dur, xSess[1].count, xSess[1].ongoing], ['audio', '05:20', 6, false]);
+  eq('回看·画面段判为视频', [xSess[2].mode, xSess[2].dur, xSess[2].count], ['video', '01:02', 2]);
+  eq('回看·无记录返回空', LW.Engine.callSessions('查无此人').length, 0);
   // sys 条目：msgToLine 不带人名前缀（跨场景携带里就是干净的「语音通话 · 03:24」）
   eq('通话·sys行格式', LW.Floor.msgToLine({ who: 'sys', kind: 'sys', text: '语音通话 · 03:24' }, '裴知意'), '语音通话 · 03:24');
   eq('通话·callKey', LW.Engine.callKey('沈锡元'), 'call:沈锡元');
@@ -822,6 +839,7 @@ ctx.getWorldbook = async () => [
   // 拆分保险丝：wechat 只留委托，不得残留备忘录屏幕与样式；esc 单一实现在 uikit
   eq('备忘录·wechat仅委托', wsrc.includes('DiaryApp.render(this)') && wsrc.includes('DiaryApp.bind(ph, UI)') && wsrc.indexOf('lzjm-dread') === -1 && wsrc.indexOf('function esc') === -1, true);
   eq('通话·最小化按钮', wsrc.includes("'callmin'") && wsrc.includes('lzjm-callmin') && wsrc.indexOf("a === 'callmin'") !== -1, true);
+  eq('通话·记录回看入口', wsrc.includes('data-chist') && wsrc.includes("screen === 'callhist'") && wsrc.includes("screen === 'callview'") && wsrc.indexOf('callSessions') !== -1, true);
   eq('uikit·共享件在位', usrc.includes('lzjm-scrim') && usrc.includes('lzjm-cbtn') && usrc.includes('function esc') && usrc.includes('ICON_REROLL'), true);
   // 保险丝：当日判重已随纯手动化删除——引擎不得残留 lastGenDay，备忘录不得有自动补写
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);

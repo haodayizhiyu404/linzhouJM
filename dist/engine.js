@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-03 15:58
+//  构建时间（本地）：2026-10-03 16:11
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-03 15:58';
+var __LZJM_BUILD__ = '2026-10-03 16:11';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2348,10 +2348,21 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-scr-video .lzjm-callshade{opacity:.42}',
     '.lzjm-scr-video .lzjm-calltop{margin-top:22px}',
     '.lzjm-scr-video .lzjm-callava{display:none}',
-    '.lzjm-scr-video .lzjm-callroll{right:auto;left:12px}', // 右上角让给 PiP
-    '.lzjm-scr-video .lzjm-callmin{right:auto;left:40px}',
+    // 重说/收起保持在右上：PiP 自视窗在 top:48px 起，与 top:10px 的按钮行不相撞
     '.lzjm-callpip{position:absolute;top:48px;right:12px;width:62px;height:84px;border-radius:12px;background:rgba(16,20,24,.8);border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:#aeb8c2;z-index:4;box-shadow:0 3px 12px rgba(0,0,0,.35);overflow:hidden}',
     '.lzjm-callpip img{width:100%;height:100%;object-fit:cover;display:block}',
+    /* ── 通话记录回看（callhist 列表 + callview 只读 transcript，亮色屏） ── */
+    '.lzjm-chistrow{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f0f0f2;cursor:pointer}',
+    '.lzjm-chistrow:active{background:#f2f2f4}',
+    '.lzjm-chist-ico{width:34px;height:34px;border-radius:9px;background:#f2f3f5;display:flex;align-items:center;justify-content:center;color:#555;flex:none}',
+    '.lzjm-chist-main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}',
+    '.lzjm-chist-main b{font-size:13.5px;color:#111;font-weight:500}',
+    '.lzjm-chist-main i{font-size:11.5px;color:#9aa0a8;font-style:normal}',
+    '.lzjm-chvhead{padding:12px 14px;font-size:12px;color:#8a8f98;background:#fafafa;border-bottom:1px solid #eee;text-align:center;flex:none}',
+    '.lzjm-chvsubs{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px 12px}',
+    '.lzjm-chvbub{max-width:80%;align-self:flex-start;font-size:13.5px;line-height:1.5;color:#111;padding:8px 12px;border-radius:12px;background:#fff;border:1px solid #ececf0;white-space:pre-wrap}',
+    '.lzjm-chvbub.me{align-self:flex-end;background:#95ec69;border-color:#8ade5f}',
+    '.lzjm-chvscene{align-self:center;max-width:88%;font-size:12px;color:#9aa0a8;font-style:italic;text-align:center;line-height:1.6;white-space:pre-wrap}',
     // 画面旁白：穿插在气泡流中间（说到哪演到哪），靠左淡字，与台词区分开
     '.lzjm-callscene{position:relative;z-index:1;align-self:flex-start;margin:2px 0 2px 4px;max-width:86%;font-size:12px;line-height:1.55;color:rgba(255,255,255,.66);text-align:left;text-shadow:0 1px 4px rgba(0,0,0,.65);padding:2px 0}',
     // ── 发现页底栏 + 朋友圈 ──
@@ -2646,11 +2657,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   }
 
   var UI = {
-    screen: 'home',      // home | list | moments | mprofile | cdetail | chat
+    screen: 'home',      // home | list | moments | mprofile | cdetail | callhist | callview | chat
     tab: 'chats',        // list 页底栏：chats | contacts | discover
     mProfile: null,      // mprofile 页看的对象名
     mFrom: 'moments',    // mprofile 的返回来源：moments | cdetail
     cdetName: null,      // cdetail 页看的对象名
+    histName: null,      // callhist/callview 页看的对象名
+    histIdx: 0,          // callview 看的通话段下标（Engine.callSessions 返回数组下标）
     feedScr: null,       // 当前 DOM 里 .lzjm-mfeed 属于哪个屏（跨屏不还原滚动）
     mMenu: -1,           // 展开「赞/评论」小菜单的动态下标
     mCmt: -1,            // 展开评论输入框的动态下标
@@ -3096,17 +3109,76 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var dav = dc.avatar
           ? '<img class="lzjm-cava" src="' + esc(W.Worldbook.imgUrl(dc.avatar)) + '">'
           : '<div class="lzjm-cava">' + esc(dn.slice(0, 1)) + '</div>';
+        var dSess = [];
+        try { dSess = eng.callSessions(dn); } catch (e0) {}
+        var dLastCall = '';
+        if (dSess.length) {
+          var lsv = dSess[dSess.length - 1];
+          dLastCall = (lsv.mode === 'video' ? '视频' : '语音') + ' · ' + (lsv.ongoing ? '通话中' : (lsv.dur || '已接通'));
+        }
         body = '<div class="lzjm-body">' +
           '<div class="lzjm-cdetcard">' + dav + '<div class="lzjm-cdetnm">' + esc(dn) + '</div></div>' +
           '<div class="lzjm-cdetrow" data-mpf="' + esc(dn) + '" data-mfrom="cdetail">' +
           '<span class="l">朋友圈</span>' +
           '<span class="lzjm-cdetpv">' + esc(dLast || '还没发动态') + '</span>' +
           '<span class="lzjm-cdetcv">' + ICON_CHEV + '</span></div>' +
+          '<div class="lzjm-cdetrow" data-chist="' + esc(dn) + '">' +
+          '<span class="l">通话记录</span>' +
+          '<span class="lzjm-cdetpv">' + esc(dLastCall || '还没有通话') + '</span>' +
+          '<span class="lzjm-cdetcv">' + ICON_CHEV + '</span></div>' +
           '<div class="lzjm-cdetmsg" data-cmsg="' + esc(dn) + '">发消息</div>' +
           '<div class="lzjm-cdetcalls">' +
           '<div class="lzjm-cdetcall" data-ccall="' + esc(dn) + ':audio">' + ICON_CALL + '<span>语音通话</span></div>' +
           '<div class="lzjm-cdetcall" data-ccall="' + esc(dn) + ':video">' + ICON_VCALL + '<span>视频通话</span></div>' +
           '</div></div>';
+
+      } else if (this.screen === 'callhist') {
+        // 通话记录列表：视频/语音各一节，按时间倒序；点行进只读 transcript（无任何生成）
+        var hn = this.histName || '';
+        var hSess = [];
+        try { hSess = eng.callSessions(hn); } catch (e0) {}
+        var hCurDay = '';
+        try { hCurDay = W.Status.snapshot(null).dateText; } catch (e0) {}
+        var histRows = function (mode) {
+          return hSess.map(function (s, idx) { return { s: s, idx: idx }; })
+            .filter(function (x) { return x.s.mode === mode; })
+            .map(function (x) {
+              var when = (x.s.day ? relDay(x.s.day, hCurDay) : '') + (x.s.time ? ' ' + x.s.time : '');
+              var meta = (mode === 'video' ? '视频通话' : '语音通话') + ' · ' +
+                (x.s.ongoing ? '通话中' : (x.s.dur || '已接通')) + ' · ' + x.s.count + '条';
+              return '<div class="lzjm-chistrow" data-chv="' + x.idx + '">' +
+                '<span class="lzjm-chist-ico">' + (mode === 'video' ? ICON_VCALL : ICON_CALL) + '</span>' +
+                '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><i>' + esc(meta) + '</i></span>' +
+                '<span class="lzjm-cdetcv">' + ICON_CHEV + '</span></div>';
+            }).join('');
+        };
+        var vRows = histRows('video'), aRows = histRows('audio');
+        body = '<div class="lzjm-body">' +
+          (vRows ? '<div class="lzjm-sechead">视频通话</div>' + vRows : '') +
+          (aRows ? '<div class="lzjm-sechead">语音通话</div>' + aRows : '') +
+          ((!vRows && !aRows) ? '<div class="lzjm-sysrow">还没有通话记录</div>' : '') +
+          '</div>';
+
+      } else if (this.screen === 'callview') {
+        // 只读 transcript：与通话界面同款气泡排版（亮色版），不触发任何生成
+        var vn = this.histName || '';
+        var vSess = [];
+        try { vSess = eng.callSessions(vn); } catch (e0) {}
+        var sv = vSess[this.histIdx] || null;
+        if (sv) {
+          var seg = W.Store.history(eng.callKey(vn)).slice(sv.start, sv.end)
+            .filter(function (m) { return m.who !== 'sys'; });
+          var bub = seg.map(function (m) {
+            if (m.kind === 'scene') return '<div class="lzjm-chvscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
+            return '<div class="lzjm-chvbub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
+          }).join('');
+          var vHead = (sv.mode === 'video' ? '视频通话' : '语音通话') + (sv.dur ? ' · ' + sv.dur : '') +
+            (sv.ongoing ? ' · 通话中' : '') + (sv.day ? ' · ' + sv.day : '');
+          body = '<div class="lzjm-body"><div class="lzjm-chvhead">' + esc(vHead) + '</div>' +
+            '<div class="lzjm-chvsubs">' + bub + '</div></div>';
+        } else {
+          body = '<div class="lzjm-body"><div class="lzjm-sysrow">记录不存在</div></div>';
+        }
 
       } else { // chat
         var key = this.chatKey || '';
@@ -3356,7 +3428,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         el.onclick = function () {
           // mprofile 的返回看来源：详细资料进来回详细资料，朋友圈进来回朋友圈
           var act = el.dataset.act === 'mback' ? (UI.mFrom === 'cdetail' ? 'cdetail' : 'moments') : el.dataset.act;
-          UI.screen = act === 'home' ? 'home' : act === 'moments' ? 'moments' : act === 'cdetail' ? 'cdetail' : act === 'diary' ? 'diary' : 'list';
+          UI.screen = act === 'home' ? 'home' : act === 'moments' ? 'moments' : act === 'cdetail' ? 'cdetail' : act === 'callhist' ? 'callhist' : act === 'callview' ? 'callview' : act === 'diary' ? 'diary' : 'list';
           UI.panel = null;
           UI.render();
         };
@@ -3411,6 +3483,23 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       });
       ph.querySelectorAll('[data-cmsg]').forEach(function (el) {
         el.onclick = function () { UI.openChat(el.dataset.cmsg, false); };
+      });
+      // 详细资料页：通话记录入口 → 列表 → 只读 transcript
+      ph.querySelectorAll('[data-chist]').forEach(function (el) {
+        el.onclick = function () {
+          UI.histName = el.dataset.chist;
+          UI.screen = 'callhist';
+          UI.panel = null;
+          UI.render();
+        };
+      });
+      ph.querySelectorAll('[data-chv]').forEach(function (el) {
+        el.onclick = function () {
+          UI.histIdx = parseInt(el.dataset.chv, 10) || 0;
+          UI.screen = 'callview';
+          UI.panel = null;
+          UI.render();
+        };
       });
       ph.querySelectorAll('[data-ccall]').forEach(function (el) {
         el.onclick = function () {
@@ -4275,6 +4364,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     if (screen === 'mprofile') return '<div class="lzjm-appbar lzjm-appbar-ovl"><span class="lzjm-back" data-act="mback">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'mpost') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="mback">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r lzjm-appbar-rw"><button class="lzjm-postsend" data-mpost-send="1">发表</button></span></div>';
     if (screen === 'cdetail') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="list">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
+    if (screen === 'callhist') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="cdetail">' + ICON_BACK + '</span><span class="lzjm-appbar-t">通话记录</span><span class="lzjm-appbar-r"></span></div>';
+    if (screen === 'callview') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="callhist">' + ICON_BACK + '</span><span class="lzjm-appbar-t">通话详情</span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'diary') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="home">' + ICON_BACK + '</span><span class="lzjm-appbar-t">备忘录</span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'dread') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="diary">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
     return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="list">' + ICON_BACK + '</span><span class="lzjm-appbar-t">' + esc(disp || '') + '</span><span class="lzjm-appbar-r">' +
@@ -6117,6 +6208,46 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) return i + 1;
       }
       return 0;
+    },
+
+    // 通话详单切段，供「通话记录」回看：每个「通话开始」边界到下一边界/末尾为一通。
+    // mode 由画面条目判定（scene 只存在于视频通话）；dur 取段尾「通话结束 · X」；
+    // 无内容段（接通即挂断）跳过；无边界的老数据整体算一通（可能混合多通旧通话）。
+    // 拒接/未接不进详单（那些落在聊天记录里），本列表只列接通过的。
+    callSessions: function (name) {
+      var W = window.LZJM;
+      var hist = W.Store.history(this.callKey(name));
+      var begins = [];
+      for (var i = 0; i < hist.length; i++) {
+        if (hist[i].who === 'sys' && /通话开始/.test(hist[i].text || '')) begins.push(i);
+      }
+      // 段界：首个边界标记之前的头部（无边界老数据）也算一段，之后每标记到下一边界各一段
+      var bounds = [];
+      if (!begins.length) bounds.push([0, hist.length]);
+      else {
+        if (begins[0] > 0) bounds.push([0, begins[0]]);
+        for (var b2 = 0; b2 < begins.length; b2++) {
+          bounds.push([begins[b2] + 1, b2 + 1 < begins.length ? begins[b2 + 1] : hist.length]);
+        }
+      }
+      var out = [];
+      for (var si = 0; si < bounds.length; si++) {
+        var seg = hist.slice(bounds[si][0], bounds[si][1]);
+        var mode = 'audio', dur = '', day = '', time = '', count = 0, ongoing = true;
+        seg.forEach(function (m) {
+          if (m.who === 'sys') {
+            var dm = String(m.text || '').match(/^通话结束 · (.+)$/);
+            if (dm) { dur = dm[1]; ongoing = false; }
+            return;
+          }
+          count++;
+          if (m.kind === 'scene') mode = 'video';
+          if (!day && m.day) { day = m.day; time = m.time || ''; }
+        });
+        if (!count) continue;
+        out.push({ mode: mode, dur: dur, day: day, time: time, count: count, start: bounds[si][0], end: bounds[si][1], ongoing: ongoing });
+      }
+      return out;
     },
 
     // 拨打邀请：AI 决定接/拒
