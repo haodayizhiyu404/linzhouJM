@@ -1017,9 +1017,9 @@
         if (lk) {
           var lastPost = posts[posts.length - 1];
           if (lastPost) {
-            var names = lk[1].split(/[、,，]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
+            var names = lk[1].split(/[、,，]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 12);
             names.forEach(function (n) { if (lastPost.likes.indexOf(n) === -1) lastPost.likes.push(n); });
-            lastPost.likes = lastPost.likes.slice(0, 5);
+            lastPost.likes = lastPost.likes.slice(0, 12);
           }
           return;
         }
@@ -1027,7 +1027,7 @@
         if (cm) {
           // 评论挂在紧跟的那条动态下；@后面是"被回复的人"（作者或前面的评论者），不是动态作者校验
           var target = posts[posts.length - 1];
-          if (target && target.comments.length < 5) {
+          if (target && target.comments.length < 8) {
             target.comments.push({ who: cm[1].trim(), replyTo: cm[2] ? cm[2].trim() : '', text: cm[3].trim() });
           }
         }
@@ -1124,7 +1124,7 @@
         var m = line.match(/^\[评论:([^:：@\]]{1,12})(?:@([^:：\]]{1,12}))?[:：]([\s\S]+)\]$/);
         if (m) out.push({ who: m[1].trim(), replyTo: m[2] ? m[2].trim() : '', text: m[3].trim() });
       });
-      return out.slice(0, 5);
+      return out.slice(0, 8);
     },
 
     // 首次填充：抽 3~4 位联系人/群成员，各写一条动态（日期散在"今天/昨天/前几天"）

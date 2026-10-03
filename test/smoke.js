@@ -462,7 +462,7 @@ ctx.getWorldbook = async () => [
   eq('朋友圈·时间契约', mfTxt.indexOf('[时间:M月D日 HH:MM]') !== -1, true);
   eq('朋友圈·时间不晚于当前', mfTxt.indexOf('不得晚于当前时刻') !== -1, true);
   eq('朋友圈·配图契约', mfTxt.indexOf('[配图:名字:画面描述]') !== -1, true);
-  eq('朋友圈·点赞契约', mfTxt.indexOf('[点赞:点赞者1、点赞者2]') !== -1, true);
+  eq('朋友圈·点赞契约', mfTxt.indexOf('[点赞:点赞者1、点赞者2、点赞者3]') !== -1, true);
   eq('朋友圈·生成期评论契约', mfTxt.indexOf('[评论:评论者@被回复的人:') !== -1, true);
   eq('朋友圈·不刻意emoji', mfTxt.indexOf('不要刻意凑 emoji') !== -1, true);
   eq('朋友圈·不为发动态而发动态', mfTxt.indexOf('为了发动态而发动态') !== -1, true);
@@ -923,6 +923,10 @@ ctx.getWorldbook = async () => [
   eq('通话·记录回看入口', wsrc.includes('data-chist') && wsrc.includes("screen === 'callhist'") && wsrc.includes("screen === 'callview'") && wsrc.indexOf('callSessions') !== -1, true);
   eq('通话·回看复刻通话屏', wsrc.includes('lzjm-scr-chv') && wsrc.indexOf('callscene') !== -1 && wsrc.indexOf("m.kind === 'scene'") !== -1, true);
   eq('通话·回看返回键反白', wsrc.indexOf('.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}') !== -1, true); // SVG 描边写死，color 覆不到
+  eq('朋友圈·热度与虚构人物条款', psrc.indexOf('至多 12 人') !== -1 && psrc.indexOf('可虚构次要人物') !== -1, true);
+  eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
+  eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
+  eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);
   eq('通话·换行以完整句子为单位', psrc.indexOf('换行以完整句子为单位') !== -1 && psrc.indexOf('砍成多行') !== -1, true);
   eq('通话·单轮上限放宽并留痕', esrc.indexOf('callCap') !== -1 && wsrc.indexOf('eng.callCap') !== -1, true);
   eq('通话·记忆对齐三件套', esrc.indexOf('_callExtras') !== -1 && psrc.indexOf('机主发过的朋友圈（近3天）') !== -1, true);

@@ -2481,8 +2481,13 @@
       : '';    var cmtbar = UI.mCmt === idx
       ? '<div class="lzjm-cmtbar"><input id="lzjm-cmtin" maxlength="60" placeholder="说点什么…"><button data-msend="' + idx + '">发送</button></div>'
       : '';
+    // 点赞行：超 5 人压成"前三 + 等 N 人"（微信真实样式，显热闹；前三=AI 排序的前三，即最重要的反应者）
     var likeRow = (e.likes && e.likes.length)
-      ? '<div class="lzjm-plike">❤ ' + e.likes.map(esc).join('、') + '</div>'
+      ? (function () {
+          var lk = e.likes;
+          if (lk.length > 5) return '<div class="lzjm-plike">❤ ' + esc(lk[0]) + '、' + esc(lk[1]) + '、' + esc(lk[2]) + ' 等 ' + lk.length + ' 人</div>';
+          return '<div class="lzjm-plike">❤ ' + lk.map(esc).join('、') + '</div>';
+        })()
       : '';
     var cmtRows = (e.comments || []).map(function (cm) {
       return '<div><span class="n">' + esc(cm.who) + '</span>' +

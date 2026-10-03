@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 06:00
+//  构建时间（本地）：2026-10-04 06:06
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 06:00';
+var __LZJM_BUILD__ = '2026-10-04 06:06';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1368,8 +1368,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '- 口吻必须符合各人人设；不要刻意凑 emoji（不是每条动态都需要）',
       '- 至多一半的人配图片；配图单独一行：[配图:名字:画面描述]（描述 ≤40 字，写看得见的内容，认真党写细节、随手拍一句话带过），跟在对应动态之后',
       '- 朋友圈是活的：可在动态后配熟人互动（都是紧跟在该动态后面的行，不每条都配满）——',
-      '  · 点赞一行：[点赞:点赞者1、点赞者2]（至多 5 人，从共同熟人里挑）',
-      '  · 评论一行：[评论:评论者@被回复的人:评论内容]（每条动态至多 3 条，≤25 字；@后面是被回复的人，可以是作者也可以是前面的评论者；普通评论省略@写成 [评论:评论者:评论内容]）',
+      '  · 点赞一行：[点赞:点赞者1、点赞者2、点赞者3]（至多 12 人；日常从共同熟人里挑，大事件——夺冠/官宣/生日——可大量出现队友/同学/粉丝；人不够时可虚构次要人物：亲戚/同事/共同好友/路人等，只起个合理名字，不展开设定）',
+      '  · 评论一行：[评论:评论者@被回复的人:评论内容]（每条动态至多 8 条，≤25 字；大事件的动态评论可刷起来；@后面是被回复的人，可以是作者也可以是前面的评论者；普通评论省略@写成 [评论:评论者:评论内容]；评论者同样可虚构次要人物）',
       '- 互动口吻要符合关系：损友互怼、熟人捧场、长辈式关心，不要客套水军味',
       '- 不要点名单「' + myName + '」，不要写需要机主回复的问句（机主只是刷到，还没互动）',
       '- 各人的动态主题互不重复；除 [动态]/[时间]/[配图]/[点赞]/[评论] 行外不要输出任何其他内容'
@@ -1418,10 +1418,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '',
       '## 输出要求（严格遵守）',
       nsfwBlock(),
-      '- 生成 0~3 条接话评论，每条一行，格式严格为：[评论:名字:评论内容]',
+      '- 生成 0~8 条接话评论，看热闹程度定——夺冠、官宣类大事件可刷起来，冷清的动态 0 条也行，每条一行，格式严格为：[评论:名字:评论内容]',
+      '- 接话者除上方涉及的人外，可虚构次要人物（共同好友/同事/队友/路人等）——只起名不展开；别硬拉不熟的人互评',
       '- 回复机主时格式为：[评论:名字@' + myName + ':评论内容]；回复其他评论者同理 @ 对方名字',
       '- 朋友圈口吻：短（≤25 字）、轻松、可玩梗可阴阳，但须符合各人与机主的关系阶段',
-      '- 没有谁接话就不输出那一条；至多 5 条，看热闹程度定——冷清的动态 0 条也行；除 [评论] 行外不要输出任何其他内容'
+      '- 没有谁接话就不输出那一条；除 [评论] 行外不要输出任何其他内容'
     ].filter(function (s) { return s !== ''; }).join('\n');
     return {
       ordered_prompts: [
@@ -1468,7 +1469,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '## 输出要求（严格遵守）',
       nsfwBlock(),
       '- 针对机主刚发的那条动态（最后一条用户消息里给出）生成反应',
-      '- 生成 1~12 个 [赞:名字] 行，再生成 0~8 条 [评论:名字:评论内容] 行；每人只许出现一次（要么赞要么评论）',
+      '- 生成 1~12 个 [赞:名字] 行，再生成 0~8 条 [评论:名字:评论内容] 行；每人只许出现一次（要么赞要么评论）；更重要/亲近的反应者排在列表前面（显示时只突出前几名）',
       '- **热度与动态分量相称**：夺冠、官宣、生日这类大事——赞可以拉满、评论刷屏，涌进大量队友/粉丝/熟人；日常小事——三两熟人点赞，没人评论也正常',
       '- 谁会有反应由动态内容与人设决定：关系近的、爱玩梗的更容易冒泡',
       '- 评论口径：短（≤25 字）、像真人在朋友圈留的言，可玩梗可阴阳，须符合此人与机主的关系阶段',
@@ -4588,8 +4589,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       : '';    var cmtbar = UI.mCmt === idx
       ? '<div class="lzjm-cmtbar"><input id="lzjm-cmtin" maxlength="60" placeholder="说点什么…"><button data-msend="' + idx + '">发送</button></div>'
       : '';
+    // 点赞行：超 5 人压成"前三 + 等 N 人"（微信真实样式，显热闹；前三=AI 排序的前三，即最重要的反应者）
     var likeRow = (e.likes && e.likes.length)
-      ? '<div class="lzjm-plike">❤ ' + e.likes.map(esc).join('、') + '</div>'
+      ? (function () {
+          var lk = e.likes;
+          if (lk.length > 5) return '<div class="lzjm-plike">❤ ' + esc(lk[0]) + '、' + esc(lk[1]) + '、' + esc(lk[2]) + ' 等 ' + lk.length + ' 人</div>';
+          return '<div class="lzjm-plike">❤ ' + lk.map(esc).join('、') + '</div>';
+        })()
       : '';
     var cmtRows = (e.comments || []).map(function (cm) {
       return '<div><span class="n">' + esc(cm.who) + '</span>' +
@@ -5908,9 +5914,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         if (lk) {
           var lastPost = posts[posts.length - 1];
           if (lastPost) {
-            var names = lk[1].split(/[、,，]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 5);
+            var names = lk[1].split(/[、,，]/).map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 12);
             names.forEach(function (n) { if (lastPost.likes.indexOf(n) === -1) lastPost.likes.push(n); });
-            lastPost.likes = lastPost.likes.slice(0, 5);
+            lastPost.likes = lastPost.likes.slice(0, 12);
           }
           return;
         }
@@ -5918,7 +5924,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         if (cm) {
           // 评论挂在紧跟的那条动态下；@后面是"被回复的人"（作者或前面的评论者），不是动态作者校验
           var target = posts[posts.length - 1];
-          if (target && target.comments.length < 5) {
+          if (target && target.comments.length < 8) {
             target.comments.push({ who: cm[1].trim(), replyTo: cm[2] ? cm[2].trim() : '', text: cm[3].trim() });
           }
         }
@@ -6015,7 +6021,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var m = line.match(/^\[评论:([^:：@\]]{1,12})(?:@([^:：\]]{1,12}))?[:：]([\s\S]+)\]$/);
         if (m) out.push({ who: m[1].trim(), replyTo: m[2] ? m[2].trim() : '', text: m[3].trim() });
       });
-      return out.slice(0, 5);
+      return out.slice(0, 8);
     },
 
     // 首次填充：抽 3~4 位联系人/群成员，各写一条动态（日期散在"今天/昨天/前几天"）
