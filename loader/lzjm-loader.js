@@ -12,6 +12,7 @@
   var NS = '__LZJM__';
   var GH_USER = 'haodayizhiyu404';
   var GH_REPO = 'linzhouJM';
+  var BRANCH = 'main';   // ← 版本指针：日常开发推 dev，测试时把这里改成 'dev'；发版合并回 main 后改回 'main'
   var FILE = 'dist/engine.js';
   var MIRRORS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'testingcf.jsdelivr.net', 'gcore.jsdelivr.net'];
   var log = function (m) { try { console.log('[霖州引擎] ' + m); } catch (e) {} };
@@ -28,11 +29,11 @@
       .finally(function () { if (timer) clearTimeout(timer); });
   }
 
-  // ── 3. 版本指针：GitHub API 取 main 最新提交号，失败退回 'main' ──
+  // ── 3. 版本指针：GitHub API 取 BRANCH 最新提交号，失败退回分支名 ──
   async function resolveRef() {
     try {
       var r = await timedFetch(
-        'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/commits/main',
+        'https://api.github.com/repos/' + GH_USER + '/' + GH_REPO + '/commits/' + BRANCH,
         5000);
       if (r.ok) {
         var j = await r.json();
@@ -41,7 +42,7 @@
       }
       log('GitHub API 不可用（限流），改用备用源');
     } catch (e) { log('提交号请求失败：' + (e && e.message || e)); }
-    return 'main';
+    return BRANCH;
   }
 
   // ── 4. 本地缓存（断网兜底） ──

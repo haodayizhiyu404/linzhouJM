@@ -1548,8 +1548,9 @@
       var userInfo = this.userBlock();
       var hist = W.Store.history(this.callKey(name));
       var tail = [];
-      // 只带本会话（最近一个「通话开始」边界之后）；旧通话详单不进新通话的请求
-      for (var i = Math.max(this.callSessionStart(hist), hist.length - 30); i < hist.length; i++) {
+      // 携带本会话全部内容（「通话开始」边界之后）——单次通话文本量小（远不及一轮正文），
+      // 截条数只会让模型忘了本次通话开头的目的；条目总量另有落库上限（200）兜底
+      for (var i = this.callSessionStart(hist); i < hist.length; i++) {
         var m = hist[i];
         if (m.who === 'sys') continue;
         tail.push(m);
