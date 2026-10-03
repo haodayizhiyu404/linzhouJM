@@ -1432,7 +1432,7 @@
     },
 
     // 解析朋友们对机主动态的反应：[赞:名字] / [评论:名字:内容]；
-    // 剔除机主自己与重复人名，各封顶 5（评论满 5 条后接话的传统从 momentsFill 沿用）
+    // 剔除机主自己与重复人名；上限给足热度分级（夺冠刷屏要装得下：赞 12、评论 8）
     parseMomentReacts: function (text, myName) {
       var likes = [], comments = [], used = {};
       if (myName) used[myName] = 1;
@@ -1442,13 +1442,13 @@
         var lk = line.match(/^\[赞[:：]([^:：\]]{1,12})\]$/);
         if (lk) {
           var ln = lk[1].trim();
-          if (ln && !used[ln] && likes.length < 5) { used[ln] = 1; likes.push(ln); }
+          if (ln && !used[ln] && likes.length < 12) { used[ln] = 1; likes.push(ln); }
           return;
         }
         var cm = line.match(/^\[评论[:：]([^:：@\]]{1,12})(?:@([^:：\]]{1,12}))?[:：]([\s\S]+)\]$/);
         if (cm) {
           var w = cm[1].trim();
-          if (w && !used[w] && comments.length < 5) {
+          if (w && !used[w] && comments.length < 8) {
             used[w] = 1;
             comments.push({ who: w, replyTo: cm[2] ? cm[2].trim() : '', text: cm[3].trim() });
           }

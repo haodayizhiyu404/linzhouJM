@@ -526,8 +526,11 @@ ctx.getWorldbook = async () => [
   eq('发圈·解析评论条数', reacts.comments.length, 2);
   eq('发圈·一人只许反应一次', reacts.comments.every(function (cm) { return reacts.likes.indexOf(cm.who) === -1; }), true);
   eq('发圈·评论带回复指向', reacts.comments[1].replyTo, '陈默');
-  const reactsCap = LW.Engine.parseMomentReacts('[赞:林溪]\n[赞:周言]\n[赞:陆飞]\n[赞:张裕民]\n[赞:裴知意]\n[赞:许嘉文]', '陈默');
-  eq('发圈·赞封顶5', reactsCap.likes.length, 5);
+  const reactsCap = LW.Engine.parseMomentReacts('[赞:林溪]\n[赞:周言]\n[赞:陆飞]\n[赞:张裕民]\n[赞:裴知意]\n[赞:许嘉文]\n[赞:王教练]\n[赞:李叔]\n[赞:赵球迷]\n[赞:孙同学]\n[赞:钱队友]\n[赞:周记者]\n[赞:吴邻居]\n[赞:郑队友]', '陈默');
+  eq('发圈·赞封顶12（热度拉满）', reactsCap.likes.length, 12);
+  // 虚构次要人物（父母/队友/粉丝路人）照常解析——他们只是名字，不进通讯录体系
+  const reactsFic = LW.Engine.parseMomentReacts('[赞:蒋妈妈]\n[赞:王教练]\n[评论:球迷小张:恭喜夺冠！]', '陈默');
+  eq('发圈·虚构路人解析', reactsFic.likes.length === 2 && reactsFic.comments[0].who === '球迷小张', true);
   // 机主动态摘要：近 3 天机主发的 + 谁互动了，进私聊上下文当话题
   LW.Store.patchAt(LW.Engine.momentsKey, mpIdx, { likes: ['林溪', '周言'], comments: [{ who: '周言', replyTo: '', text: '恭喜脱离苦海' }] });
   const myNote = LW.Engine.myMomentsNote({ dateText: '2034年8月26日 星期五' });
