@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 05:06
+//  构建时间（本地）：2026-10-04 05:19
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 05:06';
+var __LZJM_BUILD__ = '2026-10-04 05:19';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -6863,14 +6863,70 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         return raw;
       } catch (e) { return []; }
     },
-    // 卡的配置桥：开场白选择页（regex 脚本，消息渲染时在主窗口上下文 eval）挂出 GS_CONFIG。
-    // 两个可能的位置都探（父页/沙盒窗），并在弹层日志里报命中与否，排查靠它。
+    // 卡的配置桥三级读取：
+    // ① 0 楼渲染过时 GameStart 脚本挂出的 window 全局（最快，但长聊天/只渲染最近N楼时常缺）
+    // ② 引擎初始化时从卡内嵌正则脚本的替换文本里抠 GS_CONFIG——regex 随卡走、任何会话都在，
+    //    不依赖 0 楼渲染（这正是大多数会话拿不到标注的根因）
+    // ③ 都没有则退回文本派生名。
     openingConfig: function () {
       var cfg = null;
       try { cfg = window.parent.LZJM_OPENINGS; } catch (e) {}
       if (!cfg) { try { cfg = window.LZJM_OPENINGS; } catch (e) {} }
       if (cfg && Array.isArray(cfg.groups) && cfg.groups.length) return cfg;
+      if (this._openingsCfg && Array.isArray(this._openingsCfg.groups) && this._openingsCfg.groups.length) return this._openingsCfg;
       return null;
+    },
+    // 字符串里抠 JS 对象字面量（找 marker 后的第一个 '{'，括号配平、字符串感知），eval 成对象。
+    // GS_CONFIG 是纯数据（分组/标题/IF）， eval 安全；抠不到返回 null。
+    _extractObj: function (src, marker) {
+      var s = String(src || '');
+      var i = s.indexOf(marker);
+      if (i < 0) return null;
+      var j = s.indexOf('{', i + marker.length);
+      if (j < 0) return null;
+      var depth = 0, inStr = null, esc = false;
+      for (var k = j; k < s.length; k++) {
+        var c = s[k];
+        if (inStr) {
+          if (esc) esc = false;
+          else if (c === '\\') esc = true;
+          else if (c === inStr) inStr = null;
+          continue;
+        }
+        if (c === '"' || c === "'" || c === '`') { inStr = c; continue; }
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            try { return (new Function('return (' + s.slice(j, k + 1) + ');'))(); } catch (e) { return null; }
+          }
+        }
+      }
+      return null;
+    },
+    // 初始化时预载：扫卡内嵌正则脚本，找含 GS_CONFIG 的替换文本并抠配置（异步，结果进缓存）
+    _preloadOpeningsCfg: async function () {
+      var self = this;
+      if (this._openingsCfg) return;
+      try {
+        var getRx = null;
+        try { if (typeof getTavernRegexes === 'function') getRx = getTavernRegexes; } catch (e) {}
+        if (!getRx) try { if (typeof TavernHelper !== 'undefined' && TavernHelper && TavernHelper.getTavernRegexes) getRx = function () { return TavernHelper.getTavernRegexes(); }; } catch (e) {}
+        if (!getRx) try { var tp = window.parent.TavernHelper; if (tp && tp.getTavernRegexes) getRx = function () { return tp.getTavernRegexes(); }; } catch (e) {}
+        if (!getRx) return;
+        var scripts = await getRx();
+        if (!Array.isArray(scripts)) return;
+        for (var i = 0; i < scripts.length; i++) {
+          var rs = String((scripts[i] && (scripts[i].replace_string || scripts[i].replaceString)) || '');
+          if (rs.indexOf('GS_CONFIG') === -1) continue;
+          var obj = self._extractObj(rs, 'GS_CONFIG');
+          if (obj && Array.isArray(obj.groups) && obj.groups.length) {
+            self._openingsCfg = { worldbooks: obj.worldbooks || [], groups: obj.groups };
+            console.log('[霖州引擎] 开场白配置已从卡内嵌正则读取（' + obj.groups.length + ' 个时代分组）');
+            return;
+          }
+        }
+      } catch (e) {}
     },
     openingFloors: function () {
       try { return getChatMessages('0-{{lastMessageId}}').length; } catch (e) { return 0; }
@@ -7093,6 +7149,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       await this.load();
 
       this.locateLine();
+      // 刷新丢半边标注的根因修复：不依赖 0 楼渲染，直接从卡内嵌正则文本预载开场白配置
+      try { this._preloadOpeningsCfg(); } catch (e) {}
       // 刷新丢在半路的通话：残卷补「通话中断」收尾（幂等，已闭合的段不碰）
       try { this.closeOrphanCalls(); } catch (e) {}
       this.uninstallLegacyQr();

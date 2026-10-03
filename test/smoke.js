@@ -949,6 +949,11 @@ ctx.getWorldbook = async () => [
     return a === '高中·新城的月亮' && LW.Store.lineIf() === '';
   })(), true);
   eq('IF线·归位机制在位', esrc.indexOf('ifStateMatches') !== -1 && esrc.indexOf('lineIfOps(target, savedIf || null)') !== -1 && wsrc.indexOf('setLineIf') !== -1, true);
+  // 开场白配置不依赖 0 楼渲染：从卡内嵌正则文本抠 GS_CONFIG（括号配平+字符串感知）
+  const _cfgProbe = LW.Engine._extractObj("var GS_CONFIG = { worldbooks: ['W'], swipeOffset: 1, groups: [{ line: 'DLC·高中', items: [{ page: 1, title: 't】{', ifName: '', open: [] }] }] };", 'GS_CONFIG');
+  eq('开场白·脚本文本抠配置', _cfgProbe && _cfgProbe.groups.length === 1 && _cfgProbe.groups[0].items[0].title === 't】{' && _cfgProbe.swipeOffset === 1, true);
+  eq('开场白·抠取健壮性', LW.Engine._extractObj('nothing here', 'GS_CONFIG') === null && LW.Engine._extractObj('var GS_CONFIG = { a: 1; broken', 'GS_CONFIG') === null, true);
+  eq('开场白·预载与三级读取在位', esrc.indexOf('_preloadOpeningsCfg') !== -1 && esrc.indexOf('getTavernRegexes') !== -1, true);
   eq('聊天·头像开名片', wsrc.includes('lzjm-ava" data-cdet="') && wsrc.indexOf('.lzjm-chatrow .lzjm-ava{cursor:pointer}') !== -1, true);
   eq('通话·孤儿收尾', esrc.includes('closeOrphanCalls') && esrc.includes('通话中断'), true);
   eq('通话·边界标记仅拨号打一次', (wsrc.match(/—— 通话开始 ——/g) || []).length, 1); // 前移后接通处不得再打，否则响铃期界面错位复发
