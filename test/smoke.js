@@ -831,6 +831,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[2].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[2].content.indexOf('不可使用已存在的日期') === -1, true);
+  // 日期窗口过滤：排除清单只留可选窗口附近（未来1天~过去9天）的日期，旧日期不罗列防无限膨胀
+  const _dw = LW.Engine._diaryWindowDates(['2034-08-01', '2034-08-19', '2034-08-24', '2034-08-26', '2034-08-27', 'bad'], '2034年8月26日 星期五');
+  eq('备忘录·日期窗口过滤', JSON.stringify(_dw), JSON.stringify(['2034-08-19', '2034-08-24', '2034-08-26', '2034-08-27']));
   // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位；不设楼数上限——
   // 截断只会从最旧侧砍掉 summary 衔接带，用户自有压缩体系兜底
   const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', ['2034-08-25'], false);
@@ -972,6 +975,7 @@ ctx.getWorldbook = async () => [
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
   eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1 && dsrc.indexOf('diaryEnsure') === -1, true);
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
+  eq('备忘录·当天优先与张冠李戴禁令', psrc.indexOf('优先写当天') !== -1 && psrc.indexOf('张冠李戴是备忘录的头号事故') !== -1 && esrc.includes('_diaryWindowDates'), true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   // 日记历史回归保险丝：必须走 chat_history 标准槽位（与主生成同管线），自拼残留清零

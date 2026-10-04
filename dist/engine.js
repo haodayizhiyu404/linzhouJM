@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 06:16
+//  构建时间（本地）：2026-10-04 15:57
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 06:16';
+var __LZJM_BUILD__ = '2026-10-04 15:57';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -1617,10 +1617,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '  第一行：※备忘录※|日期|标题',
       '  中间：正文（可多段）',
       '  最后一行：※完※',
-      '- 日期：从当前时间往前 1~7 天内任选一天（不必是当天），格式 YYYY-MM-DD，不得晚于当前时间。',
+      '- 日期：**优先写当天**；当天没有值得记的事，再从当前往前 1~7 天里回望选一天。格式 YYYY-MM-DD，不得晚于写作当天——绝不许把更晚发生的事塞进更早的日期（张冠李戴是备忘录的头号事故）。',
       (usedDates && usedDates.length)
-        ? '- **不可使用已存在的日期**：' + usedDates.join('、') + '（这些天已各有一篇，必须避开）'
-        : '- 当前此人无已存在的备忘录日期。',
+        ? '- **不可使用已存在的日期**：' + usedDates.join('、') + '（这些天已各有一篇，必须避开；窗口外的旧日期不影响选择）'
+        : '- 可选窗口内无已存在的备忘录日期。',
       '- 篇幅：正文不少于 500 字。写满，严禁提纲式缩写、严禁用「……（后略）」省字。',
       shortRetry ? '- ⚠ 上一篇正文过短被驳回：这次必须写足 500 字，宁可写多不可写少。' : '',
       '- 这是「' + contact.name + '」写给自己看、不打算给任何人看的东西。',
@@ -6374,6 +6374,24 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       };
     },
 
+    // 排除清单只留"可选窗口附近"的日期：写作是当天优先、至多回溯 7 天，窗口外的旧日期
+    // 永远不会撞车——全量罗列只会随时间无限膨胀。窗口 = 未来1天 ~ 过去9天，再封顶 8 条。
+    _diaryWindowDates: function (dates, todayText) {
+      var list = (dates || []).slice();
+      try {
+        var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(String(todayText || ''));
+        if (!dm) return list.slice(0, 8);
+        var t0 = new Date(+dm[1], +dm[2] - 1, +dm[3]).getTime();
+        list = list.filter(function (dstr) {
+          var di = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(dstr || ''));
+          if (!di) return false;
+          var dd = Math.round((t0 - new Date(+di[1], +di[2] - 1, +di[3]).getTime()) / 86400000);
+          return dd >= -1 && dd <= 9;
+        });
+      } catch (e) {}
+      return list.slice(0, 8);
+    },
+
     // 生成一篇（手动「写一篇/重roll」，无当日判重）。正文过短（<300字）带补强要求重试一次。
     // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
     diaryWrite: async function (name) {
@@ -6383,7 +6401,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var key = this.diaryKey(name);
       var snap = W.Status.snapshot(name);
       var today = (snap && snap.dateText) || '';
-      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var usedDates = this._diaryWindowDates(W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean), today);
       var hist = W.Store.history(name).slice(-20);
       var profile = this.profileFor(name);
       var self = this;

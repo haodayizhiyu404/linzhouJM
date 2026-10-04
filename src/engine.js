@@ -1477,6 +1477,24 @@
       };
     },
 
+    // 排除清单只留"可选窗口附近"的日期：写作是当天优先、至多回溯 7 天，窗口外的旧日期
+    // 永远不会撞车——全量罗列只会随时间无限膨胀。窗口 = 未来1天 ~ 过去9天，再封顶 8 条。
+    _diaryWindowDates: function (dates, todayText) {
+      var list = (dates || []).slice();
+      try {
+        var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(String(todayText || ''));
+        if (!dm) return list.slice(0, 8);
+        var t0 = new Date(+dm[1], +dm[2] - 1, +dm[3]).getTime();
+        list = list.filter(function (dstr) {
+          var di = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(dstr || ''));
+          if (!di) return false;
+          var dd = Math.round((t0 - new Date(+di[1], +di[2] - 1, +di[3]).getTime()) / 86400000);
+          return dd >= -1 && dd <= 9;
+        });
+      } catch (e) {}
+      return list.slice(0, 8);
+    },
+
     // 生成一篇（手动「写一篇/重roll」，无当日判重）。正文过短（<300字）带补强要求重试一次。
     // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
     diaryWrite: async function (name) {
@@ -1486,7 +1504,7 @@
       var key = this.diaryKey(name);
       var snap = W.Status.snapshot(name);
       var today = (snap && snap.dateText) || '';
-      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var usedDates = this._diaryWindowDates(W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean), today);
       var hist = W.Store.history(name).slice(-20);
       var profile = this.profileFor(name);
       var self = this;
