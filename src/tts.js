@@ -13,6 +13,11 @@
   var LS_KEY = 'lzjm_tts_key';       // API key 本机存储
   var IDB_NAME = 'lzjm-tts';
   var IDB_STORE = 'audio';
+  // 音频持久化双上限（先到先清，按时间戳淘汰最旧）：条数/体积各管一维——
+  // 长句多的时候条数远没触顶体积就先爆，反之亦然。回放热度偏向最近通话，
+  // 最旧的丢了几乎无感（真要点，重合成一次 1~2 秒）。
+  var CAP_COUNT = 500;
+  var CAP_BYTES = 100 * 1024 * 1024;   // 100MB
   var sessionUrls = {};              // hash → objectURL（会话级）
   var csrfToken = null;
   var audioEl = null;                // 单例播放器（通话连播共用）
@@ -52,6 +57,38 @@
       try { db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(rec); } catch (e) {}
     }).catch(function () {});
   }
+  // 双上限淘汰：全量扫一遍（blob.size 是元数据不读数据），超 500 条或 100MB 就按时间戳删最旧
+  function idbEvict() {
+    idbOpen().then(function (db) {
+      try {
+        var rq = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).openCursor();
+        var recs = [];
+        rq.onsuccess = function () {
+          var cur = rq.result;
+          if (cur) {
+            var b = cur.value && cur.value.blob;
+            recs.push({ k: cur.key, at: (cur.value && cur.value.at) || 0, sz: (b && b.size) || 0 });
+            cur.continue();
+            return;
+          }
+          var total = 0;
+          recs.forEach(function (r) { total += r.sz; });
+          if (recs.length <= CAP_COUNT && total <= CAP_BYTES) return;
+          recs.sort(function (a, b2) { return a.at - b2.at; });  // 最旧在前
+          var kill = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE);
+          var n = 0;
+          for (var i = 0; i < recs.length; i++) {
+            if (recs.length - n <= CAP_COUNT && total <= CAP_BYTES) break;
+            kill.delete(recs[i].k);
+            total -= recs[i].sz;
+            n++;
+          }
+          try { console.log('[霖州引擎] TTS 音频淘汰：清掉 ' + n + ' 条最旧（上限 ' + CAP_COUNT + ' 条/' + Math.round(CAP_BYTES / 1048576) + 'MB）'); } catch (e) {}
+        };
+      } catch (e) {}
+    }).catch(function () {});
+  }
+
   // 按原文精确清除音频（删除通话/消息条目时同步调用；键里含音色，遍历匹配原文全删）
   function idbPurgeByText(text) {
     idbOpen().then(function (db) {
@@ -183,6 +220,7 @@
         ? await this._openai(text, voice, cfg, key)
         : await this._fish(text, voice, cfg, key);
       idbPut({ k: h, t: text, v: voice, p: cfg.provider, blob: blob, at: Date.now() });
+      idbEvict();   // 每次写入后顺手查双上限，超了当场按时间戳淘汰最旧
       var u2 = URL.createObjectURL(blob);
       sessionUrls[h] = u2;
       return u2;

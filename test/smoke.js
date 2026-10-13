@@ -944,6 +944,7 @@ ctx.getWorldbook = async () => [
   eq('TTS·请求超时在位', tsrc.indexOf('_fetchT') !== -1 && tsrc.indexOf('AbortController') !== -1, true);
   eq('TTS·世界书配置读写', (function () { var w = fs.readFileSync(path.join(ROOT, 'src/worldbook.js'), 'utf8'); return w.indexOf('MARK_VOICE') !== -1 && w.indexOf('setEntryJson') !== -1 && w.indexOf('ttsCfg') !== -1; })(), true);
   eq('TTS·持久化与清理', tsrc.indexOf('indexedDB') !== -1 && tsrc.indexOf('purgeByText') !== -1 && tsrc.indexOf('stopQueue') !== -1, true);
+  eq('TTS·音频双上限', tsrc.indexOf('CAP_COUNT = 500') !== -1 && tsrc.indexOf('100 * 1024 * 1024') !== -1 && tsrc.indexOf('idbEvict') !== -1, true);
   eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
   eq('TTS·连播三出口在位', (wsrc.match(/Tts\.speakLines/g) || []).length >= 3, true); // 开场/回复/重说各一
   eq('TTS·重说音频清理', wsrc.indexOf('popped.forEach') !== -1, true);
