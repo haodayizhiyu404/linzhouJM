@@ -221,7 +221,8 @@ ctx.getWorldbook = async () => [
   { comment: '主角人设（DLC·成人-同路而行）', enabled: true, content: '# II. 角色演化档案\n\n[MAIN·周言·演化后]\n- 已婚设定（同路线）。\n\n[MAIN·{{user}}·演化后]\n- 与周言同居（同路线）。' },
   { comment: 'DLC扩展：大学篇', enabled: true, content: '本模块为大学阶段扩展资料库。\n\n---\n\n一、 既往因果\n- 大一时两人曾因误会冷战半年。\n\n二、 周言·角色叠加演化档案\n1. 身份变化：法学院学生，住校内宿舍。' },
   { comment: '霖州蒋默::人设::林溪', enabled: true, content: '林溪的手机专用档案' },
-  { comment: '霖州蒋默::NSFW', enabled: true, content: '[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，情欲描写以克制与留白为先。' }
+  { comment: '霖州蒋默::NSFW', enabled: true, content: '[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，情欲描写以克制与留白为先。' },
+  { comment: '霖州蒋默::音色', enabled: true, content: JSON.stringify({ enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: { '沈锡元': 'uuid-xsy-1' } }) },
 ];
 (async () => {
   const wb = await LW.Worldbook.load();
@@ -935,11 +936,13 @@ ctx.getWorldbook = async () => [
     && LW.Tts.hash('你好') !== LW.Tts.hash('你好!')
     && /^[0-9a-f]{8}$/.test(LW.Tts.hash('蒋默')), true);
   const _tcfg = await LW.Tts.ready();
-  eq('TTS·沙盒无卡接口时默认配置', _tcfg.enabled === true && _tcfg.autoCall === true && _tcfg.provider === 'fish' && typeof _tcfg.voices === 'object', true);
+  eq('TTS·配置源为世界书条目', _tcfg.enabled === true && _tcfg.provider === 'fish' && _tcfg.voices['沈锡元'] === 'uuid-xsy-1', true);
+  eq('TTS·引擎ttsConfig在位', !!(LW.Engine.ttsConfig() && LW.Engine.ttsConfig().voices), true);
   await LW.Tts.save({ voices: { '蒋默': 'abc-123' } });
-  eq('TTS·音色映射会话内生效', LW.Tts.cfgCache.voices['蒋默'] === 'abc-123', true);
+  eq('TTS·音色映射会话内生效', LW.Tts.cfgCache.voices['蒋默'] === 'abc-123' && LW.Tts.cfgCache.voices['沈锡元'] === 'uuid-xsy-1', true);
   eq('TTS·双适配器与proxy', tsrc.indexOf('/proxy/https://api.fish.audio/v1/tts') !== -1 && tsrc.indexOf('/v1/audio/speech') !== -1 && tsrc.indexOf('X-CSRF-Token') !== -1, true);
-  eq('TTS·卡接口多路径与超时', tsrc.indexOf('_charApi') !== -1 && tsrc.indexOf('TavernHelper') !== -1 && tsrc.indexOf('_fetchT') !== -1 && tsrc.indexOf('AbortController') !== -1, true);
+  eq('TTS·请求超时在位', tsrc.indexOf('_fetchT') !== -1 && tsrc.indexOf('AbortController') !== -1, true);
+  eq('TTS·世界书配置读写', (function () { var w = fs.readFileSync(path.join(ROOT, 'src/worldbook.js'), 'utf8'); return w.indexOf('MARK_VOICE') !== -1 && w.indexOf('setEntryJson') !== -1 && w.indexOf('ttsCfg') !== -1; })(), true);
   eq('TTS·持久化与清理', tsrc.indexOf('indexedDB') !== -1 && tsrc.indexOf('purgeByText') !== -1 && tsrc.indexOf('stopQueue') !== -1, true);
   eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.speakLines') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);

@@ -123,6 +123,11 @@
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 音色配置（世界书「霖州蒋默::音色」JSON）：跟世界书走，全聊天通用，卡作者可预置。
+    ttsConfig: function () {
+      return state.ttsCfg || null;
+    },
+
     // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
     // 全文原样（{{user}} 宏在注入时 deref）。
     nsfwText: function () {
@@ -346,6 +351,7 @@
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       state.nsfwRaw = data.nsfwRaw || '';
+      state.ttsCfg = data.ttsCfg || null;
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {

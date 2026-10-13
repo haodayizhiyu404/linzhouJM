@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 06:50
+//  构建时间（本地）：2026-10-14 06:57
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 06:50';
+var __LZJM_BUILD__ = '2026-10-14 06:57';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -412,6 +412,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var MARK_STICKER_ALIAS = ['媒体与表情包_StickerData'];   // 卡组既有条目，直接兼容
   var MARK_PROFILE = '霖州蒋默::人设::';
   var MARK_NSFW = '霖州蒋默::NSFW';   // 卡的亲密文风指引：口味层由卡维护，引擎只负责注入提示词
+  var MARK_VOICE = '霖州蒋默::音色';   // 音色配置（JSON：开关/厂商/地址/模型/voices映射）——跟世界书走，卡作者可预置默认
 
   // ── 适配层：世界书列表与条目 ──
   async function bookNames() {
@@ -639,7 +640,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
     // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '' };
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '', ttsCfg: null };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -696,6 +697,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
         } else if (t === MARK_NSFW) {
           result.nsfwRaw = result.nsfwRaw ? result.nsfwRaw + '\n\n' + contentOf(es[i]) : contentOf(es[i]);
+        } else if (t === MARK_VOICE) {
+          try {
+            var _tj = JSON.parse(contentOf(es[i]));
+            if (_tj && typeof _tj === 'object') result.ttsCfg = _tj;
+          } catch (e) {}
         } else {
           // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
           var dlcLn = matchDlcLine(t);
@@ -811,6 +817,45 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       }
     },
 
+    // 音色配置写回：把指定标题条目的内容改为 JSON 字符串。与 setEntriesEnabled 同套双 API：
+    // updateWorldbookWith（回调式原地改）优先，getWorldbook+replaceWorldbook 兜底。
+    setEntryJson: async function (title, obj) {
+      var names = await bookNames();
+      if (!names.length) throw new Error('未找到角色卡世界书');
+      var norm2 = function (s2) { return String(s2 || '').replace(/[【】\s]/g, ''); };
+      var want = norm2(title);
+      var body = JSON.stringify(obj);
+      var render = { render: 'immediate' };
+      var touch = function (entries) {
+        for (var j = 0; j < entries.length; j++) {
+          if (norm2(titleOf(entries[j])) === want) {
+            entries[j].content = body;
+            entries[j].text = body;
+            entries[j].disable = false;
+            entries[j].enabled = true;
+            break;
+          }
+        }
+        return entries;
+      };
+      if (typeof updateWorldbookWith === 'function') {
+        for (var i = 0; i < names.length; i++) {
+          try { await updateWorldbookWith(names[i], touch, render); } catch (e) {}
+        }
+        return;
+      }
+      if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+        for (var k = 0; k < names.length; k++) {
+          try {
+            var es = await getWorldbook(names[k]);
+            if (!es || !es.length) continue;
+            var hit = false;
+            for (var m = 0; m < es.length; m++) { if (norm2(titleOf(es[m])) === want) { hit = true; break; } }
+            if (hit) await replaceWorldbook(names[k], touch(es), render);
+          } catch (e) {}
+        }
+      }
+    },
     imgUrl: function (file) {
       file = String(file || '').trim();
       if (!file) return '';
@@ -2130,61 +2175,24 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     hash: hash,
     cfgCache: null,
 
-    // 卡接口多路径解析：不同版本酒馆助手注入位置不一——裸全局 / window.TavernHelper /
-    // 父页 TavernHelper。解析不到就退回默认值（仅本会话生效），绝不静默半挂。
-    _charApi: function () {
-      var upd = null;
-      try { if (typeof updateCharacterWith === 'function') upd = updateCharacterWith; } catch (e) {}
-      try {
-        if (typeof getCharacter === 'function' && typeof replaceCharacter === 'function')
-          return { get: getCharacter, set: replaceCharacter, update: upd };
-      } catch (e) {}
-      try {
-        if (typeof TavernHelper !== 'undefined' && TavernHelper && TavernHelper.getCharacter && TavernHelper.replaceCharacter) {
-          if (!upd && TavernHelper.updateCharacterWith) upd = TavernHelper.updateCharacterWith.bind(TavernHelper);
-          return { get: TavernHelper.getCharacter.bind(TavernHelper), set: TavernHelper.replaceCharacter.bind(TavernHelper), update: upd };
-        }
-      } catch (e) {}
-      try {
-        var tp = window.parent.TavernHelper;
-        if (tp && tp.getCharacter && tp.replaceCharacter) {
-          if (!upd && tp.updateCharacterWith) upd = tp.updateCharacterWith.bind(tp);
-          return { get: tp.getCharacter.bind(tp), set: tp.replaceCharacter.bind(tp), update: upd };
-        }
-      } catch (e) {}
-      return null;
-    },
-
-    // 角色卡扩展里的音色配置（卡接口不可用时退回默认值，仅本会话生效）
+    // 配置源 = 世界书条目「霖州蒋默::音色」（JSON）。跟世界书走：全聊天通用、卡作者可预置，
+    // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
       var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
       try {
-        var api = this._charApi();
-        if (api) {
-          var ch = await api.get('current');
-          // 深探针：写卡目标名 + 扩展实际落点（data.extensions 还是顶层 extensions）
-          var name = (ch && (ch.name || (ch.data && ch.data.name))) || '';
-          if (name) this._charName = name;
-          try {
-            console.log('[霖州引擎] TTS读卡探针: name=' + JSON.stringify(name) +
-              ' hasDataExt=' + !!(ch && ch.data && ch.data.extensions) +
-              ' hasTopExt=' + !!(ch && ch.extensions) +
-              ' dataKeys=' + (ch && ch.data ? Object.keys(ch.data).length : 'no-data'));
-          } catch (e) {}
-          var ext = (ch && ch.data && ch.data.extensions) || (ch && ch.extensions) || {};
-          this.cfgCache = Object.assign({}, def, ext[EXT_KEY] || {});
-          this.cfgCache.voices = Object.assign({}, (ext[EXT_KEY] || {}).voices || {});
-          try { console.log('[霖州引擎] TTS配置读卡：voices=' + Object.keys(this.cfgCache.voices).length + ' 条'); } catch (e) {}
+        var wb = window.LZJM.Engine.ttsConfig();
+        if (wb && typeof wb === 'object') {
+          this.cfgCache = Object.assign({}, def, wb);
+          this.cfgCache.voices = Object.assign({}, wb.voices || {});
         } else {
           this.cfgCache = def;
-          try { console.log('[霖州引擎] TTS配置读卡：卡接口不可用，退回会话默认'); } catch (e) {}
         }
       } catch (e) { this.cfgCache = def; }
       return this.cfgCache;
     },
 
-    // 写回角色卡扩展（跟卡走）。写卡被酒馆权限拦截时 toast 说明，会话内仍生效。
+    // 写回世界书条目；引擎侧缓存即时生效，刷新后从世界书读回。
     save: async function (patch) {
       var cfg = await this.ready();
       var voices = Object.assign({}, cfg.voices, patch.voices || {});
@@ -2192,35 +2200,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       cfg.voices = voices;
       this.cfgCache = cfg;
       try {
-        var api2 = this._charApi();
-        if (api2) {
-          var extObj = {};
-          extObj[EXT_KEY] = cfg;
-          if (api2.update) {
-            // 首选：取回真对象→原地改→整体写回。merge 形状问题（实测 data 层会被吞）整个绕开。
-            await api2.update('current', function (ch) {
-              ch.extensions = ch.extensions || {};
-              ch.extensions[EXT_KEY] = cfg;
-              return ch;
-            });
-            try { console.log('[霖州引擎] TTS配置写卡：✓ 经 updateCharacterWith 写入'); } catch (e) {}
-          } else {
-            // 兜底：partial 写顶层 extensions（实测对象无 data 层，v2 嵌套会被 merge 吞掉）
-            await api2.set('current', { extensions: extObj }, { render: 'none' });
-            try { console.log('[霖州引擎] TTS配置写卡：✓ 经 replaceCharacter 顶层扩展写入'); } catch (e) {}
-          }
-          try { // 立即回读验证：写进去的东西必须在同一对象上读得回来，否则就是落点错
-            var back = await api2.get(target);
-            var bext = (back && back.data && back.data.extensions && back.data.extensions[EXT_KEY]) || (back && back.extensions && back.extensions[EXT_KEY]);
-            console.log('[霖州引擎] TTS写卡回读: voices=' + (bext ? Object.keys((bext.voices) || {}).length : '未找到') +
-              ' 落点=' + (back && back.data && back.data.extensions && back.data.extensions[EXT_KEY] ? 'data.extensions' : (back && back.extensions && back.extensions[EXT_KEY] ? '顶层extensions' : '未知')));
-          } catch (e) { console.warn('[霖州引擎] TTS写卡回读失败', e); }
-        } else {
-          try { console.warn('[霖州引擎] TTS配置写卡：卡接口不可用，仅本会话生效'); } catch (e) {}
-        }
+        await window.LZJM.Worldbook.setEntryJson('霖州蒋默::音色', cfg);
+        try { console.log('[霖州引擎] TTS配置写入世界书 ✓ voices=' + Object.keys(cfg.voices).length + ' 条'); } catch (e) {}
       } catch (e) {
-        console.warn('[霖州引擎] TTS配置写卡失败', e);
-        try { toastr.warning('音色配置未能写进角色卡：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
+        console.warn('[霖州引擎] TTS配置写世界书失败', e);
+        try { toastr.warning('音色配置未能写进世界书：' + (e && e.message || e) + '（需存在条目「霖州蒋默::音色」）', '📱 霖州引擎'); } catch (e2) {}
       }
       return cfg;
     },
@@ -5515,6 +5499,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 音色配置（世界书「霖州蒋默::音色」JSON）：跟世界书走，全聊天通用，卡作者可预置。
+    ttsConfig: function () {
+      return state.ttsCfg || null;
+    },
+
     // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
     // 全文原样（{{user}} 宏在注入时 deref）。
     nsfwText: function () {
@@ -5738,6 +5727,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       state.nsfwRaw = data.nsfwRaw || '';
+      state.ttsCfg = data.ttsCfg || null;
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
