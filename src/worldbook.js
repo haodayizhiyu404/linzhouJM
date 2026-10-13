@@ -435,10 +435,8 @@
       var touch = function (entries) {
         for (var j = 0; j < entries.length; j++) {
           if (norm2(titleOf(entries[j])) === want) {
-            entries[j].content = body;
+            entries[j].content = body;   // 只改内容；启用状态由用户自管（读取不依赖勾选）
             entries[j].text = body;
-            entries[j].disable = false;
-            entries[j].enabled = true;
             break;
           }
         }

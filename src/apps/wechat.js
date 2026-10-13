@@ -2237,7 +2237,8 @@
       var n = 0;
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
       if (!n) return;
-      W.Store.popLast(key, n);
+      var popped = W.Store.popLast(key, n);
+      try { if (popped && W.Tts) popped.forEach(function (m) { if (m && m.text) W.Tts.purgeByText(m.text); }); } catch (e) {} // 旧回复作废，音频同步清
       try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 旧回复作废，朗读一并停
       call.busy = true;
       this.render();
@@ -2248,6 +2249,7 @@
           entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
         });
         if (entries.length) W.Store.push(key, entries, 200);
+        try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 重说结果同样自动连播
       } catch (e) {
         try { toastr.error('重说失败，再试一次', '📱 霖州引擎'); } catch (e2) {}
       }

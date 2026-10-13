@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 06:57
+//  构建时间（本地）：2026-10-14 07:08
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 06:57';
+var __LZJM_BUILD__ = '2026-10-14 07:08';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -829,10 +829,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var touch = function (entries) {
         for (var j = 0; j < entries.length; j++) {
           if (norm2(titleOf(entries[j])) === want) {
-            entries[j].content = body;
+            entries[j].content = body;   // 只改内容；启用状态由用户自管（读取不依赖勾选）
             entries[j].text = body;
-            entries[j].disable = false;
-            entries[j].enabled = true;
             break;
           }
         }
@@ -4667,7 +4665,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var n = 0;
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
       if (!n) return;
-      W.Store.popLast(key, n);
+      var popped = W.Store.popLast(key, n);
+      try { if (popped && W.Tts) popped.forEach(function (m) { if (m && m.text) W.Tts.purgeByText(m.text); }); } catch (e) {} // 旧回复作废，音频同步清
       try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 旧回复作废，朗读一并停
       call.busy = true;
       this.render();
@@ -4678,6 +4677,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
         });
         if (entries.length) W.Store.push(key, entries, 200);
+        try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 重说结果同样自动连播
       } catch (e) {
         try { toastr.error('重说失败，再试一次', '📱 霖州引擎'); } catch (e2) {}
       }
