@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 06:44
+//  构建时间（本地）：2026-10-14 06:47
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 06:44';
+var __LZJM_BUILD__ = '2026-10-14 06:47';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2147,7 +2147,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var api = this._charApi();
         if (api) {
           var ch = await api.get('current');
-          if (ch && ch.name) this._charName = ch.name;   // 写卡用真名：编辑路径不解析 'current'
+          // 深探针：写卡目标名 + 扩展实际落点（data.extensions 还是顶层 extensions）
+          var name = (ch && (ch.name || (ch.data && ch.data.name))) || '';
+          if (name) this._charName = name;
+          try {
+            console.log('[霖州引擎] TTS读卡探针: name=' + JSON.stringify(name) +
+              ' hasDataExt=' + !!(ch && ch.data && ch.data.extensions) +
+              ' hasTopExt=' + !!(ch && ch.extensions) +
+              ' dataKeys=' + (ch && ch.data ? Object.keys(ch.data).length : 'no-data'));
+          } catch (e) {}
           var ext = (ch && ch.data && ch.data.extensions) || (ch && ch.extensions) || {};
           this.cfgCache = Object.assign({}, def, ext[EXT_KEY] || {});
           this.cfgCache.voices = Object.assign({}, (ext[EXT_KEY] || {}).voices || {});
@@ -2174,7 +2182,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           var extObj = {};
           extObj[EXT_KEY] = cfg;
           await api2.set(target, { data: { extensions: extObj } }, { render: 'none' });
-          try { console.log('[霖州引擎] TTS配置写卡：✓ 已写入「' + target + '」卡扩展'); } catch (e) {}
+          try { console.log('[霖州引擎] TTS配置写卡：✓ 已写入「' + target + '」'); } catch (e) {}
+          try { // 立即回读验证：写进去的东西必须在同一对象上读得回来，否则就是落点错
+            var back = await api2.get(target);
+            var bext = (back && back.data && back.data.extensions && back.data.extensions[EXT_KEY]) || (back && back.extensions && back.extensions[EXT_KEY]);
+            console.log('[霖州引擎] TTS写卡回读: voices=' + (bext ? Object.keys((bext.voices) || {}).length : '未找到') +
+              ' 落点=' + (back && back.data && back.data.extensions && back.data.extensions[EXT_KEY] ? 'data.extensions' : (back && back.extensions && back.extensions[EXT_KEY] ? '顶层extensions' : '未知')));
+          } catch (e) { console.warn('[霖州引擎] TTS写卡回读失败', e); }
         } else {
           try { console.warn('[霖州引擎] TTS配置写卡：卡接口不可用，仅本会话生效'); } catch (e) {}
         }
@@ -2309,9 +2323,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         self._pumping = false;
         self._pump();
       }, 30000);
-      console.log('[霖州引擎] TTS 队列:合成「' + item.text.slice(0, 12) + '」(' + this._q.length + ' 句排队)');
       this.synth(item.text, item.voice).then(function (url) {
-        console.log('[霖州引擎] TTS 队列:合成完毕，播放');
         audioEl = new Audio(url);
         audioEl.onended = function () {
           if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
