@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 15:57
+//  构建时间（本地）：2026-10-13 21:20
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 15:57';
+var __LZJM_BUILD__ = '2026-10-13 21:20';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -6781,10 +6781,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           try {
             var bar = doc.getElementById('qr--bar');
             if (!bar) return;
-            // 挂载点 = 最后一个原生 QR 按钮的父级：combined/非 combined、有无内层
-            // 容器、版本差异全都不用猜，原生按钮排得进一行，我们就跟得上
-            var natives = bar.querySelectorAll('.qr--button:not(.lzjm-qr)');
-            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar.querySelector('.qr--buttons') || bar;
+            // 挂载点 = 最后一个【可见】原生 QR 按钮的父级。可见性含祖先链：QR 收纳类插件
+            //（如 uhhhh15/QR）把白名单外的集合容器 display:none 收进自家菜单，按钮追加进
+            // 这类容器会跟着蒸发（东海往事实测反馈）——只看按钮自身没用，容器被藏时子元素
+            // 自己的 display 仍是 flex。全不可见时直接挂 bar 本体。
+            var visOk = function (el) {
+              while (el && el.nodeType === 1 && el !== doc.body) {
+                try { if (window.parent.getComputedStyle(el).display === 'none') return false; } catch (e) {}
+                el = el.parentNode;
+              }
+              return true;
+            };
+            var natives = Array.prototype.slice.call(bar.querySelectorAll('.qr--button:not(.lzjm-qr)')).filter(visOk);
+            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar;
             // 一次性结构日志（排查换行/挂载问题用，F12 控制台可见）
             if (!self._qrLogged) {
               self._qrLogged = true;
@@ -6792,12 +6801,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
                 var cs = window.parent.getComputedStyle(holder);
                 console.log('[霖州引擎] QR 挂载点 class=' + holder.className +
                   ' disp=' + cs.display + ' wrap=' + cs.flexWrap + ' w=' + holder.offsetWidth +
-                  ' / bar w=' + bar.offsetWidth + ' / 原生按钮数=' + natives.length);
+                  ' / bar w=' + bar.offsetWidth + ' / 可见原生按钮数=' + natives.length);
               } catch (e9) {}
             }
             // 古代线（无手机世界线）不显示手机按钮，只留世界线入口（靠它切回现代线）
             var wantPhone = !!W.Engine.section();
-            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder; }));
+            // alive 额外要求按钮自身可见：插件中途把容器藏起来后，下个巡检 tick 自动迁到新挂载点
+            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder && visOk(b); }));
             if (alive && (self._qrBtns.length === (wantPhone ? 3 : 2))) return;
             if (self._qrBtns) self._qrBtns.forEach(function (b) { if (b.parentNode) b.remove(); });
             var btns = [mkBtn('\uD83E\uDDED世界线', '切换 IF 世界线（五条线选一，代劳开关世界书并记入本聊天）', function () { W.Engine.qrLines(); }),

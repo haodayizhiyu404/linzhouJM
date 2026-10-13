@@ -976,6 +976,7 @@ ctx.getWorldbook = async () => [
   eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1 && dsrc.indexOf('diaryEnsure') === -1, true);
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
   eq('备忘录·当天优先与张冠李戴禁令', psrc.indexOf('优先写当天') !== -1 && psrc.indexOf('张冠李戴是备忘录的头号事故') !== -1 && esrc.includes('_diaryWindowDates'), true);
+  eq('QR·收纳插件兼容三机制', esrc.indexOf('visOk') !== -1 && esrc.indexOf('可见原生按钮数') !== -1 && esrc.indexOf('parentNode === holder && visOk(b)') !== -1, true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   // 日记历史回归保险丝：必须走 chat_history 标准槽位（与主生成同管线），自拼残留清零
