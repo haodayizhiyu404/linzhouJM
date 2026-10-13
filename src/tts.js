@@ -76,9 +76,25 @@
     // 卡接口多路径解析：不同版本酒馆助手注入位置不一——裸全局 / window.TavernHelper /
     // 父页 TavernHelper。解析不到就退回默认值（仅本会话生效），绝不静默半挂。
     _charApi: function () {
-      try { if (typeof getCharacter === 'function' && typeof replaceCharacter === 'function') return { get: getCharacter, set: replaceCharacter }; } catch (e) {}
-      try { if (typeof TavernHelper !== 'undefined' && TavernHelper && TavernHelper.getCharacter && TavernHelper.replaceCharacter) return { get: TavernHelper.getCharacter.bind(TavernHelper), set: TavernHelper.replaceCharacter.bind(TavernHelper) }; } catch (e) {}
-      try { var tp = window.parent.TavernHelper; if (tp && tp.getCharacter && tp.replaceCharacter) return { get: tp.getCharacter.bind(tp), set: tp.replaceCharacter.bind(tp) }; } catch (e) {}
+      var upd = null;
+      try { if (typeof updateCharacterWith === 'function') upd = updateCharacterWith; } catch (e) {}
+      try {
+        if (typeof getCharacter === 'function' && typeof replaceCharacter === 'function')
+          return { get: getCharacter, set: replaceCharacter, update: upd };
+      } catch (e) {}
+      try {
+        if (typeof TavernHelper !== 'undefined' && TavernHelper && TavernHelper.getCharacter && TavernHelper.replaceCharacter) {
+          if (!upd && TavernHelper.updateCharacterWith) upd = TavernHelper.updateCharacterWith.bind(TavernHelper);
+          return { get: TavernHelper.getCharacter.bind(TavernHelper), set: TavernHelper.replaceCharacter.bind(TavernHelper), update: upd };
+        }
+      } catch (e) {}
+      try {
+        var tp = window.parent.TavernHelper;
+        if (tp && tp.getCharacter && tp.replaceCharacter) {
+          if (!upd && tp.updateCharacterWith) upd = tp.updateCharacterWith.bind(tp);
+          return { get: tp.getCharacter.bind(tp), set: tp.replaceCharacter.bind(tp), update: upd };
+        }
+      } catch (e) {}
       return null;
     },
 
@@ -121,11 +137,21 @@
       try {
         var api2 = this._charApi();
         if (api2) {
-          var target = this._charName || 'current';
           var extObj = {};
           extObj[EXT_KEY] = cfg;
-          await api2.set(target, { data: { extensions: extObj } }, { render: 'none' });
-          try { console.log('[霖州引擎] TTS配置写卡：✓ 已写入「' + target + '」'); } catch (e) {}
+          if (api2.update) {
+            // 首选：取回真对象→原地改→整体写回。merge 形状问题（实测 data 层会被吞）整个绕开。
+            await api2.update('current', function (ch) {
+              ch.extensions = ch.extensions || {};
+              ch.extensions[EXT_KEY] = cfg;
+              return ch;
+            });
+            try { console.log('[霖州引擎] TTS配置写卡：✓ 经 updateCharacterWith 写入'); } catch (e) {}
+          } else {
+            // 兜底：partial 写顶层 extensions（实测对象无 data 层，v2 嵌套会被 merge 吞掉）
+            await api2.set('current', { extensions: extObj }, { render: 'none' });
+            try { console.log('[霖州引擎] TTS配置写卡：✓ 经 replaceCharacter 顶层扩展写入'); } catch (e) {}
+          }
           try { // 立即回读验证：写进去的东西必须在同一对象上读得回来，否则就是落点错
             var back = await api2.get(target);
             var bext = (back && back.data && back.data.extensions && back.data.extensions[EXT_KEY]) || (back && back.extensions && back.extensions[EXT_KEY]);
