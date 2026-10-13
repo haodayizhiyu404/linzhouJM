@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 06:21
+//  构建时间（本地）：2026-10-14 06:33
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 06:21';
+var __LZJM_BUILD__ = '2026-10-14 06:33';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2130,13 +2130,23 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     hash: hash,
     cfgCache: null,
 
-    // 角色卡扩展里的音色配置（getCharacter 在沙盒不可用时退回默认值，仅本会话生效）
+    // 卡接口多路径解析：不同版本酒馆助手注入位置不一——裸全局 / window.TavernHelper /
+    // 父页 TavernHelper。解析不到就退回默认值（仅本会话生效），绝不静默半挂。
+    _charApi: function () {
+      try { if (typeof getCharacter === 'function' && typeof replaceCharacter === 'function') return { get: getCharacter, set: replaceCharacter }; } catch (e) {}
+      try { if (typeof TavernHelper !== 'undefined' && TavernHelper && TavernHelper.getCharacter && TavernHelper.replaceCharacter) return { get: TavernHelper.getCharacter.bind(TavernHelper), set: TavernHelper.replaceCharacter.bind(TavernHelper) }; } catch (e) {}
+      try { var tp = window.parent.TavernHelper; if (tp && tp.getCharacter && tp.replaceCharacter) return { get: tp.getCharacter.bind(tp), set: tp.replaceCharacter.bind(tp) }; } catch (e) {}
+      return null;
+    },
+
+    // 角色卡扩展里的音色配置（卡接口不可用时退回默认值，仅本会话生效）
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
       var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
       try {
-        if (typeof getCharacter === 'function') {
-          var ch = await getCharacter('current');
+        var api = this._charApi();
+        if (api) {
+          var ch = await api.get('current');
           var ext = (ch && ch.data && ch.data.extensions) || (ch && ch.extensions) || {};
           this.cfgCache = Object.assign({}, def, ext[EXT_KEY] || {});
           this.cfgCache.voices = Object.assign({}, (ext[EXT_KEY] || {}).voices || {});
@@ -2155,10 +2165,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       cfg.voices = voices;
       this.cfgCache = cfg;
       try {
-        if (typeof replaceCharacter === 'function') {
+        var api2 = this._charApi();
+        if (api2) {
           var extObj = {};
           extObj[EXT_KEY] = cfg;
-          await replaceCharacter('current', { data: { extensions: extObj } }, { render: 'none' });
+          await api2.set('current', { data: { extensions: extObj } }, { render: 'none' });
         }
       } catch (e) {
         try { toastr.warning('音色配置未能写进角色卡（酒馆设置需允许脚本修改角色卡），本次会话内仍生效', '📱 霖州引擎'); } catch (e2) {}
@@ -2183,12 +2194,21 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return csrfToken;
     },
 
+    // 带超时的 fetch：厂商请求悬挂会让连播队列永久卡死（表现为只有第一句有声）。
+    // 超时即 reject，队列跳过该行继续——宁丢一句不锁全链。
+    _fetchT: function (url, opts, ms) {
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms || 25000) : null;
+      return fetch(url, ctrl ? Object.assign({}, opts, { signal: ctrl.signal }) : (opts || {}))
+        .finally(function () { if (timer) clearTimeout(timer); });
+    },
+
     _fish: async function (text, voice, cfg, key) {
       var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
       if (cfg.model) headers['model'] = cfg.model;
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
-      var r = await fetch('/proxy/https://api.fish.audio/v1/tts', {
+      var r = await this._fetchT('/proxy/https://api.fish.audio/v1/tts', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ text: text, reference_id: voice, format: 'mp3' })
@@ -2203,7 +2223,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
-      var r = await fetch('/proxy/' + ep + '/v1/audio/speech', {
+      var r = await this._fetchT('/proxy/' + ep + '/v1/audio/speech', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' })
@@ -2272,19 +2292,47 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var item = this._q.shift();
       if (!item) return;
       this._pumping = true;
+      // 看门狗：播放中任何一步挂死（合成悬挂/ended 未触发），30 秒后强制解锁续播，
+      // 宁丢一句不锁全链。逐步日志让远程排查能直接读到死在哪一环。
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._watchdog = setTimeout(function () {
+        console.warn('[霖州引擎] TTS 看门狗触发：上一句播放卡死，强制解锁续播');
+        self._watchdog = null;
+        self._pumping = false;
+        self._pump();
+      }, 30000);
+      console.log('[霖州引擎] TTS 队列:合成「' + item.text.slice(0, 12) + '」(' + this._q.length + ' 句排队)');
       this.synth(item.text, item.voice).then(function (url) {
+        console.log('[霖州引擎] TTS 队列:合成完毕，播放');
         audioEl = new Audio(url);
-        audioEl.onended = function () { self._pumping = false; self._pump(); };
-        audioEl.onerror = function () { self._pumping = false; self._pump(); };
-        audioEl.play().catch(function () { self._pumping = false; self._pump(); });
+        audioEl.onended = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.onerror = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:播放报错，跳到下一句');
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.play().catch(function (e) {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:play() 被拒（自动播放策略？）', e);
+          self._pumping = false;
+          self._pump();
+        });
       }).catch(function (e) {
-        console.warn('[霖州引擎] TTS 播放失败', e);
+        if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+        console.warn('[霖州引擎] TTS 队列:合成失败，跳到下一句', e);
         self._pumping = false;
         self._pump();
       });
     },
     stopQueue: function () {
       this._q.length = 0;
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._pumping = false;
       this.stop();
     },
 

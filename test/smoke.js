@@ -939,6 +939,7 @@ ctx.getWorldbook = async () => [
   await LW.Tts.save({ voices: { '蒋默': 'abc-123' } });
   eq('TTS·音色映射会话内生效', LW.Tts.cfgCache.voices['蒋默'] === 'abc-123', true);
   eq('TTS·双适配器与proxy', tsrc.indexOf('/proxy/https://api.fish.audio/v1/tts') !== -1 && tsrc.indexOf('/v1/audio/speech') !== -1 && tsrc.indexOf('X-CSRF-Token') !== -1, true);
+  eq('TTS·卡接口多路径与超时', tsrc.indexOf('_charApi') !== -1 && tsrc.indexOf('TavernHelper') !== -1 && tsrc.indexOf('_fetchT') !== -1 && tsrc.indexOf('AbortController') !== -1, true);
   eq('TTS·持久化与清理', tsrc.indexOf('indexedDB') !== -1 && tsrc.indexOf('purgeByText') !== -1 && tsrc.indexOf('stopQueue') !== -1, true);
   eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.speakLines') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
