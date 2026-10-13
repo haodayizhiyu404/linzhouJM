@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 06:33
+//  构建时间（本地）：2026-10-14 06:44
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 06:33';
+var __LZJM_BUILD__ = '2026-10-14 06:44';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2147,11 +2147,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         var api = this._charApi();
         if (api) {
           var ch = await api.get('current');
+          if (ch && ch.name) this._charName = ch.name;   // 写卡用真名：编辑路径不解析 'current'
           var ext = (ch && ch.data && ch.data.extensions) || (ch && ch.extensions) || {};
           this.cfgCache = Object.assign({}, def, ext[EXT_KEY] || {});
           this.cfgCache.voices = Object.assign({}, (ext[EXT_KEY] || {}).voices || {});
+          try { console.log('[霖州引擎] TTS配置读卡：voices=' + Object.keys(this.cfgCache.voices).length + ' 条'); } catch (e) {}
         } else {
           this.cfgCache = def;
+          try { console.log('[霖州引擎] TTS配置读卡：卡接口不可用，退回会话默认'); } catch (e) {}
         }
       } catch (e) { this.cfgCache = def; }
       return this.cfgCache;
@@ -2167,12 +2170,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       try {
         var api2 = this._charApi();
         if (api2) {
+          var target = this._charName || 'current';
           var extObj = {};
           extObj[EXT_KEY] = cfg;
-          await api2.set('current', { data: { extensions: extObj } }, { render: 'none' });
+          await api2.set(target, { data: { extensions: extObj } }, { render: 'none' });
+          try { console.log('[霖州引擎] TTS配置写卡：✓ 已写入「' + target + '」卡扩展'); } catch (e) {}
+        } else {
+          try { console.warn('[霖州引擎] TTS配置写卡：卡接口不可用，仅本会话生效'); } catch (e) {}
         }
       } catch (e) {
-        try { toastr.warning('音色配置未能写进角色卡（酒馆设置需允许脚本修改角色卡），本次会话内仍生效', '📱 霖州引擎'); } catch (e2) {}
+        console.warn('[霖州引擎] TTS配置写卡失败', e);
+        try { toastr.warning('音色配置未能写进角色卡：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
       }
       return cfg;
     },
