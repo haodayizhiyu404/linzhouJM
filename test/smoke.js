@@ -16,7 +16,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 // 装载顺序与 build/build.js 的 ORDER 一致（含 apps/ UI 层，供引擎侧调用 UI 的用例）
-for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
+for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/tts.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const LW = ctx.window.LZJM;
@@ -897,6 +897,7 @@ ctx.getWorldbook = async () => [
   console.log('[UI 源码]');
   const wsrc = fs.readFileSync(path.join(ROOT, 'src/apps/wechat.js'), 'utf8');
   const usrc = fs.readFileSync(path.join(ROOT, 'src/apps/uikit.js'), 'utf8');
+  const tsrc = fs.readFileSync(path.join(ROOT, 'src/tts.js'), 'utf8');
   const dsrc = fs.readFileSync(path.join(ROOT, 'src/apps/diary.js'), 'utf8');
   eq('关闭app·有点击绑定', wsrc.includes('ph.querySelectorAll(\'[data-app="close"]\').forEach'), true);
   eq('关闭app·绑定未被误改成正则字面量（fdb0520 事故）', /^\s*\/\s*ph\\\./m.test(wsrc), false);
@@ -928,6 +929,18 @@ ctx.getWorldbook = async () => [
   eq('通话·回看返回键反白', wsrc.indexOf('.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}') !== -1, true); // SVG 描边写死，color 覆不到
   eq('朋友圈·热度与虚构人物条款', psrc.indexOf('至多 12 人') !== -1 && psrc.indexOf('可虚构次要人物') !== -1, true);
   eq('朋友圈·身份号召力标度', psrc.indexOf('动态分量 × 发动态者的号召力') !== -1 && psrc.indexOf('动态分量 × 号召力') !== -1, true);
+  // ── TTS 语音：模块/哈希/配置兜底/适配器与播放链在位 ──
+  eq('TTS·模块与哈希', typeof LW.Tts === 'object'
+    && LW.Tts.hash('你好') === LW.Tts.hash('你好')
+    && LW.Tts.hash('你好') !== LW.Tts.hash('你好!')
+    && /^[0-9a-f]{8}$/.test(LW.Tts.hash('蒋默')), true);
+  const _tcfg = await LW.Tts.ready();
+  eq('TTS·沙盒无卡接口时默认配置', _tcfg.enabled === true && _tcfg.autoCall === true && _tcfg.provider === 'fish' && typeof _tcfg.voices === 'object', true);
+  await LW.Tts.save({ voices: { '蒋默': 'abc-123' } });
+  eq('TTS·音色映射会话内生效', LW.Tts.cfgCache.voices['蒋默'] === 'abc-123', true);
+  eq('TTS·双适配器与proxy', tsrc.indexOf('/proxy/https://api.fish.audio/v1/tts') !== -1 && tsrc.indexOf('/v1/audio/speech') !== -1 && tsrc.indexOf('X-CSRF-Token') !== -1, true);
+  eq('TTS·持久化与清理', tsrc.indexOf('indexedDB') !== -1 && tsrc.indexOf('purgeByText') !== -1 && tsrc.indexOf('stopQueue') !== -1, true);
+  eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.speakLines') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
   eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);
