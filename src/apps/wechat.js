@@ -2253,26 +2253,39 @@
       if (!call || call.phase !== 'active' || call.busy) return;
       var key = eng.callKey(call.name);
       var h = W.Store.history(key);
+      var self = this;
+      // 再生：userSays='' = 重说式——transcript 里的机主末句保留作上下文，重新生成对方回应
+      var regen = async function () {
+        call.busy = true;
+        self.render();
+        try {
+          var ret = await withTimeout(eng.callTurn(call.name, call.mode, ''), 90000);
+          var entries = [];
+          (ret.entries || []).forEach(function (en) {
+            entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
+          });
+          if (entries.length) W.Store.push(key, entries, 200);
+          try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 结果自动连播
+        } catch (e) {
+          try { toastr.error('对方信号不好，再试一次', '📱 霖州引擎'); } catch (e2) {}
+        }
+        if (self.call === call) { self._callNew = true; call.busy = false; self.render(); } // 结果上屏，滚到底
+      };
       var n = 0;
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
-      if (!n) return;
+      if (!n) {
+        // 末尾没有可弹的对方回复：若是机主末句（=上次回复生成失败/被删），↻ 充当重试——
+        // 不用再发一遍话（与聊天页 canRetry 同语义）；其余情况（空通/末尾系统行）无事可做
+        var tail = h.length ? h[h.length - 1] : null;
+        if (!tail || tail.who !== 'user') return;
+        try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {}
+        regen();
+        return;
+      }
       var popped = W.Store.popLast(key, n);
       try { if (popped && W.Tts) popped.forEach(function (m) { if (m && m.text) W.Tts.purgeByText(m.text); }); } catch (e) {} // 旧回复作废，音频同步清
       try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 旧回复作废，朗读一并停
-      call.busy = true;
-      this.render();
-      try {
-        var ret = await withTimeout(eng.callTurn(call.name, call.mode, ''), 90000);
-        var entries = [];
-        (ret.entries || []).forEach(function (en) {
-          entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
-        });
-        if (entries.length) W.Store.push(key, entries, 200);
-        try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 重说结果同样自动连播
-      } catch (e) {
-        try { toastr.error('重说失败，再试一次', '📱 霖州引擎'); } catch (e2) {}
-      }
-      if (this.call === call) { this._callNew = true; call.busy = false; this.render(); } // 重说结果上屏，滚到底
+      regen();
     },
 
     // 挂断：transcript 末尾写时长；私聊里由发起方留一条通话记录灰泡（微信真实样式：
