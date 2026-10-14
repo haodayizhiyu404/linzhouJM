@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 22:24
+//  构建时间（本地）：2026-10-14 22:32
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 22:24';
+var __LZJM_BUILD__ = '2026-10-14 22:32';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2819,8 +2819,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-callbtn i{width:54px;height:54px;font-size:22px}',
     '.lzjm-callbtn.hang i{width:54px;height:54px}',
     '.lzjm-callroll{position:absolute;top:10px;right:12px;z-index:5;color:#fff;opacity:.85;cursor:pointer;padding:4px;line-height:0}',
-    '.lzjm-callmin{position:absolute;top:10px;right:40px;z-index:5;width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:0}',
-    '.lzjm-callmin:hover{background:rgba(255,255,255,.3)}',
+    /* 与刷新键同款裸图标：无圆形背景，强迫症友好（button 元素须显式清 UA 默认灰底/边框） */
+    '.lzjm-callmin{position:absolute;top:10px;right:40px;z-index:5;background:none;border:none;color:#fff;opacity:.85;cursor:pointer;padding:4px;line-height:0}',
+    '.lzjm-callmin:hover{opacity:1}',
     // 说话弹窗 + 删除确认：灰黑半透明面板，贴合通话暗色场景；输入区聚焦保持暗色不刺眼
     '.lzjm-callta{width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;caret-color:#fff;padding:9px 11px;font-size:13.5px;line-height:1.55;resize:none;outline:none !important;margin-bottom:2px;font-family:inherit}',
     '.lzjm-callta::placeholder{color:rgba(255,255,255,.55) !important}', // 个别前端主题会给 placeholder 上奇色，强制柔和白
