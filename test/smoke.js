@@ -954,6 +954,7 @@ ctx.getWorldbook = async () => [
   eq('TTS·默认音色不兜机主', wsrc.indexOf('who === meN') !== -1 && wsrc.indexOf("(isMe ? '' : cfg.defaultVoice)") !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
+  eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
   eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);

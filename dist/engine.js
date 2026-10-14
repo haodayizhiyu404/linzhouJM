@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 22:32
+//  构建时间（本地）：2026-10-14 22:44
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 22:32';
+var __LZJM_BUILD__ = '2026-10-14 22:44';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -3740,7 +3740,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
           return pre + chatRowHtml(m, userName, contactMap, disp, i, !!this.peek[key + ':' + i], this.isGroup);
         }, this).join('');
-        if (this.failed && this.canRetry()) rows += '<div class="lzjm-sysrow">⚠ 对方暂时没有回复（生成失败）<br>点右上角刷新图标，或再点小飞机重试</div>';
+        if (this.busy) rows += '<div class="lzjm-sysrow">对方正在输入中…</div>';   // 生成中优先于报错提示：请求在途可见，不会误以为没点上
+        else if (this.failed && this.canRetry()) rows += '<div class="lzjm-sysrow">⚠ 对方暂时没有回复（生成失败）<br>点右上角刷新图标，或再点小飞机重试</div>';
         if (this.staged.length) rows += stagedHtml(userName);
         body = '<div class="lzjm-body"><div class="lzjm-chatbg" id="lzjm-chatbody">' + rows + '</div></div>' +
           '<div class="lzjm-bottom">' +
@@ -4587,6 +4588,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     generate: async function (userName) {
       if (this.busy) return;
       this.busy = true;
+      this.render();   // 立即渲染"对方正在输入中"——生成期间状态可见，结束才二次渲染出回复
       var W = window.LZJM;
       var eng = W.Engine;
       // 生成是异步的，期间用户可能已切到别的会话——key 必须先抓快照，
