@@ -949,8 +949,10 @@ ctx.getWorldbook = async () => [
   eq('TTS·连播三出口在位', (wsrc.match(/Tts\.speakLines/g) || []).length >= 3, true); // 开场/回复/重说各一
   eq('TTS·重说音频清理', wsrc.indexOf('popped.forEach') !== -1, true);
   eq('TTS·回放页重播接线', wsrc.indexOf('data-cpx') !== -1 && wsrc.indexOf('histName') !== -1, true);
-  eq('TTS·默认音色fallback', (tsrc.match(/\|\| cfg\.defaultVoice/g) || []).length >= 1 && (wsrc.match(/\|\| cfg\.defaultVoice/g) || []).length >= 2 && wsrc.indexOf('data-tcfg="defaultVoice"') !== -1, true);
+  eq('TTS·默认音色fallback', tsrc.indexOf('cfg.voices[who] || cfg.defaultVoice') !== -1 && wsrc.indexOf('cfg.defaultVoice') !== -1 && wsrc.indexOf('data-tcfg="defaultVoice"') !== -1, true);
   eq('TTS·撤机主配音行', wsrc.indexOf('names.push(meName)') === -1, true);
+  eq('TTS·默认音色不兜机主', wsrc.indexOf('who === meN') !== -1 && wsrc.indexOf("(isMe ? '' : cfg.defaultVoice)") !== -1, true);
+  eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
