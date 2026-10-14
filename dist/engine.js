@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 07:11
+//  构建时间（本地）：2026-10-14 19:42
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 07:11';
+var __LZJM_BUILD__ = '2026-10-14 19:42';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -3700,7 +3700,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             (sv.interrupted ? ' · 中断' : '');
           var bub = seg.map(function (m) {
             if (m.kind === 'scene') return '<div class="lzjm-callscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
-            return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
+            // data-cpt/cpx：回放页点按重播的数据源（行内嵌文本，不依赖下标；换音色即用新音色重合成）
+            return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '" data-cpt="' + esc(m.who) + '" data-cpx="' + esc(m.text || '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
           // 与通话界面同构：音频=头像即身份；视频=头像化作背景大图，保留名字
           body = '<div class="lzjm-callbody">' +
@@ -4187,18 +4188,29 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             el.onclick = function () {
               try {
                 var W2 = window.LZJM;
-                if (!W2.Tts || !UI.call) return;
-                var idx = parseInt(el.getAttribute('data-cdel'), 10);
-                var h2 = W2.Store.history(W2.Engine.callKey(UI.call.name));
-                var en = h2[idx];
-                if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
-                var who = en.who === 'user' ? W2.Engine.userName() : UI.call.name;
+                if (!W2.Tts) return;
+                var text = '', who = '';
+                var inline = el.getAttribute('data-cpx');      // 回放页：行内嵌文本
+                if (inline && inline.trim()) {
+                  text = inline.trim();
+                  var wAttr = el.getAttribute('data-cpt');
+                  who = (wAttr === 'user') ? W2.Engine.userName() : (wAttr || UI.histName || '');
+                } else {                                        // 实时通话页：按下标寻址
+                  if (!UI.call) return;
+                  var idx = parseInt(el.getAttribute('data-cdel'), 10);
+                  var h2 = W2.Store.history(W2.Engine.callKey(UI.call.name));
+                  var en = h2[idx];
+                  if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
+                  text = String(en.text).trim();
+                  who = en.who === 'user' ? W2.Engine.userName() : UI.call.name;
+                }
+                if (!text) return;
                 W2.Tts.ready().then(function (cfg) {
-                  var v = (cfg.voices || {})[who];
-                  if (cfg.enabled && v) W2.Tts.play(String(en.text).trim(), v).catch(function () {});
+                  var v = (cfg.voices || {})[who];   // 换音色后无该音色缓存→用新音色重合成
+                  if (cfg.enabled && v) W2.Tts.play(text, v).catch(function () {});
                 });
               } catch (e) {}
-            };
+                    };
           });
 
       // 语音气泡：点整泡=展开/收起文字；点喇叭图标=朗读（配音色才播，避免展开收起都响）

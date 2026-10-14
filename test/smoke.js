@@ -948,6 +948,7 @@ ctx.getWorldbook = async () => [
   eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
   eq('TTS·连播三出口在位', (wsrc.match(/Tts\.speakLines/g) || []).length >= 3, true); // 开场/回复/重说各一
   eq('TTS·重说音频清理', wsrc.indexOf('popped.forEach') !== -1, true);
+  eq('TTS·回放页重播接线', wsrc.indexOf('data-cpx') !== -1 && wsrc.indexOf('histName') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
   eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);
