@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 19:42
+//  构建时间（本地）：2026-10-14 22:14
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 19:42';
+var __LZJM_BUILD__ = '2026-10-14 22:14';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2214,7 +2214,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
-      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', voices: {} };
       try {
         var wb = window.LZJM.Engine.ttsConfig();
         if (wb && typeof wb === 'object') {
@@ -2349,7 +2349,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       (entries || []).forEach(function (en) {
         if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
         var who = en.who === 'user' ? meName : name;
-        var v = cfg.voices[who];
+        var v = cfg.voices[who] || cfg.defaultVoice;   // 未单独配音色的角色走默认音色
         if (v) self._q.push({ text: String(en.text).trim(), voice: v });
       });
       this._pump();
@@ -2986,7 +2986,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var ICON_TAB_CONT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 4.2a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6z"/><path d="M3.8 19.4c.5-2.9 2.8-4.6 5.8-4.6s5.3 1.7 5.8 4.6"/><path d="M15.6 5.2a3 3 0 0 1 0 5.6M17.4 14.9c1.9.5 3.3 1.9 3.7 3.9"/></svg>';
   // 发现页里的朋友圈入口（彩色圆标）
   var ICON_MOMENTS = '<svg viewBox="0 0 1024 1024"><path fill="#fff" d="M512 954.24A442.24 442.24 0 1 0 69.76 512 442.08 442.08 0 0 0 512 954.24z m0-30.88a401.12 401.12 0 0 1-137.12-21.92V621.6l274.24 276.64A356 356 0 0 1 512 923.36z m285.28-119.68a400 400 0 0 1-112 81.28L487.2 687.04l389.44 1.92a359.52 359.52 0 0 1-79.2 114.72z m118.24-289.28a400 400 0 0 1-21.92 136.96H613.76l276.8-273.92a355.04 355.04 0 0 1 25.12 136.96z m-232.8-368a355.68 355.68 0 0 1 114.56 79.04 402.88 402.88 0 0 1 81.44 112L680.96 535.52zM512 653.6A141.6 141.6 0 1 1 653.6 512 141.6 141.6 0 0 1 512 653.6z m0-548.32A400 400 0 0 1 649.12 128v280L375.04 130.4A356.32 356.32 0 0 1 512 105.28z m-285.28 119.84a405.44 405.44 0 0 1 112-81.44l198.4 198.08-389.44-2.08a355.68 355.68 0 0 1 79.04-114.56zM108.64 514.4a400 400 0 0 1 21.92-136.96h279.84L133.6 651.36a357.92 357.92 0 0 1-24.96-136.96z m234.72-21.12l-1.92 389.44a357.12 357.12 0 0 1-114.72-79.04 401.76 401.76 0 0 1-81.28-112z"/><path fill="#FC6B4F" d="M649.12 128A400 400 0 0 0 512 105.28a356.32 356.32 0 0 0-137.12 25.12l274.08 276.8z"/><path fill="#7838F2" d="M797.44 225.12a355.68 355.68 0 0 0-114.56-79.04l-1.92 389.44 197.92-198.08a402.88 402.88 0 0 0-81.44-112.32z"/><path fill="#5698F3" d="M893.76 651.36a400 400 0 0 0 21.92-136.96 355.04 355.04 0 0 0-25.12-136.96l-276.8 273.92z"/><path fill="#20E9F4" d="M685.12 884.96a400 400 0 0 0 112-81.28 359.52 359.52 0 0 0 79.2-114.72l-389.44-1.92z"/><path fill="#00FD60" d="M375.04 901.44A401.12 401.12 0 0 0 512 923.36a356 356 0 0 0 136.96-25.12L375.04 621.6z"/><path fill="#ABFB5B" d="M341.44 882.72l1.92-389.44L145.44 691.2a401.76 401.76 0 0 0 81.28 112 357.12 357.12 0 0 0 114.72 79.52z"/><path fill="#F0E254" d="M130.56 377.44a400 400 0 0 0-21.92 136.96 357.92 357.92 0 0 0 24.96 136.96l276.8-273.92z"/><path fill="#F6B351" d="M339.04 144a405.44 405.44 0 0 0-112 81.44 355.68 355.68 0 0 0-79.04 114.56l389.44 2.08z"/></svg>';
-  var ICON_MEMO = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></svg>';
+  var ICON_MEMO = '<svg width="26" height="26" viewBox="0 0 1024 1024" fill="#fff"><path d="M1021.290408 7.451378C992.839691-17.838148 675.591621 17.16075 404.406615 311.828886c-144.059978 156.478942-191.929438 221.96075-317.699669 513.241897-25.063727 58.03043-50.127453 95.51312-85.577949 197.574421 8.354576 0 46.514664 0.225799 46.514663 0.225799s28.676516-25.063727 92.803529-93.029327C231.218523 834.102756 422.922161 619.819184 455.437266 587.07828c32.515105-32.740904 168.446307-155.124146 226.702536-199.606615 58.256229-44.48247 3.38699 20.32194 3.38699 20.32194L324.022051 784.201103c76.094377 31.611907 268.249614 34.547299 332.376626-55.998236-61.643219-9.709372-97.093716-46.288864-97.093716-46.288865 67.739802 0.903197 235.057111 36.579493 322.893054-174.542888-140.447189 32.515105-151.962955 7.225579-151.962954 7.225578 183.574862-51.482249 172.059096-112.448071 196.219625-148.575964 10.16097-15.128556 24.160529-46.966262 37.708489-79.029769C1014.968026 143.608379 1029.419184 31.160309 1021.290408 7.451378z m-138.640794 921.7129h-602.884234c-25.966924 0-46.966262 20.999338-46.966262 46.966262s20.999338 46.966262 46.966262 46.966263h602.884234c25.966924 0 46.966262-20.999338 46.966263-46.966263s-20.999338-46.966262-46.966263-46.966262z"/></svg>';
   var ICON_TTSAPP = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="11" rx="3" stroke="#fff" stroke-width="1.8"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>';
   var ICON_CHEV = '<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#c3c7cd" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>';
   var ICON_CAM = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#454545" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h2.2l1.6-2.4A1.5 1.5 0 0 1 9 5h6a1.5 1.5 0 0 1 1.2.6L17.8 8H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="12.5" r="3.2"/></svg>';
@@ -4206,7 +4206,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
                 }
                 if (!text) return;
                 W2.Tts.ready().then(function (cfg) {
-                  var v = (cfg.voices || {})[who];   // 换音色后无该音色缓存→用新音色重合成
+                  var v = (cfg.voices || {})[who] || cfg.defaultVoice;   // 换音色后无该音色缓存→用新音色重合成
                   if (cfg.enabled && v) W2.Tts.play(text, v).catch(function () {});
                 });
               } catch (e) {}
@@ -4227,7 +4227,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             var who = isMe ? W.Engine.userName() : UI.chatKey;
             var txt = (el.querySelector('.lzjm-voicetxt') || {}).textContent || '';
             W.Tts.ready().then(function (cfg) {
-              var v = (cfg.voices || {})[who];
+              var v = (cfg.voices || {})[who] || cfg.defaultVoice;
               if (cfg.enabled && v && txt.trim()) W.Tts.play(txt.trim(), v).catch(function (e) { console.warn('[霖州引擎] 语音播放失败', e); });
             });
           } catch (e) {}
@@ -4945,7 +4945,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     } catch (e0) {}
     var meName = '';
     try { meName = eng.userName(); } catch (e0) {}
-    if (meName) names.push(meName);
     var key = W.Tts ? W.Tts.apiKey() : '';
     function vrow(nm) {
       var v = (cfg.voices || {})[nm] || '';
@@ -4975,7 +4974,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '<div class="lzjm-setcol"><span class="lzjm-setlbl">API 密钥（只存本机浏览器）</span><div class="lzjm-setrow2">' +
       '<input class="lzjm-settxt" data-tkey type="password" value="' + esc(key) + '" placeholder="sk-..."></div></div>' +
       '</div>' +
-      '<div class="lzjm-setsec">音色映射（跟角色卡走，全聊天通用）</div><div class="lzjm-setcard">' +
+      '<div class="lzjm-setsec">音色映射（跟世界书走，全聊天通用）</div><div class="lzjm-setcard">' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">默认音色（没单独配音色的角色走这个；留空则不发声）</span><div class="lzjm-setrow2">' +
+      '<input class="lzjm-settxt" data-tcfg="defaultVoice" value="' + esc(cfg.defaultVoice || '') + '" placeholder="音色ID，可空"></div></div>' +
       (names.length ? names.map(vrow).join('') : '<div class="lzjm-sysrow">未定位到当前世界线</div>') +
       '</div>' +
       '<div class="lzjm-setnote">fish 音色：fish.audio 音色库页面复制 reference_id（一串 UUID）。没配音色的角色不发声，其余功能不受影响。</div>' +
@@ -5235,8 +5236,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var h = Math.max(420, Math.min(680, vh - 20));
     ph.style.width = w + 'px';
     ph.style.height = h + 'px';
-    var left = savedPos ? savedPos.left : (vp ? vp.offsetLeft : 0) + vw - w - 8;
-    var top = savedPos ? savedPos.top : (vp ? vp.offsetTop : 0) + vh - h - 8;
+    // 默认位置：左侧贴边、垂直居中（拖动过后记住手动位置，不再回默认）——移植自东海往事
+    var left = savedPos ? savedPos.left : (vp ? vp.offsetLeft : 0) + 8;
+    var top = savedPos ? savedPos.top : (vp ? vp.offsetTop : 0) + (vh - h) / 2;
     ph.style.left = Math.max(4, Math.min(left, vw - w - 4)) + 'px';
     ph.style.top = Math.max(4, Math.min(top, vh - h - 4)) + 'px';
     ph.style.right = 'auto';

@@ -114,7 +114,7 @@
     // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
-      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', voices: {} };
       try {
         var wb = window.LZJM.Engine.ttsConfig();
         if (wb && typeof wb === 'object') {
@@ -249,7 +249,7 @@
       (entries || []).forEach(function (en) {
         if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
         var who = en.who === 'user' ? meName : name;
-        var v = cfg.voices[who];
+        var v = cfg.voices[who] || cfg.defaultVoice;   // 未单独配音色的角色走默认音色
         if (v) self._q.push({ text: String(en.text).trim(), voice: v });
       });
       this._pump();
