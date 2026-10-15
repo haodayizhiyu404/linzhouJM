@@ -952,6 +952,13 @@ ctx.getWorldbook = async () => [
   eq('TTS·默认音色fallback', tsrc.indexOf('cfg.voices[who] || cfg.defaultVoice') !== -1 && wsrc.indexOf('cfg.defaultVoice') !== -1 && wsrc.indexOf('data-tcfg="defaultVoice"') !== -1, true);
   eq('TTS·撤机主配音行', wsrc.indexOf('names.push(meName)') === -1, true);
   eq('TTS·默认音色不兜机主', wsrc.indexOf('who === meN') !== -1 && wsrc.indexOf("(isMe ? '' : cfg.defaultVoice)") !== -1, true);
+  eq('TTS·语速规范化', LW.Tts._normSpeed({ speed: 0.8 }) === 0.8 && LW.Tts._normSpeed({ speed: 99 }) === 2 && LW.Tts._normSpeed({ speed: 0.1 }) === 0.5 && LW.Tts._normSpeed({ speed: 'x' }) === 1 && LW.Tts._normSpeed({}) === 1, true);
+  eq('TTS·语速双适配器透传', (tsrc.match(/body\.speed = sp/g) || []).length === 2 && tsrc.indexOf('speed: 1') !== -1, true);
+  eq('TTS·语速进缓存键', tsrc.indexOf("this._normSpeed(cfg) + '|' + text") !== -1, true);
+  eq('TTS·语速UI三件套', wsrc.indexOf('data-tspeed') !== -1 && wsrc.indexOf('data-tspeednum') !== -1 && wsrc.indexOf('data-tspeedreset') !== -1 && wsrc.indexOf('class="lzjm-speedrg"') !== -1, true);
+  await LW.Tts.save({ speed: 0.8 });
+  eq('TTS·语速保存即生效', LW.Tts.cfgCache.speed === 0.8, true);
+  await LW.Tts.save({ speed: 1 });
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);

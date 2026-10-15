@@ -110,11 +110,18 @@
     hash: hash,
     cfgCache: null,
 
+    // 语速：0.5~2.0，1=厂商默认（此时不发 speed 字段）。非法值收敛回 1。
+    _normSpeed: function (cfg) {
+      var s = Number(cfg && cfg.speed);
+      if (!isFinite(s) || s <= 0) return 1;
+      return Math.min(2, Math.max(0.5, Math.round(s * 10) / 10));
+    },
+
     // 配置源 = 世界书条目「霖州蒋默::音色」（JSON）。跟世界书走：全聊天通用、卡作者可预置，
     // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
-      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', voices: {} };
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', speed: 1, voices: {} };
       try {
         var wb = window.LZJM.Engine.ttsConfig();
         if (wb && typeof wb === 'object') {
@@ -175,10 +182,13 @@
       if (cfg.model) headers['model'] = cfg.model;
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { text: text, reference_id: voice, format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
       var r = await this._fetchT('/proxy/https://api.fish.audio/v1/tts', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ text: text, reference_id: voice, format: 'mp3' })
+        body: JSON.stringify(body)
       });
       if (!r.ok) throw new Error('Fish TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
       return await r.blob();
@@ -190,10 +200,13 @@
       var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
       var r = await this._fetchT('/proxy/' + ep + '/v1/audio/speech', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' })
+        body: JSON.stringify(body)
       });
       if (!r.ok) throw new Error('TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
       return await r.blob();
@@ -208,7 +221,7 @@
       var key = this.apiKey();
       if (!key) throw new Error('未配置 API 密钥（手机「音色」里填）');
       if (!voice) throw new Error('该角色未配置音色');
-      var h = hash(cfg.provider + '|' + voice + '|' + text);
+      var h = hash(cfg.provider + '|' + voice + '|' + this._normSpeed(cfg) + '|' + text);
       if (sessionUrls[h]) return sessionUrls[h];
       var rec = await idbGet(h);
       if (rec && rec.blob) {

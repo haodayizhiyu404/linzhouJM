@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-14 23:10
+//  构建时间（本地）：2026-10-15 09:42
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-14 23:10';
+var __LZJM_BUILD__ = '2026-10-15 09:42';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2210,11 +2210,18 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     hash: hash,
     cfgCache: null,
 
+    // 语速：0.5~2.0，1=厂商默认（此时不发 speed 字段）。非法值收敛回 1。
+    _normSpeed: function (cfg) {
+      var s = Number(cfg && cfg.speed);
+      if (!isFinite(s) || s <= 0) return 1;
+      return Math.min(2, Math.max(0.5, Math.round(s * 10) / 10));
+    },
+
     // 配置源 = 世界书条目「霖州蒋默::音色」（JSON）。跟世界书走：全聊天通用、卡作者可预置，
     // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
     ready: async function () {
       if (this.cfgCache) return this.cfgCache;
-      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', voices: {} };
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', speed: 1, voices: {} };
       try {
         var wb = window.LZJM.Engine.ttsConfig();
         if (wb && typeof wb === 'object') {
@@ -2275,10 +2282,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (cfg.model) headers['model'] = cfg.model;
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { text: text, reference_id: voice, format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
       var r = await this._fetchT('/proxy/https://api.fish.audio/v1/tts', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ text: text, reference_id: voice, format: 'mp3' })
+        body: JSON.stringify(body)
       });
       if (!r.ok) throw new Error('Fish TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
       return await r.blob();
@@ -2290,10 +2300,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
       var csrf = await this._csrf();
       if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
       var r = await this._fetchT('/proxy/' + ep + '/v1/audio/speech', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' })
+        body: JSON.stringify(body)
       });
       if (!r.ok) throw new Error('TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
       return await r.blob();
@@ -2308,7 +2321,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var key = this.apiKey();
       if (!key) throw new Error('未配置 API 密钥（手机「音色」里填）');
       if (!voice) throw new Error('该角色未配置音色');
-      var h = hash(cfg.provider + '|' + voice + '|' + text);
+      var h = hash(cfg.provider + '|' + voice + '|' + this._normSpeed(cfg) + '|' + text);
       if (sessionUrls[h]) return sessionUrls[h];
       var rec = await idbGet(h);
       if (rec && rec.blob) {
@@ -2878,6 +2891,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-setlbl{font-size:12px;color:#8a8f99}',
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
+    '.lzjm-speedrg{flex:1;min-width:0;accent-color:#22c05e}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
@@ -3878,6 +3892,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       ph.querySelectorAll('[data-tgl]').forEach(function (el) {
         el.onchange = function () { var p2 = {}; p2[el.dataset.tgl] = el.checked; window.LZJM.Tts.save(p2); };
       });
+      // 语速三件套：滑块拖动实时改数字（不发请求），松手/数字确认才保存；复位一键回 1
+      (function () {
+        var rg = ph.querySelector('[data-tspeed]'), numEl = ph.querySelector('[data-tspeednum]'), rst = ph.querySelector('[data-tspeedreset]');
+        if (!rg || !numEl) return;
+        var norm = function (v) { v = Math.round(Number(v) * 10) / 10; if (!isFinite(v) || v <= 0) v = 1; return Math.min(2, Math.max(0.5, v)); };
+        var apply = function (v, doSave) { v = norm(v); rg.value = v; numEl.value = v.toFixed(1); if (doSave) window.LZJM.Tts.save({ speed: v }); };
+        rg.oninput = function () { numEl.value = norm(rg.value).toFixed(1); };
+        rg.onchange = function () { apply(rg.value, true); };
+        numEl.onchange = function () { apply(numEl.value, true); };
+        if (rst) rst.onclick = function () { apply(1, true); };
+      })();
       ph.querySelectorAll('[data-tprov]').forEach(function (el) {
         el.onchange = function () { window.LZJM.Tts.save({ provider: el.value }); };
       });
@@ -4956,7 +4981,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   // 音色 app：生成源配置 + 通讯录逐人音色映射 + 试音。配置存角色卡扩展（跟卡走），key 存本机。
   function ttsHtml() {
     var W = window.LZJM;
-    var cfg = (W.Tts && W.Tts.cfgCache) || { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
+    var cfg = (W.Tts && W.Tts.cfgCache) || { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', speed: 1, voices: {} };
     var eng = W.Engine;
     var names = [];
     try {
@@ -4966,6 +4991,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var meName = '';
     try { meName = eng.userName(); } catch (e0) {}
     var key = W.Tts ? W.Tts.apiKey() : '';
+    var spv = (function () { var s = Number(cfg.speed); if (!isFinite(s) || s <= 0) s = 1; return (Math.round(Math.min(2, Math.max(0.5, s)) * 10) / 10).toFixed(1); })();
     function vrow(nm) {
       var v = (cfg.voices || {})[nm] || '';
       var isMe = nm === meName;
@@ -4984,6 +5010,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">通话自动连播</div>' +
       '<div class="lzjm-setdesc">语音通话中 AI 的台词逐条朗读；挂断/你说话/重说即打断</div></div>' +
       '<input type="checkbox" data-tgl="autoCall"' + (cfg.autoCall ? ' checked' : '') + '></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">语速（全局）</div>' +
+      '<div class="lzjm-setdesc">0.5~2.0，1 为厂商默认；克隆音色太快易破音</div>' +
+      '<div class="lzjm-setrow2"><input type="range" class="lzjm-speedrg" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeed>' +
+      '<input type="number" class="lzjm-setnum" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeednum>' +
+      '<button class="lzjm-setbtn" data-tspeedreset>复位</button></div></div></div>' +
       '</div>' +
       '<div class="lzjm-setsec">生成源</div><div class="lzjm-setcard">' +
       '<div class="lzjm-setcol"><span class="lzjm-setlbl">提供商</span><div class="lzjm-setrow2"><select class="lzjm-settxt" data-tprov>' + srcSel + '</select></div></div>' +

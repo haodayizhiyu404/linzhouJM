@@ -412,6 +412,7 @@
     '.lzjm-setlbl{font-size:12px;color:#8a8f99}',
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
+    '.lzjm-speedrg{flex:1;min-width:0;accent-color:#22c05e}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
@@ -1412,6 +1413,17 @@
       ph.querySelectorAll('[data-tgl]').forEach(function (el) {
         el.onchange = function () { var p2 = {}; p2[el.dataset.tgl] = el.checked; window.LZJM.Tts.save(p2); };
       });
+      // 语速三件套：滑块拖动实时改数字（不发请求），松手/数字确认才保存；复位一键回 1
+      (function () {
+        var rg = ph.querySelector('[data-tspeed]'), numEl = ph.querySelector('[data-tspeednum]'), rst = ph.querySelector('[data-tspeedreset]');
+        if (!rg || !numEl) return;
+        var norm = function (v) { v = Math.round(Number(v) * 10) / 10; if (!isFinite(v) || v <= 0) v = 1; return Math.min(2, Math.max(0.5, v)); };
+        var apply = function (v, doSave) { v = norm(v); rg.value = v; numEl.value = v.toFixed(1); if (doSave) window.LZJM.Tts.save({ speed: v }); };
+        rg.oninput = function () { numEl.value = norm(rg.value).toFixed(1); };
+        rg.onchange = function () { apply(rg.value, true); };
+        numEl.onchange = function () { apply(numEl.value, true); };
+        if (rst) rst.onclick = function () { apply(1, true); };
+      })();
       ph.querySelectorAll('[data-tprov]').forEach(function (el) {
         el.onchange = function () { window.LZJM.Tts.save({ provider: el.value }); };
       });
@@ -2490,7 +2502,7 @@
   // 音色 app：生成源配置 + 通讯录逐人音色映射 + 试音。配置存角色卡扩展（跟卡走），key 存本机。
   function ttsHtml() {
     var W = window.LZJM;
-    var cfg = (W.Tts && W.Tts.cfgCache) || { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: {} };
+    var cfg = (W.Tts && W.Tts.cfgCache) || { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', speed: 1, voices: {} };
     var eng = W.Engine;
     var names = [];
     try {
@@ -2500,6 +2512,7 @@
     var meName = '';
     try { meName = eng.userName(); } catch (e0) {}
     var key = W.Tts ? W.Tts.apiKey() : '';
+    var spv = (function () { var s = Number(cfg.speed); if (!isFinite(s) || s <= 0) s = 1; return (Math.round(Math.min(2, Math.max(0.5, s)) * 10) / 10).toFixed(1); })();
     function vrow(nm) {
       var v = (cfg.voices || {})[nm] || '';
       var isMe = nm === meName;
@@ -2518,6 +2531,11 @@
       '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">通话自动连播</div>' +
       '<div class="lzjm-setdesc">语音通话中 AI 的台词逐条朗读；挂断/你说话/重说即打断</div></div>' +
       '<input type="checkbox" data-tgl="autoCall"' + (cfg.autoCall ? ' checked' : '') + '></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">语速（全局）</div>' +
+      '<div class="lzjm-setdesc">0.5~2.0，1 为厂商默认；克隆音色太快易破音</div>' +
+      '<div class="lzjm-setrow2"><input type="range" class="lzjm-speedrg" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeed>' +
+      '<input type="number" class="lzjm-setnum" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeednum>' +
+      '<button class="lzjm-setbtn" data-tspeedreset>复位</button></div></div></div>' +
       '</div>' +
       '<div class="lzjm-setsec">生成源</div><div class="lzjm-setcard">' +
       '<div class="lzjm-setcol"><span class="lzjm-setlbl">提供商</span><div class="lzjm-setrow2"><select class="lzjm-settxt" data-tprov>' + srcSel + '</select></div></div>' +
