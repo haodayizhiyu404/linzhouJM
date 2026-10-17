@@ -209,7 +209,31 @@
     return up;
   }
 
-  // 写成功后同步内存里的卡对象（不等酒馆重读盘）
+  // 写成功后让酒馆重读盘并广播（对齐 ST 自己的编辑流程：/edit 后 getOneCharacter 整只替换
+  // + CHARACTER_EDITED 事件——script.js:9831。不这么做，内存/磁盘虽对，但角色列表等监听者不知道卡变了）。
+  // 重读失败则退化为手补内存对象。
+  async function reloadCardFromDisk(ctx, ch, planned) {
+    var done = false;
+    try {
+      var r = await postJson('/api/characters/get', { avatar_url: ch.avatar });
+      if (r && r.ok) {
+        var fresh = await r.json();
+        var arr = ctx.characters;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && arr[i].avatar === ch.avatar) { arr[i] = fresh; done = true; break; }
+        }
+      }
+    } catch (e) {}
+    if (!done) refreshCardMemory(ch, planned);
+    try {
+      var p = window.parent;
+      var es = (typeof eventSource !== 'undefined') ? eventSource : (p && p.eventSource);
+      var et = (typeof event_types !== 'undefined') ? event_types : (p && p.event_types);
+      if (es && et && et.CHARACTER_EDITED) es.emit(et.CHARACTER_EDITED, { detail: { id: ctx.characterId != null ? ctx.characterId : ctx.this_chid } });
+    } catch (e) {}
+  }
+
+  // 兜底：重读盘失败时手补内存里的卡对象
   function refreshCardMemory(ch, planned) {
     var d = ch.data = ch.data || {};
     planned.forEach(function (p) {
@@ -257,7 +281,7 @@
       var up = buildCardUpdate(ch.avatar, plan.planned);
       var r = await postJson('/api/characters/merge-attributes', up);
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      refreshCardMemory(ch, plan.planned);
+      await reloadCardFromDisk(ctx, ch, plan.planned);
       log('角色卡已更新：' + labels.join('、'));
       return { applied: true, labels: labels };
     } catch (e) {
