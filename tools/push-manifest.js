@@ -33,7 +33,7 @@ function push(repoDir, version) {
   const blob = git('hash-object', '-w', REL);
   git('read-tree', base);
   try {
-    git('update-index', '--cacheinfo', '100644,' + blob + ',' + REL);
+    git('update-index', '--add', '--cacheinfo', '100644,' + blob + ',' + REL);   // --add：main 上可能还没有这个文件（首发）
     const tree = git('write-tree');
     if (tree === git('rev-parse', base + '^{tree}')) {
       console.log('main 上已是最新内容，无需推送');

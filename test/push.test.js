@@ -14,16 +14,15 @@ const work = path.join(tmp, 'work');
 execFileSync('git', ['init', '--bare', remote], { encoding: 'utf8' });
 execFileSync('git', ['init', '-b', 'dev', work], { encoding: 'utf8' });
 git(work, 'config', 'user.email', 't@t.t'); git(work, 'config', 'user.name', 't');
-fs.mkdirSync(path.join(work, 'content'), { recursive: true });
-fs.writeFileSync(path.join(work, 'content', 'manifest.json'), '{"version":0,"entries":[]}\n');
 fs.writeFileSync(path.join(work, 'code.js'), '// BASECODE\n');
 git(work, 'add', '.'); git(work, 'commit', '-m', 'init');
 git(work, 'remote', 'add', 'origin', remote.replace(/\\/g, '/'));
 git(work, 'push', 'origin', 'dev');
 git(work, 'push', 'origin', 'dev:refs/heads/main');
 
-// 模拟：dev 上有未提交的代码改动 + bat 刚生成的新清单
+// 模拟：dev 上有未提交的代码改动 + bat 刚生成的新清单（main 上还没有这个文件——首发场景）
 fs.writeFileSync(path.join(work, 'code.js'), '// HALFEDIT-绝不能被推送牵连\n');
+fs.mkdirSync(path.join(work, 'content'), { recursive: true });
 fs.writeFileSync(path.join(work, 'content', 'manifest.json'), '{"version":1,"entries":[{"title":"蒋默·档案"}]}\n');
 const codeBefore = fs.readFileSync(path.join(work, 'code.js'), 'utf8');
 
