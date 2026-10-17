@@ -16,7 +16,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 // 装载顺序与 build/build.js 的 ORDER 一致（含 apps/ UI 层，供引擎侧调用 UI 的用例）
-for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/tts.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
+for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/tts.js', 'src/sync.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const LW = ctx.window.LZJM;
@@ -959,6 +959,47 @@ ctx.getWorldbook = async () => [
   await LW.Tts.save({ speed: 0.8 });
   eq('TTS·语速保存即生效', LW.Tts.cfgCache.speed === 0.8, true);
   await LW.Tts.save({ speed: 1 });
+
+  // ── 设定同步（一期：世界书托管条目）──
+  console.log('[同步]');
+  // 可写世界书 mock：一条已有关闭的托管条目 + 一条用户 :: 条目
+  const syncStore = [
+    { comment: 'NPC（DLC·大学）', enabled: false, content: '旧版大学档案' },
+    { comment: '霖州蒋默::音色', enabled: true, content: '{"voices":{"沈锡元":"uuid-xsy-1"}}' },
+  ];
+  ctx.updateWorldbookWith = async (name, fn) => { fn(syncStore); };
+  ctx.getWorldbook = async () => syncStore;
+  eq('同步·semver比较', LW.Sync.semverLTE('1.9.0', '1.10.0') === true && LW.Sync.semverLTE('1.10.0', '1.9.0') === false && LW.Sync.semverLTE('1.1.0', '1.1.0') === true, true);
+  const rBad = await LW.Sync.apply({ version: 9, minPlugin: '99.0.0', entries: [{ title: 'NPC（DLC·大学）', content: '不该写入' }] });
+  eq('同步·门槛拒收', rBad.applied === false && syncStore[0].content === '旧版大学档案' && syncStore.length === 2, true);
+  const rOk = await LW.Sync.apply({ version: 2, minPlugin: '1.0.0', entries: [
+    { title: 'NPC（DLC·大学）', content: '新版大学档案v2', keys: ['大学'] },
+    { title: '霖州蒋默::音色', content: '{"voices":{}}' },   // 清单误带的运行时条目，必须被拒
+    { title: '新NPC条目', content: '全新内容', enabled: false },
+  ] });
+  eq('同步·应用成功', rOk.applied === true && rOk.updated === 1 && rOk.created === 1, true);
+  eq('同步·内容已更新', syncStore[0].content, '新版大学档案v2');
+  eq('同步·触发键已同步', JSON.stringify(syncStore[0].key || syncStore[0].keys), '["大学"]');
+  eq('同步·enabled保留原值', syncStore[0].enabled, false);
+  eq('同步·::条目不触碰', syncStore[1].content.indexOf('uuid-xsy-1') !== -1, true);
+  const neoEntry = syncStore.filter(e => (e.comment || '') === '新NPC条目')[0];
+  eq('同步·新条目已建且尊重enabled', !!neoEntry && neoEntry.content === '全新内容' && neoEntry.enabled === false && neoEntry.disable === true, true);
+  const verEntry = syncStore.filter(e => (e.comment || '') === '霖州蒋默::版本')[0];
+  eq('同步·版本号落库且关闭', !!verEntry && verEntry.content === '2' && verEntry.enabled === false, true);
+  const rSame = await LW.Sync.apply({ version: 2, entries: [] });
+  eq('同步·同版本跳过', rSame.applied === false, true);
+  const rNewer = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·更高版本再更新', rNewer.applied === true && syncStore[0].content === 'v3', true);
+  eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
+  const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
+  const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');
+  const xsrc = fs.readFileSync(path.join(ROOT, 'tools/export-manifest.js'), 'utf8');
+  const ssrc = fs.readFileSync(path.join(ROOT, 'src/sync.js'), 'utf8');
+  eq('同步·装载器暴露ref与branch', lsrc.indexOf('window[NS].ref = ref') !== -1 && lsrc.indexOf('window[NS].branch = BRANCH') !== -1, true);
+  eq('同步·构建挂载sync.js', bsrc.indexOf("'src/sync.js'") !== -1, true);
+  eq('同步·导出工具排除::条目', xsrc.indexOf("indexOf('::')") !== -1, true);
+  eq('同步·拉取链同装载器源系', ssrc.indexOf('raw.githubusercontent.com') !== -1 && ssrc.indexOf('fastly.jsdelivr.net') !== -1 && ssrc.indexOf('content/manifest.json') !== -1, true);
+  eq('同步·失败静默不抛', ssrc.indexOf('全程失败静默') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);

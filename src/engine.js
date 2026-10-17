@@ -2337,6 +2337,9 @@
 
       await this.load();
 
+      // 设定同步：异步静默跑，失败不影响任何本地功能
+      try { if (W.Sync) W.Sync.run(); } catch (e) {}
+
       this.locateLine();
       // 刷新丢半边标注的根因修复：不依赖 0 楼渲染，直接从卡内嵌正则文本预载开场白配置
       try { this._preloadOpeningsCfg(); } catch (e) {}
@@ -2405,6 +2408,7 @@
   };
 
   window.LZJM = window.LZJM || {};
+  window.LZJM.VERSION = '1.1.0';   // 插件版本：同步清单的 minPlugin 与它比较
   window.LZJM.Engine = Engine;
 
   // 启动

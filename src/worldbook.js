@@ -460,6 +460,115 @@
         }
       }
     },
+    // 按标题取单条（同步模块读版本号用）。命中第一条；无则 null。
+    getEntry: async function (title) {
+      var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
+      var want = norm(title);
+      var es = await allEntries();
+      for (var i = 0; i < es.length; i++) {
+        if (norm(titleOf(es[i])) === want) {
+          return { title: titleOf(es[i]), content: contentOf(es[i]), enabled: es[i].enabled !== false && es[i].disable !== true };
+        }
+      }
+      return null;
+    },
+
+    // 同步专用 upsert：list = [{title, content, keys?, keysSecondary?, constant?, selective?, order?, position?, enabled?}]
+    // 已存在 → 只改 内容/键/策略/顺序，enabled 保留原值（开关是运行时状态，归用户与引擎）；
+    // 不存在 → 按清单整只创建到主书（enabled 缺省 true）。
+    // 返回 {updated, created, failed:[标题]}——按书分批写，哪本失败哪批记 failed，幂等，重试安全。
+    upsertManaged: async function (list) {
+      var names = await bookNames();
+      if (!names.length) throw new Error('未找到角色卡世界书');
+      var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
+      var render = { render: 'immediate' };
+      var res = { updated: 0, created: 0, failed: [] };
+      var todo = {};
+      list.forEach(function (e) { if (e && e.title) todo[norm(e.title)] = e; });
+
+      // 1) 定位：标题 → 所在书序号（跨书只认第一处命中）
+      var loc = {};
+      var booksCache = [];
+      for (var i = 0; i < names.length; i++) {
+        var es0 = await entriesOf(names[i]);
+        booksCache.push(es0);
+        for (var j0 = 0; j0 < es0.length; j0++) {
+          var t0 = norm(titleOf(es0[j0]));
+          if (todo[t0] && loc[t0] === undefined) loc[t0] = i;
+        }
+      }
+      // 2) 分派：已有 → 所在书更新；没有 → 主书（第一本）新建
+      var updWants = {};   // 书序号 → {normTitle: true}
+      var creates = [];
+      for (var k in todo) {
+        if (loc[k] !== undefined) {
+          (updWants[loc[k]] = updWants[loc[k]] || {})[k] = true;
+        } else {
+          creates.push(todo[k]);
+        }
+      }
+
+      var mkTouch = function (want, doCreate, bag) {
+        return function (entries) {
+          for (var j = 0; j < entries.length; j++) {
+            var en = entries[j];
+            var key = norm(titleOf(en));
+            var src = todo[key];
+            if (!src || !want[key]) continue;
+            if (src.content !== undefined) { en.content = String(src.content); en.text = en.content; }
+            if (src.keys) { en.key = src.keys.slice(); en.keys = src.keys.slice(); }
+            if (src.keysSecondary) { en.keysecondary = src.keysSecondary.slice(); }
+            if (src.constant !== undefined) en.constant = !!src.constant;
+            if (src.selective !== undefined) en.selective = !!src.selective;
+            if (src.order !== undefined) en.order = src.order;
+            if (src.position !== undefined) en.position = src.position;
+            bag.updated++;
+          }
+          if (doCreate) {
+            creates.forEach(function (s2) {
+              var body = String(s2.content || '');
+              entries.push({
+                comment: s2.title, content: body, text: body,
+                key: (s2.keys || []).slice(), keys: (s2.keys || []).slice(),
+                keysecondary: (s2.keysSecondary || []).slice(),
+                constant: !!s2.constant, selective: !!s2.selective,
+                order: s2.order !== undefined ? s2.order : 100,
+                position: s2.position !== undefined ? s2.position : 0,
+                enabled: s2.enabled !== false, disable: s2.enabled === false
+              });
+              bag.created++;
+            });
+          }
+          return entries;
+        };
+      };
+
+      var jobs = [];
+      for (var bi in updWants) jobs.push({ idx: +bi, want: updWants[bi], create: +bi === 0 && creates.length > 0 });
+      if (creates.length && !updWants[0]) jobs.push({ idx: 0, want: {}, create: true });
+
+      for (var w = 0; w < jobs.length; w++) {
+        var job = jobs[w];
+        var bag = { updated: 0, created: 0 };
+        var titles = Object.keys(job.want).concat(job.create ? creates.map(function (c) { return c.title; }) : []);
+        try {
+          if (typeof updateWorldbookWith === 'function') {
+            await updateWorldbookWith(names[job.idx], mkTouch(job.want, job.create, bag), render);
+          } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+            var es = booksCache[job.idx] || [];
+            await replaceWorldbook(names[job.idx], mkTouch(job.want, job.create, bag)(es), render);
+          } else {
+            throw new Error('无世界书写入 API');
+          }
+          res.updated += bag.updated;
+          res.created += bag.created;
+        } catch (e) {
+          res.failed = res.failed.concat(titles);
+        }
+      }
+      return res;
+    },
+
     imgUrl: function (file) {
       file = String(file || '').trim();
       if (!file) return '';

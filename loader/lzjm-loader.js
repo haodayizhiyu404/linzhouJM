@@ -82,6 +82,7 @@
     if (window[NS]) window[NS].status = 'loading';
 
     var ref = await resolveRef();
+    window[NS].ref = ref; window[NS].branch = BRANCH;   // 同步模块免二次解析
     var code = null, lastErr = null;
 
     // 源清单：raw 优先（版本号 pinning——raw 对同一 URL 有 5 分钟边缘缓存，
