@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-18 01:53
+//  构建时间（本地）：2026-10-18 02:22
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-18 01:53';
+var __LZJM_BUILD__ = '2026-10-18 02:22';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -826,19 +826,38 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var want = norm2(title);
       var body = JSON.stringify(obj);
       var render = { render: 'immediate' };
+      var found = false;
       var touch = function (entries) {
         for (var j = 0; j < entries.length; j++) {
           if (norm2(titleOf(entries[j])) === want) {
             entries[j].content = body;   // 只改内容；启用状态由用户自管（读取不依赖勾选）
             entries[j].text = body;
+            found = true;
             break;
           }
         }
         return entries;
       };
+      // 仅「缺失」才建条目（:: 条目是用户空间：由用户自己的配置动作创建，同步永不托管）。
+      // 建出来即禁用态——读取不依赖勾选，禁用保证这段 JSON 绝不注入上下文。
+      // 已存在的条目（含被用户关闭/改过的）只走 touch 改内容，其余一概不动。
+      var mk = function (entries) {
+        entries.push({
+          name: title,
+          enabled: false,
+          strategy: { type: 'selective', keys: [], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+          position: { type: 'before_character_definition', role: 'system', depth: 4, order: 100 },
+          content: body,
+          probability: 100
+        });
+        return entries;
+      };
       if (typeof updateWorldbookWith === 'function') {
         for (var i = 0; i < names.length; i++) {
           try { await updateWorldbookWith(names[i], touch, render); } catch (e) {}
+        }
+        if (!found) {
+          try { await updateWorldbookWith(names[0], mk, render); } catch (e) {}
         }
         return;
       }
@@ -850,6 +869,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             var hit = false;
             for (var m = 0; m < es.length; m++) { if (norm2(titleOf(es[m])) === want) { hit = true; break; } }
             if (hit) await replaceWorldbook(names[k], touch(es), render);
+          } catch (e) {}
+        }
+        if (!found) {
+          try {
+            var es0 = (await getWorldbook(names[0])) || [];
+            await replaceWorldbook(names[0], mk(es0), render);
           } catch (e) {}
         }
       }

@@ -1006,6 +1006,19 @@ ctx.getWorldbook = async () => [
   eq('同步·无新版本也复原用户改动', rRestore.applied === true && syncStore[0].content === 'v3', true);
   const rNoDiff = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
   eq('同步·无差异不误报不重写', rNoDiff.applied === false, true);
+  // setEntryJson 缺失才建条目（:: 用户空间：不存在→创建禁用态；存在→只改内容，enabled/其余不动）
+  const voice0 = syncStore.filter(e => e.name === '霖州蒋默::音色')[0];
+  voice0.enabled = false;   // 模拟用户关掉了这条
+  const voiceLen = syncStore.length;
+  await LW.Worldbook.setEntryJson('霖州蒋默::音色', { enabled: true, voices: { '蒋默': 'uuid-jm' } });
+  eq('音色·已存在不另建条目', syncStore.length === voiceLen && syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1, true);
+  eq('音色·已存在enabled不动', syncStore.filter(e => e.name === '霖州蒋默::音色')[0].enabled === false, true);
+  eq('音色·内容已写入', syncStore.filter(e => e.name === '霖州蒋默::音色')[0].content.indexOf('uuid-jm') !== -1, true);
+  syncStore.splice(syncStore.findIndex(e => e.name === '霖州蒋默::音色'), 1);   // 删掉条目，模拟旧卡
+  await LW.Worldbook.setEntryJson('霖州蒋默::音色', { enabled: true, voices: {} });
+  const voiceRe = syncStore.filter(e => e.name === '霖州蒋默::音色')[0];
+  eq('音色·缺失时新建一条', !!voiceRe && syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1, true);
+  eq('音色·新建即禁用态', !!voiceRe && voiceRe.enabled === false, true);
   eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
   const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
   const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');
