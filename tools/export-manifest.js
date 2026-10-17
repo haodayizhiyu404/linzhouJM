@@ -6,8 +6,10 @@
 //   node tools/export-manifest.js --from <目录>     ← 换扫描目录
 //   选项：--version N（缺省旧清单+1） / --minPlugin x.y.z（缺省沿用旧清单）
 //
-// 识别口径：JSON 文本含「霖州蒋默」标记 + 有世界书条目结构；多个命中取修改时间最新，
-// 文件名带不带 (1)(2) 后缀无所谓——不认文件名，认内容。
+// 识别口径（两级筛，不蛮扫）：
+//   ① 文件名含「蒋默」——只列文件名不读内容，下载夹里几百个文件也是毫秒级；
+//   ② 对收窄后的寥寥几本读文本，确认含「霖州蒋默」标记 + 有世界书条目结构。
+// 多个命中取修改时间最新，文件名带不带 (1)(2) 后缀无所谓。
 // 标题含「::」的条目（音色/版本等运行时与用户数据）自动排除，永不进清单。
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +17,8 @@ const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'content', 'manifest.json');
-const SIGN = '霖州蒋默';
+const NAMEKEY = '蒋默';        // 一级筛：文件名关键字（世界书导出以书命名）
+const SIGN = '霖州蒋默';       // 二级筛：内容签名，确认是这张卡的书而非同名杂物
 
 const args = process.argv.slice(2);
 function opt(name) { const i = args.indexOf(name); return i !== -1 ? args[i + 1] : null; }
@@ -25,13 +28,15 @@ for (let i = 0; i < args.length; i++) {
   if (!src) src = args[i];
 }
 
-// 在目录里找本卡世界书导出：含签名标记 + 有条目结构，按修改时间从新到旧
+// 在目录里找本卡世界书导出：先按文件名含「蒋默」收窄（不读内容），
+// 再对命中者读文本确认签名 + 条目结构，按修改时间从新到旧
 function findExports(dir) {
   const cands = [];
   let files = [];
   try { files = fs.readdirSync(dir); } catch (e) { return cands; }
   for (const f of files) {
     if (!/\.json$/i.test(f)) continue;
+    if (f.indexOf(NAMEKEY) === -1) continue;   // 一级筛：只看文件名，大文件再多也不读
     const p = path.join(dir, f);
     let txt;
     try { txt = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
@@ -47,7 +52,7 @@ if (!src) {
   const dir = opt('--from') || path.join(os.homedir(), 'Downloads');
   const cands = findExports(dir);
   if (!cands.length) {
-    console.error('在「' + dir + '」没找到含「' + SIGN + '」标记的世界书导出 JSON。');
+    console.error('在「' + dir + '」没找到文件名含「' + NAMEKEY + '」的世界书导出 JSON。');
     console.error('可以：把导出的 JSON 直接拖到「发布设定.bat」上，或用 --from 指定目录。');
     process.exit(1);
   }
@@ -63,7 +68,7 @@ let list = [];
 if (Array.isArray(raw)) list = raw;
 else if (raw && Array.isArray(raw.entries)) list = raw.entries;
 else if (raw && raw.entries && typeof raw.entries === 'object') list = Object.keys(raw.entries).map(k => raw.entries[k]);
-else { console.error('认不出世界书导出格式（entries 既不是数组也不是对象）'); process.exit(1); }
+else { console.error('认不出「' + path.basename(src) + '」的世界书导出格式（entries 既不是数组也不是对象）——如果这是角色卡 JSON 而非世界书导出，请导出世界书本身'); process.exit(1); }
 
 const excluded = [];
 const entries = [];
