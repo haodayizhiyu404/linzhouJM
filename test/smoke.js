@@ -1002,6 +1002,9 @@ ctx.getWorldbook = async () => [
   eq('同步·发布精确名优先防同名片', xsrc.indexOf('EXACT') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
   eq('同步·发布保留下载夹兜底', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1, true);
   eq('同步·发布bat在位', fs.existsSync(path.join(ROOT, '发布设定.bat')), true);
+  const pmsrc = fs.readFileSync(path.join(ROOT, 'tools/push-manifest.js'), 'utf8');
+  eq('同步·发布可一键推送', xsrc.indexOf("require('./push-manifest')") !== -1 && xsrc.indexOf('isTTY') !== -1, true);
+  eq('同步·推送管道不碰分支与工作区', pmsrc.indexOf('commit-tree') !== -1 && pmsrc.indexOf('update-index') !== -1 && pmsrc.indexOf("read-tree', 'HEAD'") !== -1, true);
   eq('同步·拉取链同装载器源系', ssrc.indexOf('raw.githubusercontent.com') !== -1 && ssrc.indexOf('fastly.jsdelivr.net') !== -1 && ssrc.indexOf('content/manifest.json') !== -1, true);
   eq('同步·失败静默不抛', ssrc.indexOf('全程失败静默') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);

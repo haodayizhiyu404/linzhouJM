@@ -174,4 +174,23 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify({ version, minPlugin, entries }, null, 2) + '\n', 'utf8');
 console.log('manifest v' + version + '（minPlugin ' + minPlugin + '）：托管 ' + entries.length + ' 条，排除 ' + excluded.length + ' 条 :: 条目');
 if (excluded.length) console.log('  排除：' + excluded.join('、'));
-console.log('→ 下一步：喊 Claude「发设定」把清单推上 main（或自行提交 content/manifest.json）');
+
+// ── 一键上线：y 则直接推 main（dev 同步提交，管道推送不切分支）；否则清单留本地 ──
+if (process.stdin.isTTY) {
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  rl.question('推送到 main 上线？用户下次打开卡即收到新设定。[y/N] ', function (ans) {
+    rl.close();
+    if (/^y(es)?$/i.test(String(ans).trim())) {
+      try { require('./push-manifest').push(ROOT, version); }
+      catch (e) {
+        console.error('推送失败：' + String((e && e.message) || e).split('\n')[0]);
+        console.error('清单已在本地，重跑本工具或喊 Claude「发设定」可补推。');
+      }
+    } else {
+      console.log('好，清单已生成但未推送，用户暂时收不到。想发时重跑本工具，或喊 Claude「发设定」。');
+    }
+  });
+} else {
+  console.log('清单已生成：content/manifest.json（非交互环境，跳过推送询问）');
+}
