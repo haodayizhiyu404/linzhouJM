@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-17 23:20
+//  构建时间（本地）：2026-10-18 00:04
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-17 23:20';
+var __LZJM_BUILD__ = '2026-10-18 00:04';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2831,7 +2831,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     if (mode === 'dry') {
       var msg = '角色卡同步预览：将更新 ' + plan.planned.map(function (p) { return p.label; }).join('、');
       log('[干跑] ' + msg + '（localStorage 设 lzjm-cardsync-mode=on 即静默直写）');
-      try { toastr.info(msg + '（当前为预览模式，未改动）', '📱 霖州引擎'); } catch (e) {}
+      // 干跑报告是给人逐字核对的，必须常驻（timeOut:0 不自动消失，带关闭按钮），手机端没有 F12 看不了 console
+      try { toastr.info(msg + '（预览模式，未改动）', '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false }); } catch (e) {}
       return { applied: false, dry: true, planned: plan.planned.length };
     }
 

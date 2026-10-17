@@ -1041,6 +1041,7 @@ ctx.getWorldbook = async () => [
   eq('卡同步·正则只动extensions.regex_scripts', JSON.stringify(up.data.extensions) === '{"regex_scripts":[{"id":1}]}', true);
   eq('卡同步·白名单不外溢', Object.keys(up.data).sort().join(','), 'alternate_greetings,description,extensions,first_mes');
   eq('卡同步·干跑默认与作者赢哲学', ssrc.indexOf("lzjm-cardsync-mode") !== -1 && ssrc.indexOf("|| 'dry'") !== -1 && ssrc.indexOf('作者赢') !== -1 && ssrc.indexOf('cardsync-base') === -1, true);
+  eq('卡同步·干跑报告常驻不闪退', ssrc.indexOf('timeOut: 0') !== -1 && ssrc.indexOf('closeButton: true') !== -1, true);
   eq('卡同步·写卡走merge-attributes', ssrc.indexOf('/api/characters/merge-attributes') !== -1, true);
   eq('卡同步·发布抠卡白名单', xsrc.indexOf('CARD_FIELDS') !== -1 && xsrc.indexOf('regex_scripts') !== -1 && xsrc.indexOf('readCardPng') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
