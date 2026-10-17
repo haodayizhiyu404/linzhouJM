@@ -997,9 +997,15 @@ ctx.getWorldbook = async () => [
   const verEntry = syncStore.filter(e => e.name === '霖州蒋默::版本')[0];
   eq('同步·版本号落库且关闭', !!verEntry && verEntry.content === '2' && verEntry.enabled === false, true);
   const rSame = await LW.Sync.apply({ version: 2, entries: [] });
-  eq('同步·同版本跳过', rSame.applied === false, true);
+  eq('同步·无差异跳过', rSame.applied === false, true);
   const rNewer = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
   eq('同步·更高版本再更新', rNewer.applied === true && syncStore[0].content === 'v3', true);
+  // 差异驱动关键行为：版本号不变，用户本地删改也必须复原（不等新版本发布）
+  syncStore[0].content = '用户手贱改掉的';
+  const rRestore = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·无新版本也复原用户改动', rRestore.applied === true && syncStore[0].content === 'v3', true);
+  const rNoDiff = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·无差异不误报不重写', rNoDiff.applied === false, true);
   eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
   const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
   const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');

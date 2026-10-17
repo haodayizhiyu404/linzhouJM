@@ -476,7 +476,8 @@
     // 同步专用 upsert：list = [{title, content, keys?, keysSecondary?, constant?, selective?, order?, position?, depth?, role?, enabled?}]
     // 已存在 → 只改 内容/键/策略/顺序/位置，enabled 保留原值（开关是运行时状态，归用户与引擎）；
     // 不存在 → 按清单整只创建到主书（enabled 缺省 true）。
-    // 返回 {updated, created, failed:[标题]}——按书分批写，哪本失败哪批记 failed，幂等，重试安全。
+    // 返回 {updated, created, failed:[标题]}——updated 只计真有差异的条目（差异预检），
+    // 无差异的书整本不动笔；按书分批写，哪本失败哪批记 failed，幂等，重试安全。
     //
     // 【字段纪律】酒馆助手条目结构（权威源：JS-Slash-Runner dist/@types.txt 的 WorldbookEntry）：
     //   标题=name；启用=enabled；触发=strategy{type,keys,keys_secondary{logic,keys}}；
@@ -528,6 +529,22 @@
         if (src.role !== undefined && ROLE_TYPE[src.role]) en.position.role = ROLE_TYPE[src.role];
       }
 
+      // 差异预检：touchEntry 会动的字段里有任何一个真不一样才算「有差异」（只比 src 提供的字段）。
+      // 差异驱动同步每次启动都跑到这里，无差异必须整本书不动笔——不能每次刷新都重写一遍书。
+      function diffEntry(en, src) {
+        if (src.content !== undefined && String(src.content) !== String(en.content == null ? '' : en.content)) return true;
+        var st = en.strategy || {};
+        if (src.keys && JSON.stringify(src.keys) !== JSON.stringify(st.keys || [])) return true;
+        if (src.keysSecondary && JSON.stringify(src.keysSecondary) !== JSON.stringify((st.keys_secondary || {}).keys || [])) return true;
+        if (src.constant !== undefined && st.type !== 'vectorized' && st.type !== (src.constant ? 'constant' : 'selective')) return true;
+        var po = en.position || {};
+        if (src.order !== undefined && po.order !== src.order) return true;
+        if (src.position !== undefined && POS_TYPE[src.position] && po.type !== POS_TYPE[src.position]) return true;
+        if (src.depth !== undefined && po.depth !== src.depth) return true;
+        if (src.role !== undefined && ROLE_TYPE[src.role] && po.role !== ROLE_TYPE[src.role]) return true;
+        return false;
+      }
+
       return async function (list) {
         var names = await bookNames();
         if (!names.length) throw new Error('未找到角色卡世界书');
@@ -559,9 +576,16 @@
           }
         }
 
-        // 3) 更新：按书分批（回调式原地改优先，整本替换兜底）
+        // 3) 更新：按书分批（回调式原地改优先，整本替换兜底）；预检无差异的书整本跳过
         for (var bi in updWants) {
           var want = updWants[bi];
+          var changed = {};
+          var cached = booksCache[+bi] || [];
+          for (var cj = 0; cj < cached.length; cj++) {
+            var cn = norm(titleOf(cached[cj]));
+            if (want[cn] && diffEntry(cached[cj], todo[cn])) changed[cn] = true;
+          }
+          if (!Object.keys(changed).length) continue;
           var bag = { updated: 0 };
           var mkTouch = function (w, bg) {
             return function (entries) {
@@ -574,15 +598,15 @@
           };
           try {
             if (typeof updateWorldbookWith === 'function') {
-              await updateWorldbookWith(names[+bi], mkTouch(want, bag), render);
+              await updateWorldbookWith(names[+bi], mkTouch(changed, bag), render);
             } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
-              await replaceWorldbook(names[+bi], mkTouch(want, bag)(booksCache[+bi] || []), render);
+              await replaceWorldbook(names[+bi], mkTouch(changed, bag)(cached), render);
             } else {
               throw new Error('无世界书写入 API');
             }
             res.updated += bag.updated;
           } catch (e) {
-            res.failed = res.failed.concat(Object.keys(want).map(function (n2) { return todo[n2].title; }));
+            res.failed = res.failed.concat(Object.keys(changed).map(function (n2) { return todo[n2].title; }));
           }
         }
 
