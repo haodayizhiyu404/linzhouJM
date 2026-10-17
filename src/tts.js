@@ -1,0 +1,325 @@
+// ═══════════════════════════════════════════════════════════
+//  tts.js —— 语音合成与播放
+//  双适配器：fish 原生 /v1/tts（reference_id 音色克隆）+ OpenAI 兼容 /v1/audio/speech
+//  （通吃公益站/OpenAI 系）。一律走酒馆服务端 /proxy 转发——免 CORS，沙盒内可用。
+//  配置音色映射写角色卡扩展（跟卡走、全聊天通用、卡作者可预置）；API key 只存本机。
+//  音频 blob 绝不进聊天变量/卡：会话级 Map + IndexedDB 双级缓存，键=文本内容哈希；
+//  删除通话内容时按原文精确清音频。
+// ═══════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+
+  var EXT_KEY = 'lzjm_tts';          // 角色卡扩展字段名
+  var LS_KEY = 'lzjm_tts_key';       // API key 本机存储
+  var IDB_NAME = 'lzjm-tts';
+  var IDB_STORE = 'audio';
+  // 音频持久化双上限（先到先清，按时间戳淘汰最旧）：条数/体积各管一维——
+  // 长句多的时候条数远没触顶体积就先爆，反之亦然。回放热度偏向最近通话，
+  // 最旧的丢了几乎无感（真要点，重合成一次 1~2 秒）。
+  var CAP_COUNT = 500;
+  var CAP_BYTES = 100 * 1024 * 1024;   // 100MB
+  var sessionUrls = {};              // hash → objectURL（会话级）
+  var csrfToken = null;
+  var audioEl = null;                // 单例播放器（通话连播共用）
+
+  // djb2 → 8 位 hex：文本+音色+厂商决定一段音频的身份
+  function hash(s) {
+    var h = 5381;
+    s = String(s || '');
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  // ── IndexedDB 最小封装（不可用则全部静默降级为仅会话缓存）──
+  function idbOpen() {
+    return new Promise(function (res, rej) {
+      try {
+        var rq = indexedDB.open(IDB_NAME, 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore(IDB_STORE, { keyPath: 'k' }); };
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { rej(rq.error || new Error('idb')); };
+      } catch (e) { rej(e); }
+    });
+  }
+  function idbGet(k) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res) {
+        try {
+          var rq = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(k);
+          rq.onsuccess = function () { res(rq.result || null); };
+          rq.onerror = function () { res(null); };
+        } catch (e) { res(null); }
+      });
+    }).catch(function () { return null; });
+  }
+  function idbPut(rec) {
+    idbOpen().then(function (db) {
+      try { db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(rec); } catch (e) {}
+    }).catch(function () {});
+  }
+  // 双上限淘汰：全量扫一遍（blob.size 是元数据不读数据），超 500 条或 100MB 就按时间戳删最旧
+  function idbEvict() {
+    idbOpen().then(function (db) {
+      try {
+        var rq = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).openCursor();
+        var recs = [];
+        rq.onsuccess = function () {
+          var cur = rq.result;
+          if (cur) {
+            var b = cur.value && cur.value.blob;
+            recs.push({ k: cur.key, at: (cur.value && cur.value.at) || 0, sz: (b && b.size) || 0 });
+            cur.continue();
+            return;
+          }
+          var total = 0;
+          recs.forEach(function (r) { total += r.sz; });
+          if (recs.length <= CAP_COUNT && total <= CAP_BYTES) return;
+          recs.sort(function (a, b2) { return a.at - b2.at; });  // 最旧在前
+          var kill = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE);
+          var n = 0;
+          for (var i = 0; i < recs.length; i++) {
+            if (recs.length - n <= CAP_COUNT && total <= CAP_BYTES) break;
+            kill.delete(recs[i].k);
+            total -= recs[i].sz;
+            n++;
+          }
+          try { console.log('[霖州引擎] TTS 音频淘汰：清掉 ' + n + ' 条最旧（上限 ' + CAP_COUNT + ' 条/' + Math.round(CAP_BYTES / 1048576) + 'MB）'); } catch (e) {}
+        };
+      } catch (e) {}
+    }).catch(function () {});
+  }
+
+  // 按原文精确清除音频（删除通话/消息条目时同步调用；键里含音色，遍历匹配原文全删）
+  function idbPurgeByText(text) {
+    idbOpen().then(function (db) {
+      try {
+        var tx = db.transaction(IDB_STORE, 'readwrite');
+        var rq = tx.objectStore(IDB_STORE).openCursor();
+        rq.onsuccess = function () {
+          var cur = rq.result;
+          if (cur) {
+            if (cur.value && cur.value.t === text) cur.delete();
+            cur.continue();
+          }
+        };
+      } catch (e) {}
+    }).catch(function () {});
+  }
+
+  var Tts = {
+    hash: hash,
+    cfgCache: null,
+
+    // 语速：0.5~2.0，1=厂商默认（此时不发 speed 字段）。非法值收敛回 1。
+    _normSpeed: function (cfg) {
+      var s = Number(cfg && cfg.speed);
+      if (!isFinite(s) || s <= 0) return 1;
+      return Math.min(2, Math.max(0.5, Math.round(s * 10) / 10));
+    },
+
+    // 配置源 = 世界书条目「霖州蒋默::音色」（JSON）。跟世界书走：全聊天通用、卡作者可预置，
+    // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
+    ready: async function () {
+      if (this.cfgCache) return this.cfgCache;
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', speed: 1, voices: {} };
+      try {
+        var wb = window.LZJM.Engine.ttsConfig();
+        if (wb && typeof wb === 'object') {
+          this.cfgCache = Object.assign({}, def, wb);
+          this.cfgCache.voices = Object.assign({}, wb.voices || {});
+        } else {
+          this.cfgCache = def;
+        }
+      } catch (e) { this.cfgCache = def; }
+      return this.cfgCache;
+    },
+
+    // 写回世界书条目；引擎侧缓存即时生效，刷新后从世界书读回。
+    save: async function (patch) {
+      var cfg = await this.ready();
+      var voices = Object.assign({}, cfg.voices, patch.voices || {});
+      cfg = Object.assign({}, cfg, patch);
+      cfg.voices = voices;
+      this.cfgCache = cfg;
+      try {
+        await window.LZJM.Worldbook.setEntryJson('霖州蒋默::音色', cfg);
+        try { console.log('[霖州引擎] TTS配置写入世界书 ✓ voices=' + Object.keys(cfg.voices).length + ' 条'); } catch (e) {}
+      } catch (e) {
+        console.warn('[霖州引擎] TTS配置写世界书失败', e);
+        try { toastr.warning('音色配置未能写进世界书：' + (e && e.message || e) + '（需存在条目「霖州蒋默::音色」）', '📱 霖州引擎'); } catch (e2) {}
+      }
+      return cfg;
+    },
+
+    apiKey: function () {
+      try { return localStorage.getItem(LS_KEY) || ''; } catch (e) { return ''; }
+    },
+    setApiKey: function (k) {
+      try { if (k) localStorage.setItem(LS_KEY, k); else localStorage.removeItem(LS_KEY); } catch (e) {}
+    },
+
+    // CSRF：新版 /proxy 免校验，老版本仍可能校验——自取 token 两头兼容（不依赖页面全局）
+    _csrf: async function () {
+      if (csrfToken) return csrfToken;
+      try {
+        var r = await fetch('/csrf-token');
+        if (r.ok) csrfToken = (await r.json()).token;
+      } catch (e) {}
+      return csrfToken;
+    },
+
+    // 带超时的 fetch：厂商请求悬挂会让连播队列永久卡死（表现为只有第一句有声）。
+    // 超时即 reject，队列跳过该行继续——宁丢一句不锁全链。
+    _fetchT: function (url, opts, ms) {
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms || 25000) : null;
+      return fetch(url, ctrl ? Object.assign({}, opts, { signal: ctrl.signal }) : (opts || {}))
+        .finally(function () { if (timer) clearTimeout(timer); });
+    },
+
+    _fish: async function (text, voice, cfg, key) {
+      var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      if (cfg.model) headers['model'] = cfg.model;
+      var csrf = await this._csrf();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { text: text, reference_id: voice, format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
+      var r = await this._fetchT('/proxy/https://api.fish.audio/v1/tts', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) throw new Error('Fish TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
+      return await r.blob();
+    },
+
+    _openai: async function (text, voice, cfg, key) {
+      var ep = String(cfg.endpoint || '').trim().replace(/\/+$/, '');
+      if (!ep) throw new Error('OpenAI 兼容：未填接口地址');
+      var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      var csrf = await this._csrf();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
+      var r = await this._fetchT('/proxy/' + ep + '/v1/audio/speech', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) throw new Error('TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
+      return await r.blob();
+    },
+
+    // 合成：会话缓存 → IndexedDB 命中 → 厂商 API → 双级写入。返回 objectURL。
+    synth: async function (text, voice) {
+      text = String(text || '').trim();
+      if (!text) throw new Error('空文本');
+      var cfg = await this.ready();
+      if (!cfg.enabled) throw new Error('语音功能未开启');
+      var key = this.apiKey();
+      if (!key) throw new Error('未配置 API 密钥（手机「音色」里填）');
+      if (!voice) throw new Error('该角色未配置音色');
+      var h = hash(cfg.provider + '|' + voice + '|' + this._normSpeed(cfg) + '|' + text);
+      if (sessionUrls[h]) return sessionUrls[h];
+      var rec = await idbGet(h);
+      if (rec && rec.blob) {
+        var u1 = URL.createObjectURL(rec.blob);
+        sessionUrls[h] = u1;
+        return u1;
+      }
+      var blob = cfg.provider === 'openai'
+        ? await this._openai(text, voice, cfg, key)
+        : await this._fish(text, voice, cfg, key);
+      idbPut({ k: h, t: text, v: voice, p: cfg.provider, blob: blob, at: Date.now() });
+      idbEvict();   // 每次写入后顺手查双上限，超了当场按时间戳淘汰最旧
+      var u2 = URL.createObjectURL(blob);
+      sessionUrls[h] = u2;
+      return u2;
+    },
+
+    play: async function (text, voice) {
+      var url = await this.synth(text, voice);
+      this.stop();
+      audioEl = new Audio(url);
+      return audioEl.play();
+    },
+    stop: function () {
+      try { if (audioEl) { audioEl.pause(); audioEl.onended = null; audioEl.onerror = null; audioEl = null; } } catch (e) {}
+    },
+
+    // 通话连播：台词行入队逐条播；画面行跳过；挂断/新输入/重说 → stopQueue 打断
+    _q: [],
+    _pumping: false,
+    speakLines: async function (name, entries) {
+      var self = this;
+      var cfg = await this.ready();
+      if (!cfg.enabled || !cfg.autoCall) return;
+      var W = window.LZJM;
+      var meName = '';
+      try { meName = W.Engine.userName(); } catch (e) {}
+      (entries || []).forEach(function (en) {
+        if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
+        var who = en.who === 'user' ? meName : name;
+        var v = cfg.voices[who] || cfg.defaultVoice;   // 未单独配音色的角色走默认音色
+        if (v) self._q.push({ text: String(en.text).trim(), voice: v });
+      });
+      this._pump();
+    },
+    _pump: function () {
+      var self = this;
+      if (this._pumping) return;
+      var item = this._q.shift();
+      if (!item) return;
+      this._pumping = true;
+      // 看门狗：播放中任何一步挂死（合成悬挂/ended 未触发），30 秒后强制解锁续播，
+      // 宁丢一句不锁全链。逐步日志让远程排查能直接读到死在哪一环。
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._watchdog = setTimeout(function () {
+        console.warn('[霖州引擎] TTS 看门狗触发：上一句播放卡死，强制解锁续播');
+        self._watchdog = null;
+        self._pumping = false;
+        self._pump();
+      }, 30000);
+      this.synth(item.text, item.voice).then(function (url) {
+        audioEl = new Audio(url);
+        audioEl.onended = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.onerror = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:播放报错，跳到下一句');
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.play().catch(function (e) {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:play() 被拒（自动播放策略？）', e);
+          self._pumping = false;
+          self._pump();
+        });
+      }).catch(function (e) {
+        if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+        console.warn('[霖州引擎] TTS 队列:合成失败，跳到下一句', e);
+        self._pumping = false;
+        self._pump();
+      });
+    },
+    stopQueue: function () {
+      this._q.length = 0;
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._pumping = false;
+      this.stop();
+    },
+
+    purgeByText: function (text) {
+      idbPurgeByText(String(text || '').trim());
+    }
+  };
+
+  window.LZJM = window.LZJM || {};
+  window.LZJM.Tts = Tts;
+})();

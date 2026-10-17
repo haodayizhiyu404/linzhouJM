@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-04 06:16
+//  构建时间（本地）：2026-10-18 02:53
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-04 06:16';
+var __LZJM_BUILD__ = '2026-10-18 02:53';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -412,6 +412,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var MARK_STICKER_ALIAS = ['媒体与表情包_StickerData'];   // 卡组既有条目，直接兼容
   var MARK_PROFILE = '霖州蒋默::人设::';
   var MARK_NSFW = '霖州蒋默::NSFW';   // 卡的亲密文风指引：口味层由卡维护，引擎只负责注入提示词
+  var MARK_VOICE = '霖州蒋默::音色';   // 音色配置（JSON：开关/厂商/地址/模型/voices映射）——跟世界书走，卡作者可预置默认
 
   // ── 适配层：世界书列表与条目 ──
   async function bookNames() {
@@ -639,7 +640,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 返回 { rosters, stickers, profiles, states, dlcLineRaw }
     // states = { 条目标题: 是否勾选开启 }——世界线主条目定位用（enabled 字段读不到时按"开"记）
     // dlcLineRaw = [{line, parsed:{mainName, main, evol:{名字:文本}, fresh:{名字:文本}}}]——DLC长文条目解析结果
-    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '' };
+    load: async function () {      var result = { rosters: {}, stickers: {}, profiles: {}, states: {}, dlcLineRaw: [], nsfwRaw: '', ttsCfg: null };
       var names = await bookNames();
       console.log('[霖州引擎] 世界书：' + names.length + ' 本 → ' + names.join(' / '));
       var es = await allEntries();
@@ -696,6 +697,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
         } else if (t === MARK_NSFW) {
           result.nsfwRaw = result.nsfwRaw ? result.nsfwRaw + '\n\n' + contentOf(es[i]) : contentOf(es[i]);
+        } else if (t === MARK_VOICE) {
+          try {
+            var _tj = JSON.parse(contentOf(es[i]));
+            if (_tj && typeof _tj === 'object') result.ttsCfg = _tj;
+          } catch (e) {}
         } else {
           // DLC 长文条目（大学篇/成人篇）：主角演化层 + 既有NPC演化层 + 新增NPC全档
           var dlcLn = matchDlcLine(t);
@@ -810,6 +816,244 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         }
       }
     },
+
+    // 音色配置写回：把指定标题条目的内容改为 JSON 字符串。与 setEntriesEnabled 同套双 API：
+    // updateWorldbookWith（回调式原地改）优先，getWorldbook+replaceWorldbook 兜底。
+    setEntryJson: async function (title, obj) {
+      var names = await bookNames();
+      if (!names.length) throw new Error('未找到角色卡世界书');
+      var norm2 = function (s2) { return String(s2 || '').replace(/[【】\s]/g, ''); };
+      var want = norm2(title);
+      var body = JSON.stringify(obj);
+      var render = { render: 'immediate' };
+      var found = false;
+      var touch = function (entries) {
+        for (var j = 0; j < entries.length; j++) {
+          if (norm2(titleOf(entries[j])) === want) {
+            entries[j].content = body;   // 只改内容；启用状态由用户自管（读取不依赖勾选）
+            entries[j].text = body;
+            found = true;
+            break;
+          }
+        }
+        return entries;
+      };
+      // 仅「缺失」才建条目（:: 条目是用户空间：由用户自己的配置动作创建，同步永不托管）。
+      // 建出来即禁用态——读取不依赖勾选，禁用保证这段 JSON 绝不注入上下文。
+      // 已存在的条目（含被用户关闭/改过的）只走 touch 改内容，其余一概不动。
+      var mk = function (entries) {
+        entries.push({
+          name: title,
+          enabled: false,
+          strategy: { type: 'selective', keys: [], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+          position: { type: 'before_character_definition', role: 'system', depth: 4, order: 100 },
+          content: body,
+          probability: 100
+        });
+        return entries;
+      };
+      if (typeof updateWorldbookWith === 'function') {
+        for (var i = 0; i < names.length; i++) {
+          try { await updateWorldbookWith(names[i], touch, render); } catch (e) {}
+        }
+        if (!found) {
+          try { await updateWorldbookWith(names[0], mk, render); } catch (e) {}
+        }
+        return;
+      }
+      if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+        for (var k = 0; k < names.length; k++) {
+          try {
+            var es = await getWorldbook(names[k]);
+            if (!es || !es.length) continue;
+            var hit = false;
+            for (var m = 0; m < es.length; m++) { if (norm2(titleOf(es[m])) === want) { hit = true; break; } }
+            if (hit) await replaceWorldbook(names[k], touch(es), render);
+          } catch (e) {}
+        }
+        if (!found) {
+          try {
+            var es0 = (await getWorldbook(names[0])) || [];
+            await replaceWorldbook(names[0], mk(es0), render);
+          } catch (e) {}
+        }
+      }
+    },
+    // 按标题取单条（同步模块读版本号用）。命中第一条；无则 null。
+    getEntry: async function (title) {
+      var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
+      var want = norm(title);
+      var es = await allEntries();
+      for (var i = 0; i < es.length; i++) {
+        if (norm(titleOf(es[i])) === want) {
+          return { title: titleOf(es[i]), content: contentOf(es[i]), enabled: es[i].enabled !== false && es[i].disable !== true };
+        }
+      }
+      return null;
+    },
+
+    // 同步专用 upsert：list = [{title, content, keys?, keysSecondary?, constant?, selective?, order?, position?, depth?, role?, enabled?}]
+    // 已存在 → 只改 内容/键/策略/顺序/位置，enabled 保留原值（开关是运行时状态，归用户与引擎）；
+    // 不存在 → 按清单整只创建到主书（enabled 缺省 true）。
+    // 返回 {updated, created, failed:[标题]}——updated 只计真有差异的条目（差异预检），
+    // 无差异的书整本不动笔；按书分批写，哪本失败哪批记 failed，幂等，重试安全。
+    //
+    // 【字段纪律】酒馆助手条目结构（权威源：JS-Slash-Runner dist/@types.txt 的 WorldbookEntry）：
+    //   标题=name；启用=enabled；触发=strategy{type,keys,keys_secondary{logic,keys}}；
+    //   顺序=position.order（嵌套！顶层没有 order）；位置=position.type（枚举字符串，非数字）。
+    //   写错层级（如顶层 order、comment 当标题）会被静默丢弃或兜底成默认值——一期的教训。
+    upsertManaged: (function () {
+      // ST 数字 position → 助手 position.type（照抄助手 dist 的转换表）
+      var POS_TYPE = { 0: 'before_character_definition', 1: 'after_character_definition', 5: 'before_example_messages', 6: 'after_example_messages', 2: 'before_author_note', 3: 'after_author_note', 4: 'at_depth', 7: 'outlet' };
+      var ROLE_TYPE = { 0: 'system', 1: 'user', 2: 'assistant' };
+
+      // 清单条目 → 助手 PartialDeep<WorldbookEntry>（创建用；缺的字段酒馆补默认值）
+      function toTh(s2) {
+        return {
+          name: s2.title,
+          enabled: s2.enabled !== false,
+          strategy: {
+            type: s2.constant ? 'constant' : 'selective',
+            keys: (s2.keys || []).slice(),
+            keys_secondary: { logic: 'and_any', keys: (s2.keysSecondary || []).slice() },
+            scan_depth: 'same_as_global'
+          },
+          position: {
+            type: POS_TYPE[s2.position] || 'before_character_definition',
+            role: ROLE_TYPE[s2.role] || 'system',
+            depth: typeof s2.depth === 'number' ? s2.depth : 4,
+            order: typeof s2.order === 'number' ? s2.order : 100
+          },
+          content: String(s2.content || ''),
+          probability: 100
+        };
+      }
+
+      // 原地更新已有条目（TH 格式）：内容/触发键/策略/顺序/位置/深度/身份；enabled、uid 不动
+      function touchEntry(en, src) {
+        if (src.content !== undefined) en.content = String(src.content);
+        en.strategy = en.strategy || {};
+        if (src.keys) en.strategy.keys = src.keys.slice();
+        if (src.keysSecondary) {
+          en.strategy.keys_secondary = en.strategy.keys_secondary || { logic: 'and_any', keys: [] };
+          en.strategy.keys_secondary.keys = src.keysSecondary.slice();
+        }
+        if (src.constant !== undefined && en.strategy.type !== 'vectorized') {
+          en.strategy.type = src.constant ? 'constant' : 'selective';   // 向量化🔗条目的策略类型不动
+        }
+        en.position = en.position || {};
+        if (src.order !== undefined) en.position.order = src.order;
+        if (src.position !== undefined && POS_TYPE[src.position]) en.position.type = POS_TYPE[src.position];
+        if (src.depth !== undefined) en.position.depth = src.depth;
+        if (src.role !== undefined && ROLE_TYPE[src.role]) en.position.role = ROLE_TYPE[src.role];
+      }
+
+      // 差异预检：touchEntry 会动的字段里有任何一个真不一样才算「有差异」（只比 src 提供的字段）。
+      // 差异驱动同步每次启动都跑到这里，无差异必须整本书不动笔——不能每次刷新都重写一遍书。
+      function diffEntry(en, src) {
+        if (src.content !== undefined && String(src.content) !== String(en.content == null ? '' : en.content)) return true;
+        var st = en.strategy || {};
+        if (src.keys && JSON.stringify(src.keys) !== JSON.stringify(st.keys || [])) return true;
+        if (src.keysSecondary && JSON.stringify(src.keysSecondary) !== JSON.stringify((st.keys_secondary || {}).keys || [])) return true;
+        if (src.constant !== undefined && st.type !== 'vectorized' && st.type !== (src.constant ? 'constant' : 'selective')) return true;
+        var po = en.position || {};
+        if (src.order !== undefined && po.order !== src.order) return true;
+        if (src.position !== undefined && POS_TYPE[src.position] && po.type !== POS_TYPE[src.position]) return true;
+        if (src.depth !== undefined && po.depth !== src.depth) return true;
+        if (src.role !== undefined && ROLE_TYPE[src.role] && po.role !== ROLE_TYPE[src.role]) return true;
+        return false;
+      }
+
+      return async function (list) {
+        var names = await bookNames();
+        if (!names.length) throw new Error('未找到角色卡世界书');
+        var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
+        var render = { render: 'immediate' };
+        var res = { updated: 0, created: 0, failed: [] };
+        var todo = {};
+        list.forEach(function (e) { if (e && e.title) todo[norm(e.title)] = e; });
+
+        // 1) 定位：标题 → 所在书序号（跨书只认第一处命中）
+        var loc = {};
+        var booksCache = [];
+        for (var i = 0; i < names.length; i++) {
+          var es0 = await entriesOf(names[i]);
+          booksCache.push(es0);
+          for (var j0 = 0; j0 < es0.length; j0++) {
+            var t0 = norm(titleOf(es0[j0]));
+            if (todo[t0] && loc[t0] === undefined) loc[t0] = i;
+          }
+        }
+        // 2) 分派：已有 → 所在书更新；没有 → 主书（第一本）新建
+        var updWants = {};   // 书序号 → {normTitle: true}
+        var creates = [];
+        for (var k in todo) {
+          if (loc[k] !== undefined) {
+            (updWants[loc[k]] = updWants[loc[k]] || {})[k] = true;
+          } else {
+            creates.push(todo[k]);
+          }
+        }
+
+        // 3) 更新：按书分批（回调式原地改优先，整本替换兜底）；预检无差异的书整本跳过
+        for (var bi in updWants) {
+          var want = updWants[bi];
+          var changed = {};
+          var cached = booksCache[+bi] || [];
+          for (var cj = 0; cj < cached.length; cj++) {
+            var cn = norm(titleOf(cached[cj]));
+            if (want[cn] && diffEntry(cached[cj], todo[cn])) changed[cn] = true;
+          }
+          if (!Object.keys(changed).length) continue;
+          var bag = { updated: 0 };
+          var mkTouch = function (w, bg) {
+            return function (entries) {
+              for (var j = 0; j < entries.length; j++) {
+                var src = todo[norm(titleOf(entries[j]))];
+                if (src && w[norm(titleOf(entries[j]))]) { touchEntry(entries[j], src); bg.updated++; }
+              }
+              return entries;
+            };
+          };
+          try {
+            if (typeof updateWorldbookWith === 'function') {
+              await updateWorldbookWith(names[+bi], mkTouch(changed, bag), render);
+            } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+              await replaceWorldbook(names[+bi], mkTouch(changed, bag)(cached), render);
+            } else {
+              throw new Error('无世界书写入 API');
+            }
+            res.updated += bag.updated;
+          } catch (e) {
+            res.failed = res.failed.concat(Object.keys(changed).map(function (n2) { return todo[n2].title; }));
+          }
+        }
+
+        // 4) 新建：专用创建 API 优先（缺省字段由酒馆补默认），否则往主书推半成品
+        if (creates.length) {
+          try {
+            if (typeof createWorldbookEntries === 'function') {
+              await createWorldbookEntries(names[0], creates.map(toTh), render);
+            } else if (typeof updateWorldbookWith === 'function') {
+              await updateWorldbookWith(names[0], function (entries) {
+                creates.forEach(function (s2) { entries.push(toTh(s2)); });
+                return entries;
+              }, render);
+            } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+              var es = booksCache[0] || [];
+              creates.forEach(function (s2) { es.push(toTh(s2)); });
+              await replaceWorldbook(names[0], es, render);
+            } else {
+              throw new Error('无世界书写入 API');
+            }
+            res.created += creates.length;
+          } catch (e) {
+            res.failed = res.failed.concat(creates.map(function (c) { return c.title; }));
+          }
+        }
+        return res;
+      };
+    })(),
 
     imgUrl: function (file) {
       file = String(file || '').trim();
@@ -1617,10 +1861,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       '  第一行：※备忘录※|日期|标题',
       '  中间：正文（可多段）',
       '  最后一行：※完※',
-      '- 日期：从当前时间往前 1~7 天内任选一天（不必是当天），格式 YYYY-MM-DD，不得晚于当前时间。',
+      '- 日期：**优先写当天**；当天没有值得记的事，再从当前往前 1~7 天里回望选一天。格式 YYYY-MM-DD，不得晚于写作当天——绝不许把更晚发生的事塞进更早的日期（张冠李戴是备忘录的头号事故）。',
       (usedDates && usedDates.length)
-        ? '- **不可使用已存在的日期**：' + usedDates.join('、') + '（这些天已各有一篇，必须避开）'
-        : '- 当前此人无已存在的备忘录日期。',
+        ? '- **不可使用已存在的日期**：' + usedDates.join('、') + '（这些天已各有一篇，必须避开；窗口外的旧日期不影响选择）'
+        : '- 可选窗口内无已存在的备忘录日期。',
       '- 篇幅：正文不少于 500 字。写满，严禁提纲式缩写、严禁用「……（后略）」省字。',
       shortRetry ? '- ⚠ 上一篇正文过短被驳回：这次必须写足 500 字，宁可写多不可写少。' : '',
       '- 这是「' + contact.name + '」写给自己看、不打算给任何人看的东西。',
@@ -2054,6 +2298,698 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 })();
 
 
+// ── src/tts.js ──
+// ═══════════════════════════════════════════════════════════
+//  tts.js —— 语音合成与播放
+//  双适配器：fish 原生 /v1/tts（reference_id 音色克隆）+ OpenAI 兼容 /v1/audio/speech
+//  （通吃公益站/OpenAI 系）。一律走酒馆服务端 /proxy 转发——免 CORS，沙盒内可用。
+//  配置音色映射写角色卡扩展（跟卡走、全聊天通用、卡作者可预置）；API key 只存本机。
+//  音频 blob 绝不进聊天变量/卡：会话级 Map + IndexedDB 双级缓存，键=文本内容哈希；
+//  删除通话内容时按原文精确清音频。
+// ═══════════════════════════════════════════════════════════
+(function () {
+  'use strict';
+
+  var EXT_KEY = 'lzjm_tts';          // 角色卡扩展字段名
+  var LS_KEY = 'lzjm_tts_key';       // API key 本机存储
+  var IDB_NAME = 'lzjm-tts';
+  var IDB_STORE = 'audio';
+  // 音频持久化双上限（先到先清，按时间戳淘汰最旧）：条数/体积各管一维——
+  // 长句多的时候条数远没触顶体积就先爆，反之亦然。回放热度偏向最近通话，
+  // 最旧的丢了几乎无感（真要点，重合成一次 1~2 秒）。
+  var CAP_COUNT = 500;
+  var CAP_BYTES = 100 * 1024 * 1024;   // 100MB
+  var sessionUrls = {};              // hash → objectURL（会话级）
+  var csrfToken = null;
+  var audioEl = null;                // 单例播放器（通话连播共用）
+
+  // djb2 → 8 位 hex：文本+音色+厂商决定一段音频的身份
+  function hash(s) {
+    var h = 5381;
+    s = String(s || '');
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  // ── IndexedDB 最小封装（不可用则全部静默降级为仅会话缓存）──
+  function idbOpen() {
+    return new Promise(function (res, rej) {
+      try {
+        var rq = indexedDB.open(IDB_NAME, 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore(IDB_STORE, { keyPath: 'k' }); };
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { rej(rq.error || new Error('idb')); };
+      } catch (e) { rej(e); }
+    });
+  }
+  function idbGet(k) {
+    return idbOpen().then(function (db) {
+      return new Promise(function (res) {
+        try {
+          var rq = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(k);
+          rq.onsuccess = function () { res(rq.result || null); };
+          rq.onerror = function () { res(null); };
+        } catch (e) { res(null); }
+      });
+    }).catch(function () { return null; });
+  }
+  function idbPut(rec) {
+    idbOpen().then(function (db) {
+      try { db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(rec); } catch (e) {}
+    }).catch(function () {});
+  }
+  // 双上限淘汰：全量扫一遍（blob.size 是元数据不读数据），超 500 条或 100MB 就按时间戳删最旧
+  function idbEvict() {
+    idbOpen().then(function (db) {
+      try {
+        var rq = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).openCursor();
+        var recs = [];
+        rq.onsuccess = function () {
+          var cur = rq.result;
+          if (cur) {
+            var b = cur.value && cur.value.blob;
+            recs.push({ k: cur.key, at: (cur.value && cur.value.at) || 0, sz: (b && b.size) || 0 });
+            cur.continue();
+            return;
+          }
+          var total = 0;
+          recs.forEach(function (r) { total += r.sz; });
+          if (recs.length <= CAP_COUNT && total <= CAP_BYTES) return;
+          recs.sort(function (a, b2) { return a.at - b2.at; });  // 最旧在前
+          var kill = db.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE);
+          var n = 0;
+          for (var i = 0; i < recs.length; i++) {
+            if (recs.length - n <= CAP_COUNT && total <= CAP_BYTES) break;
+            kill.delete(recs[i].k);
+            total -= recs[i].sz;
+            n++;
+          }
+          try { console.log('[霖州引擎] TTS 音频淘汰：清掉 ' + n + ' 条最旧（上限 ' + CAP_COUNT + ' 条/' + Math.round(CAP_BYTES / 1048576) + 'MB）'); } catch (e) {}
+        };
+      } catch (e) {}
+    }).catch(function () {});
+  }
+
+  // 按原文精确清除音频（删除通话/消息条目时同步调用；键里含音色，遍历匹配原文全删）
+  function idbPurgeByText(text) {
+    idbOpen().then(function (db) {
+      try {
+        var tx = db.transaction(IDB_STORE, 'readwrite');
+        var rq = tx.objectStore(IDB_STORE).openCursor();
+        rq.onsuccess = function () {
+          var cur = rq.result;
+          if (cur) {
+            if (cur.value && cur.value.t === text) cur.delete();
+            cur.continue();
+          }
+        };
+      } catch (e) {}
+    }).catch(function () {});
+  }
+
+  var Tts = {
+    hash: hash,
+    cfgCache: null,
+
+    // 语速：0.5~2.0，1=厂商默认（此时不发 speed 字段）。非法值收敛回 1。
+    _normSpeed: function (cfg) {
+      var s = Number(cfg && cfg.speed);
+      if (!isFinite(s) || s <= 0) return 1;
+      return Math.min(2, Math.max(0.5, Math.round(s * 10) / 10));
+    },
+
+    // 配置源 = 世界书条目「霖州蒋默::音色」（JSON）。跟世界书走：全聊天通用、卡作者可预置，
+    // 读写 API 与通讯录/NSFW 同体系（世界线 QR 天天在跑，久经实战）。
+    ready: async function () {
+      if (this.cfgCache) return this.cfgCache;
+      var def = { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', defaultVoice: '', speed: 1, voices: {} };
+      try {
+        var wb = window.LZJM.Engine.ttsConfig();
+        if (wb && typeof wb === 'object') {
+          this.cfgCache = Object.assign({}, def, wb);
+          this.cfgCache.voices = Object.assign({}, wb.voices || {});
+        } else {
+          this.cfgCache = def;
+        }
+      } catch (e) { this.cfgCache = def; }
+      return this.cfgCache;
+    },
+
+    // 写回世界书条目；引擎侧缓存即时生效，刷新后从世界书读回。
+    save: async function (patch) {
+      var cfg = await this.ready();
+      var voices = Object.assign({}, cfg.voices, patch.voices || {});
+      cfg = Object.assign({}, cfg, patch);
+      cfg.voices = voices;
+      this.cfgCache = cfg;
+      try {
+        await window.LZJM.Worldbook.setEntryJson('霖州蒋默::音色', cfg);
+        try { console.log('[霖州引擎] TTS配置写入世界书 ✓ voices=' + Object.keys(cfg.voices).length + ' 条'); } catch (e) {}
+      } catch (e) {
+        console.warn('[霖州引擎] TTS配置写世界书失败', e);
+        try { toastr.warning('音色配置未能写进世界书：' + (e && e.message || e) + '（需存在条目「霖州蒋默::音色」）', '📱 霖州引擎'); } catch (e2) {}
+      }
+      return cfg;
+    },
+
+    apiKey: function () {
+      try { return localStorage.getItem(LS_KEY) || ''; } catch (e) { return ''; }
+    },
+    setApiKey: function (k) {
+      try { if (k) localStorage.setItem(LS_KEY, k); else localStorage.removeItem(LS_KEY); } catch (e) {}
+    },
+
+    // CSRF：新版 /proxy 免校验，老版本仍可能校验——自取 token 两头兼容（不依赖页面全局）
+    _csrf: async function () {
+      if (csrfToken) return csrfToken;
+      try {
+        var r = await fetch('/csrf-token');
+        if (r.ok) csrfToken = (await r.json()).token;
+      } catch (e) {}
+      return csrfToken;
+    },
+
+    // 带超时的 fetch：厂商请求悬挂会让连播队列永久卡死（表现为只有第一句有声）。
+    // 超时即 reject，队列跳过该行继续——宁丢一句不锁全链。
+    _fetchT: function (url, opts, ms) {
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms || 25000) : null;
+      return fetch(url, ctrl ? Object.assign({}, opts, { signal: ctrl.signal }) : (opts || {}))
+        .finally(function () { if (timer) clearTimeout(timer); });
+    },
+
+    _fish: async function (text, voice, cfg, key) {
+      var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      if (cfg.model) headers['model'] = cfg.model;
+      var csrf = await this._csrf();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { text: text, reference_id: voice, format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
+      var r = await this._fetchT('/proxy/https://api.fish.audio/v1/tts', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) throw new Error('Fish TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
+      return await r.blob();
+    },
+
+    _openai: async function (text, voice, cfg, key) {
+      var ep = String(cfg.endpoint || '').trim().replace(/\/+$/, '');
+      if (!ep) throw new Error('OpenAI 兼容：未填接口地址');
+      var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key };
+      var csrf = await this._csrf();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      var body = { model: cfg.model || 'tts-1', voice: voice, input: text, response_format: 'mp3' };
+      var sp = this._normSpeed(cfg);
+      if (sp !== 1) body.speed = sp;
+      var r = await this._fetchT('/proxy/' + ep + '/v1/audio/speech', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) throw new Error('TTS HTTP ' + r.status + '：' + String(await r.text()).slice(0, 100));
+      return await r.blob();
+    },
+
+    // 合成：会话缓存 → IndexedDB 命中 → 厂商 API → 双级写入。返回 objectURL。
+    synth: async function (text, voice) {
+      text = String(text || '').trim();
+      if (!text) throw new Error('空文本');
+      var cfg = await this.ready();
+      if (!cfg.enabled) throw new Error('语音功能未开启');
+      var key = this.apiKey();
+      if (!key) throw new Error('未配置 API 密钥（手机「音色」里填）');
+      if (!voice) throw new Error('该角色未配置音色');
+      var h = hash(cfg.provider + '|' + voice + '|' + this._normSpeed(cfg) + '|' + text);
+      if (sessionUrls[h]) return sessionUrls[h];
+      var rec = await idbGet(h);
+      if (rec && rec.blob) {
+        var u1 = URL.createObjectURL(rec.blob);
+        sessionUrls[h] = u1;
+        return u1;
+      }
+      var blob = cfg.provider === 'openai'
+        ? await this._openai(text, voice, cfg, key)
+        : await this._fish(text, voice, cfg, key);
+      idbPut({ k: h, t: text, v: voice, p: cfg.provider, blob: blob, at: Date.now() });
+      idbEvict();   // 每次写入后顺手查双上限，超了当场按时间戳淘汰最旧
+      var u2 = URL.createObjectURL(blob);
+      sessionUrls[h] = u2;
+      return u2;
+    },
+
+    play: async function (text, voice) {
+      var url = await this.synth(text, voice);
+      this.stop();
+      audioEl = new Audio(url);
+      return audioEl.play();
+    },
+    stop: function () {
+      try { if (audioEl) { audioEl.pause(); audioEl.onended = null; audioEl.onerror = null; audioEl = null; } } catch (e) {}
+    },
+
+    // 通话连播：台词行入队逐条播；画面行跳过；挂断/新输入/重说 → stopQueue 打断
+    _q: [],
+    _pumping: false,
+    speakLines: async function (name, entries) {
+      var self = this;
+      var cfg = await this.ready();
+      if (!cfg.enabled || !cfg.autoCall) return;
+      var W = window.LZJM;
+      var meName = '';
+      try { meName = W.Engine.userName(); } catch (e) {}
+      (entries || []).forEach(function (en) {
+        if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
+        var who = en.who === 'user' ? meName : name;
+        var v = cfg.voices[who] || cfg.defaultVoice;   // 未单独配音色的角色走默认音色
+        if (v) self._q.push({ text: String(en.text).trim(), voice: v });
+      });
+      this._pump();
+    },
+    _pump: function () {
+      var self = this;
+      if (this._pumping) return;
+      var item = this._q.shift();
+      if (!item) return;
+      this._pumping = true;
+      // 看门狗：播放中任何一步挂死（合成悬挂/ended 未触发），30 秒后强制解锁续播，
+      // 宁丢一句不锁全链。逐步日志让远程排查能直接读到死在哪一环。
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._watchdog = setTimeout(function () {
+        console.warn('[霖州引擎] TTS 看门狗触发：上一句播放卡死，强制解锁续播');
+        self._watchdog = null;
+        self._pumping = false;
+        self._pump();
+      }, 30000);
+      this.synth(item.text, item.voice).then(function (url) {
+        audioEl = new Audio(url);
+        audioEl.onended = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.onerror = function () {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:播放报错，跳到下一句');
+          self._pumping = false;
+          self._pump();
+        };
+        audioEl.play().catch(function (e) {
+          if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+          console.warn('[霖州引擎] TTS 队列:play() 被拒（自动播放策略？）', e);
+          self._pumping = false;
+          self._pump();
+        });
+      }).catch(function (e) {
+        if (self._watchdog) { clearTimeout(self._watchdog); self._watchdog = null; }
+        console.warn('[霖州引擎] TTS 队列:合成失败，跳到下一句', e);
+        self._pumping = false;
+        self._pump();
+      });
+    },
+    stopQueue: function () {
+      this._q.length = 0;
+      if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
+      this._pumping = false;
+      this.stop();
+    },
+
+    purgeByText: function (text) {
+      idbPurgeByText(String(text || '').trim());
+    }
+  };
+
+  window.LZJM = window.LZJM || {};
+  window.LZJM.Tts = Tts;
+})();
+
+
+// ── src/sync.js ──
+// ─────────────────────────────────────────────────────────────
+// sync.js —— 设定自动同步（世界书托管条目 + 角色卡字段，两端一套逻辑）
+//
+// 仓库 content/manifest.json 是「设定清单」。引擎启动后异步拉取，两端统一【差异驱动】：
+// 清单值 ≠ 本地值才动笔，全无差异则完全静默——不看清单版本号
+// （版本号只是诊断记录：用户删改了条目无需等新版本，下次打开即复原）。
+//   · 世界书：已存在条目更新 内容/触发键/策略/顺序；【enabled 不动】——开关是运行时状态，归用户与引擎
+//   · 角色卡：白名单字段静默覆盖（开场白整组）
+//   · 标题含「::」的条目（音色/版本/通讯录等用户与运行时数据）一律拒收，清单误带也不收
+// 主权哲学「作者赢」两端一致：设定以作者发布为准；用户空间（自建条目/::条目/其他插件 data）永不触碰。
+// 用户出口：设置屏「角色卡自动更新」可关（整张卡静态，世界书也不更新）；「立刻检查更新」手动兜底，
+// 关闭状态下也能强制对齐最新版。
+// minPlugin 是格式门槛：清单要求比本插件新 → 整体拒收，等插件追上
+// （防 CDN 缓存按文件分别过期造成的「旧插件+新清单」错配）。
+// 全程失败静默：拉不到/读不懂/写不进都只记日志，绝不影响本地既有内容。
+// ─────────────────────────────────────────────────────────────
+(function () {
+  'use strict';
+
+  var GH = 'haodayizhiyu404/linzhouJM';
+  var MFILE = 'content/manifest.json';
+  var MARK_VERSION = '霖州蒋默::版本';   // 本地同步版本号落这条（内容=整数；:: 前缀天然免托管）
+  var MIRRORS = ['cdn.jsdelivr.net', 'fastly.jsdelivr.net', 'testingcf.jsdelivr.net', 'gcore.jsdelivr.net'];
+  var log = function (m) { try { console.log('[霖州引擎·同步] ' + m); } catch (e) {} };
+
+  function timedFetch(url, ms) {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms) : null;
+    return fetch(url, { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+      .finally(function () { if (timer) clearTimeout(timer); });
+  }
+
+  // a ≤ b？三段数字比较（'1.10.0' > '1.9.0'，字符串比大小会翻车）
+  function semverLTE(a, b) {
+    var pa = String(a || '0').split('.'), pb = String(b || '0').split('.');
+    for (var i = 0; i < 3; i++) {
+      var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+      if (x !== y) return x < y;
+    }
+    return true;
+  }
+
+  function branch() {
+    try { var lz = window.__LZJM__; if (lz && lz.branch) return lz.branch; } catch (e) {}
+    return 'main';
+  }
+
+  // 与装载器同套：GitHub API 解析分支最新提交号（绕 jsdelivr @branch 缓存），失败退分支名。
+  // 新装载器会直接给 ref（window.__LZJM__.ref），省一次 API 调用。
+  async function resolveRef() {
+    try { var lz = window.__LZJM__; if (lz && lz.ref) return lz.ref; } catch (e) {}
+    try {
+      var r = await timedFetch('https://api.github.com/repos/' + GH + '/commits/' + branch(), 5000);
+      if (r.ok) {
+        var sha = String(((await r.json()) || {}).sha || '').trim();
+        if (/^[0-9a-f]{7,40}$/.test(sha)) return sha;
+      }
+    } catch (e) {}
+    return branch();
+  }
+
+  async function fetchManifest() {
+    var ref = await resolveRef();
+    var urls = ['https://raw.githubusercontent.com/' + GH + '/' + ref + '/' + MFILE];
+    MIRRORS.forEach(function (h) { urls.push('https://' + h + '/gh/' + GH + '@' + ref + '/' + MFILE); });
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var r = await timedFetch(urls[i], 8000);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var j = await r.json();
+        if (!j || typeof j.version !== 'number' || !Array.isArray(j.entries)) throw new Error('清单格式不对');
+        return j;
+      } catch (e) { log('源' + (i + 1) + ' 失败：' + (e && e.message || e)); }
+    }
+    return null;
+  }
+
+  // 应用清单（拉取之外的全部逻辑，测试直调这里）。差异驱动：逐条目比对，有差异才写——
+  // 不看清单版本号（用户删改了条目无需等新版本，下次打开即复原）。
+  // 返回 {applied, updated, created, from, to} 或 {applied:false, reason}。
+  async function apply(mf) {
+    var W = window.LZJM;
+    if (!semverLTE(mf.minPlugin || '0.0.0', W.VERSION)) {
+      return { applied: false, reason: '清单要求插件≥' + mf.minPlugin + '（当前 ' + W.VERSION + '），跳过' };
+    }
+
+    // :: 条目是用户/运行时数据，清单误带也一律拒收（双保险，导出工具那头也拦）
+    var clean = mf.entries.filter(function (e) { return e && e.title && String(e.title).indexOf('::') === -1; });
+    var res = await W.Worldbook.upsertManaged(clean);
+    if (res.failed.length) {
+      return { applied: false, reason: '部分条目写入失败：' + res.failed.join('、') + '（下次打开重试）' };
+    }
+
+    // 版本号标记退化为纯诊断：记录「本地见过的最新清单版本」，不再是触发开关
+    var cur = await W.Worldbook.getEntry(MARK_VERSION);
+    var local = cur ? (parseInt(cur.content, 10) || 0) : 0;
+    if (mf.version > local) {
+      await W.Worldbook.upsertManaged([{ title: MARK_VERSION, content: String(mf.version), enabled: false }]);
+    }
+    return { applied: (res.updated + res.created) > 0, updated: res.updated, created: res.created, from: local, to: mf.version };
+  }
+
+  // ─────────────────────────────────────────────
+  // 二期：角色卡字段同步（开场白组/描述/性格/场景/示例对话/系统提示/后历史指令/
+  //   作者名/创作者注释/版本号/标签 + 卡面正则 regex_scripts）
+  //
+  // 【纪律】只写白名单字段；其他插件挂在 data.extensions 下的数据永不触碰。
+  // 主权与世界书统一为「作者赢」：清单值 ≠ 本地值就照清单覆盖，无基线、无锁死、无留底——
+  //   用户自定义走用户空间（自建条目/::条目/自己的正则），设定本身以作者发布为准。
+  // 开场白整组处理（first_mes + alternate_greetings 一起比对一起换）：
+  //   作者增/删/改开场白都只是「新数组≠旧数组」，一次覆盖全部到位。
+  // ─────────────────────────────────────────────
+  var SYNC_KEY = 'lzjm-sync';   // 'off' = 用户关了自动更新（整张卡静态）；缺省/其他 = 开
+  var CARD_GROUPS = [
+    { key: 'greetings', label: '开场白', fields: ['first_mes', 'alternate_greetings'] },
+    { key: 'description', label: '角色描述' },
+    { key: 'personality', label: '性格' },
+    { key: 'scenario', label: '场景' },
+    { key: 'mes_example', label: '示例对话' },
+    { key: 'system_prompt', label: '系统提示' },
+    { key: 'post_history_instructions', label: '后历史指令' },
+    { key: 'creator', label: '作者名' },
+    { key: 'creator_notes', label: '创作者注释' },
+    { key: 'character_version', label: '版本号' },
+    { key: 'tags', label: '标签' },
+    { key: 'regex', label: '正则' }
+  ];
+
+  // 确定性哈希：键排序的稳定串化 + djb2。字符串统一 \r\n→\n（ST 读写可能归一化换行，
+  // 不归一化会出现「永远有差异」的假象）。
+  function stableStringify(v) {
+    if (typeof v === 'string') return JSON.stringify(v.replace(/\r\n/g, '\n'));
+    if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+    if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+    var keys = Object.keys(v).sort();
+    return '{' + keys.map(function (k) { return JSON.stringify(k) + ':' + stableStringify(v[k]); }).join(',') + '}';
+  }
+  function stableHash(v) {
+    var s = stableStringify(v), h = 5381;
+    for (var i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) >>> 0;
+    return h.toString(16);
+  }
+
+  // 清单里这组的远端值（没带这组返回 undefined = 不管）
+  function groupRemote(card, g) {
+    if (g.key === 'regex') return Array.isArray(card.regex) ? card.regex : undefined;
+    var f = card.fields || {};
+    if (g.fields) {
+      if (f.first_mes === undefined && f.alternate_greetings === undefined) return undefined;
+      return { first_mes: f.first_mes, alternate_greetings: f.alternate_greetings };
+    }
+    return f[g.key];
+  }
+
+  // 纯函数（测试直调）：比对清单卡字段 vs 本地值，有差异即进计划（作者赢，无基线概念）。
+  // getField(key) 取本地当前值。返回 {planned:[{key,label,value}], unchanged}。
+  function planCardUpdates(card, getField) {
+    var planned = [], unchanged = 0;
+    CARD_GROUPS.forEach(function (g) {
+      var remote = groupRemote(card, g);
+      if (remote === undefined) return;
+      if (stableHash(getField(g.key)) === stableHash(remote)) { unchanged++; return; }
+      planned.push({ key: g.key, label: g.label, value: remote });
+    });
+    return { planned: planned, unchanged: unchanged };
+  }
+
+  // 卡上下文：沙盒原生注入优先，父页 getContext 兜底（与 engine.openingCtx 同套）
+  function cardCtx() {
+    try { if (typeof SillyTavern !== 'undefined' && SillyTavern && SillyTavern.characters) return SillyTavern; } catch (e) {}
+    try {
+      var st = window.parent && window.parent.SillyTavern;
+      var c = st && st.getContext && st.getContext();
+      if (c && c.characters) return c;
+    } catch (e) {}
+    return null;
+  }
+
+  // 本地取值适配器：v2 卡字段可能在顶层也可能在 data 镜像下，两处都读（data 优先）
+  function cardFieldGetter(ch) {
+    var d = ch.data || {};
+    return function (key) {
+      if (key === 'greetings') {
+        return {
+          first_mes: d.first_mes !== undefined ? d.first_mes : ch.first_mes,
+          alternate_greetings: d.alternate_greetings !== undefined ? d.alternate_greetings : ch.alternate_greetings
+        };
+      }
+      if (key === 'regex') { var ex = d.extensions || {}; return Array.isArray(ex.regex_scripts) ? ex.regex_scripts : []; }
+      return d[key] !== undefined ? d[key] : ch[key];
+    };
+  }
+
+  // 组装 merge-attributes 请求体：顶层+data 镜像都写（ST 两个位置都读），
+  // data 只带白名单字段——deepMerge 递归合对象，extensions 里其他插件的键不受影响。
+  function buildCardUpdate(avatar, planned) {
+    var up = { avatar: avatar, data: {} };
+    planned.forEach(function (p) {
+      if (p.key === 'greetings') {
+        var v = p.value;
+        if (v.first_mes !== undefined) { up.first_mes = v.first_mes; up.data.first_mes = v.first_mes; }
+        if (v.alternate_greetings !== undefined) { up.alternate_greetings = v.alternate_greetings; up.data.alternate_greetings = v.alternate_greetings; }
+      } else if (p.key === 'regex') {
+        up.data.extensions = { regex_scripts: p.value };
+      } else {
+        up[p.key] = p.value; up.data[p.key] = p.value;
+      }
+    });
+    return up;
+  }
+
+  // 写成功后让酒馆重读盘并广播（对齐 ST 自己的编辑流程：/edit 后 getOneCharacter 整只替换
+  // + CHARACTER_EDITED 事件——script.js:9831。不这么做，内存/磁盘虽对，但角色列表等监听者不知道卡变了）。
+  // 重读失败则退化为手补内存对象。
+  async function reloadCardFromDisk(ctx, ch, planned) {
+    var done = false;
+    try {
+      var r = await postJson('/api/characters/get', { avatar_url: ch.avatar });
+      if (r && r.ok) {
+        var fresh = await r.json();
+        var arr = ctx.characters;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && arr[i].avatar === ch.avatar) { arr[i] = fresh; done = true; break; }
+        }
+      }
+    } catch (e) {}
+    if (!done) refreshCardMemory(ch, planned);
+    try {
+      var p = window.parent;
+      var es = (typeof eventSource !== 'undefined') ? eventSource : (p && p.eventSource);
+      var et = (typeof event_types !== 'undefined') ? event_types : (p && p.event_types);
+      if (es && et && et.CHARACTER_EDITED) es.emit(et.CHARACTER_EDITED, { detail: { id: ctx.characterId != null ? ctx.characterId : ctx.this_chid } });
+    } catch (e) {}
+    // 面板刷新：角色编辑器是「打开时快照」，CHARACTER_EDITED 只有 PromptManager 在听，
+    // 开着的面板不会自己重填。重选当前角色（switchMenu:false 不弹菜单、不切聊天），
+    // 走 ST 自己的 select_selected_character 从新数据重填全部字段（版本号/正则同理）。
+    try {
+      var stx = (typeof SillyTavern !== 'undefined' && SillyTavern && SillyTavern.getContext) ? SillyTavern.getContext()
+        : (p && p.SillyTavern && p.SillyTavern.getContext && p.SillyTavern.getContext());
+      var cid = ctx.characterId != null ? ctx.characterId : ctx.this_chid;
+      if (stx && stx.selectCharacterById && cid != null) stx.selectCharacterById(String(cid), { switchMenu: false });
+    } catch (e) {}
+  }
+
+  // 兜底：重读盘失败时手补内存里的卡对象
+  function refreshCardMemory(ch, planned) {
+    var d = ch.data = ch.data || {};
+    planned.forEach(function (p) {
+      if (p.key === 'greetings') {
+        if (p.value.first_mes !== undefined) { ch.first_mes = p.value.first_mes; d.first_mes = p.value.first_mes; }
+        if (p.value.alternate_greetings !== undefined) { ch.alternate_greetings = p.value.alternate_greetings; d.alternate_greetings = p.value.alternate_greetings; }
+      } else if (p.key === 'regex') {
+        d.extensions = d.extensions || {}; d.extensions.regex_scripts = p.value;
+      } else { ch[p.key] = p.value; d[p.key] = p.value; }
+    });
+  }
+
+  var csrfToken = null;
+  async function postJson(url, body, ms) {
+    if (!csrfToken) {
+      try {
+        var r0 = await timedFetch('/csrf-token', 5000);
+        if (r0.ok) csrfToken = (await r0.json()).token;
+      } catch (e) {}
+    }
+    var headers = { 'Content-Type': 'application/json' };
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms || 15000) : null;
+    return fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: ctrl ? ctrl.signal : undefined })
+      .finally(function () { if (timer) clearTimeout(timer); });
+  }
+
+  // 卡同步主流程：差异驱动（不看清单版本号——版本号归世界书），失败静默。
+  async function applyCard(mf) {
+    var card = mf && mf.card;
+    if (!card || typeof card !== 'object') return { applied: false, reason: '清单无卡字段' };
+
+    var ctx = cardCtx();
+    var ch = ctx && ctx.characters && ctx.characters[ctx.characterId != null ? ctx.characterId : ctx.this_chid];
+    if (!ch || !ch.avatar) return { applied: false, reason: '未打开角色卡' };
+
+    var plan = planCardUpdates(card, cardFieldGetter(ch));
+    var labels = plan.planned.map(function (p) { return p.label; });
+
+    if (!plan.planned.length) return { applied: false, reason: '卡字段无差异' };
+
+    // 静默直写（作者赢，与世界书同待遇）；toast 由 run() 统一发，这里只记日志
+    try {
+      var up = buildCardUpdate(ch.avatar, plan.planned);
+      var r = await postJson('/api/characters/merge-attributes', up);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await reloadCardFromDisk(ctx, ch, plan.planned);
+      log('角色卡已更新：' + labels.join('、'));
+      return { applied: true, labels: labels };
+    } catch (e) {
+      log('卡字段写入失败：' + (e && e.message || e) + '（本地内容不变，下次打开重试）');
+      return { applied: false, reason: '写入失败' };
+    }
+  }
+
+  var Sync = {
+    semverLTE: semverLTE,
+    apply: apply,
+    // 二期卡同步（planCardUpdates/stableHash 是纯函数，测试直调）
+    planCardUpdates: planCardUpdates,
+    stableHash: stableHash,
+    buildCardUpdate: buildCardUpdate,
+    applyCard: applyCard,
+    // 自动更新总开关（默认开；设置屏「角色卡自动更新」写入）
+    syncEnabled: function () {
+      try { return localStorage.getItem(SYNC_KEY) !== 'off'; } catch (e) { return true; }
+    },
+    setSyncEnabled: function (on) {
+      try { if (on === false) localStorage.setItem(SYNC_KEY, 'off'); else localStorage.removeItem(SYNC_KEY); } catch (e) {}
+    },
+    // manual=true：设置屏「立刻检查更新」——强制跑一轮且必有反馈；关闭状态下也可用（兜底恢复通道）
+    run: async function (manual) {
+      try {
+        if (!Sync.syncEnabled() && !manual) { log('自动更新已关，跳过'); return; }
+        var mf = await fetchManifest();
+        if (!mf) {
+          log('清单拉取失败，跳过（本地内容不变）');
+          if (manual) { try { toastr.warning('检查更新失败：网络异常，稍后再试', '📱 霖州引擎'); } catch (e) {} }
+          return;
+        }
+        // minPlugin 门槛不过 = 清单格式可能比本插件新，世界书与卡段都不能碰
+        if (!semverLTE(mf.minPlugin || '0.0.0', window.LZJM.VERSION)) {
+          log('清单要求插件≥' + mf.minPlugin + '（当前 ' + window.LZJM.VERSION + '），等插件追上');
+          if (manual) { try { toastr.warning('清单要求更新版本的插件，请先更新插件', '📱 霖州引擎'); } catch (e) {} }
+          return;
+        }
+        var r = await apply(mf);
+        if (r.reason) log(r.reason);
+        var cr = null;
+        if (mf.card) {
+          try { cr = await applyCard(mf); } catch (e) { log('卡同步异常：' + (e && e.message || e)); }
+        }
+        // 统一报告：两端差异驱动，任何一处有实际变化 → 一条常驻 toast 说完，点一下即关（不自动消失）；
+        // 全无变化 → 自动模式完全静默；手动模式报「已是最新」给用户一个交代
+        var parts = [];
+        if (r.applied) parts.push('更新' + r.updated + '条' + (r.created ? '·新增' + r.created + '条' : '') + '设定');
+        if (cr && cr.applied) parts.push('更新 ' + cr.labels.join('、'));
+        if (parts.length) {
+          var msg = '设定已同步：' + parts.join('；');
+          log(msg);
+          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: false, tapToDismiss: true }); } catch (e) {}
+        } else {
+          log('无差异，无需更新');
+          if (manual) { try { toastr.info('已是最新，无需更新', '📱 霖州引擎'); } catch (e) {} }
+        }
+      } catch (e) {
+        log('同步异常：' + (e && e.message || e));
+        if (manual) { try { toastr.warning('检查更新失败，稍后再试', '📱 霖州引擎'); } catch (e2) {} }
+      }
+    }
+  };
+
+  window.LZJM = window.LZJM || {};
+  window.LZJM.Sync = Sync;
+})();
+
+
 // ── src/apps/uikit.js ──
 // ═══════════════════════════════════════════════════════════
 //  apps/uikit.js —— 手机 UI 共享件：esc / 确认弹窗等通用 CSS / 跨应用图标
@@ -2210,10 +3146,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-island{position:absolute;left:50%;top:9px;transform:translateX(-50%);width:72px;height:17px;',
     'background:#0b0d10;border-radius:10px}',
     '.lzjm-sicons{display:flex;align-items:center;gap:5px}',
+    // 信号格用 span 不用 i/em：酒馆主题普遍给斜体元素套气泡底色（嘎嘎灰/棉花糖等），
+    // i 标签会被主题染成粉块；主题选择器带五层 :not()，特异性碾压，CSS 压不住，只能换标签
     '.lzjm-sig{display:inline-flex;align-items:flex-end;gap:1.5px;height:11px}',
-    '.lzjm-sig i{display:block;width:3px;background:#111;border-radius:1px}',
-    '.lzjm-sig i:nth-child(1){height:4px}.lzjm-sig i:nth-child(2){height:6px}',
-    '.lzjm-sig i:nth-child(3){height:8px}.lzjm-sig i:nth-child(4){height:10px;opacity:.35}',
+    '.lzjm-sig span{display:block;width:3px;background:#111;border-radius:1px}',
+    '.lzjm-sig span:nth-child(1){height:4px}.lzjm-sig span:nth-child(2){height:6px}',
+    '.lzjm-sig span:nth-child(3){height:8px}.lzjm-sig span:nth-child(4){height:10px;opacity:.35}',
     // 应用栏
     '.lzjm-appbar{flex:none;min-height:40px;display:flex;align-items:center;gap:6px;padding:2px 10px 8px;',
     'background:rgba(247,247,249,.92);border-bottom:1px solid rgba(0,0,0,.06)}',
@@ -2233,7 +3171,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     // 朋友圈屏：状态栏脱离文档流 + 透明，时钟/信号加白色光晕保证暗封面上可读
     '.lzjm-scr-moments .lzjm-sbar{position:absolute;top:0;left:0;right:0;z-index:7;background:transparent}',
     '.lzjm-scr-moments .lzjm-clock{text-shadow:0 0 6px rgba(255,255,255,.95),0 0 12px rgba(255,255,255,.6)}',
-    '.lzjm-scr-moments .lzjm-sig i{box-shadow:0 0 3px rgba(255,255,255,.95),0 0 8px rgba(255,255,255,.55)}',
+    '.lzjm-scr-moments .lzjm-sig span{box-shadow:0 0 3px rgba(255,255,255,.95),0 0 8px rgba(255,255,255,.55)}',
     // 主体
     '.lzjm-body{flex:1;min-height:0;overflow-y:auto;position:relative;z-index:1}',
     // 首页（壁纸 + 大时钟 + 应用网格）；壁纸铺整个屏幕，浅色系配深色字
@@ -2461,8 +3399,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-callbtn i{width:54px;height:54px;font-size:22px}',
     '.lzjm-callbtn.hang i{width:54px;height:54px}',
     '.lzjm-callroll{position:absolute;top:10px;right:12px;z-index:5;color:#fff;opacity:.85;cursor:pointer;padding:4px;line-height:0}',
-    '.lzjm-callmin{position:absolute;top:10px;right:40px;z-index:5;width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:0}',
-    '.lzjm-callmin:hover{background:rgba(255,255,255,.3)}',
+    /* 与刷新键同款裸图标：无圆形背景，强迫症友好（button 元素须显式清 UA 默认灰底/边框） */
+    '.lzjm-callmin{position:absolute;top:10px;right:40px;z-index:5;background:none;border:none;color:#fff;opacity:.85;cursor:pointer;padding:4px;line-height:0}',
+    '.lzjm-callmin:hover{opacity:1}',
     // 说话弹窗 + 删除确认：灰黑半透明面板，贴合通话暗色场景；输入区聚焦保持暗色不刺眼
     '.lzjm-callta{width:100%;box-sizing:border-box;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;caret-color:#fff;padding:9px 11px;font-size:13.5px;line-height:1.55;resize:none;outline:none !important;margin-bottom:2px;font-family:inherit}',
     '.lzjm-callta::placeholder{color:rgba(255,255,255,.55) !important}', // 个别前端主题会给 placeholder 上奇色，强制柔和白
@@ -2495,7 +3434,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-chist-ico{width:34px;height:34px;border-radius:9px;background:#f2f3f5;display:flex;align-items:center;justify-content:center;color:#555;flex:none}',
     '.lzjm-chist-main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}',
     '.lzjm-chist-main b{font-size:13.5px;color:#111;font-weight:500}',
-    '.lzjm-chist-main i{font-size:11.5px;color:#9aa0a8;font-style:normal}',
+    '.lzjm-chist-main .chm{font-size:11.5px;color:#9aa0a8;font-style:normal}',
     // 画面旁白：穿插在气泡流中间（说到哪演到哪），靠左淡字，与台词区分开
     '.lzjm-callscene{position:relative;z-index:1;align-self:flex-start;margin:2px 0 2px 4px;max-width:86%;font-size:12px;line-height:1.55;color:rgba(255,255,255,.66);text-align:left;text-shadow:0 1px 4px rgba(0,0,0,.65);padding:2px 0}',
     // ── 发现页底栏 + 朋友圈 ──
@@ -2519,6 +3458,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-setlbl{font-size:12px;color:#8a8f99}',
     '.lzjm-setrow2{display:flex;align-items:center;gap:8px}',
     '.lzjm-setnum{width:58px;padding:5px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:13px;text-align:right;color:#1a1d21;background:#fafafa;outline:none}',
+    '.lzjm-speedrg{flex:1;min-width:0;accent-color:#22c05e}',
     '.lzjm-settxt{flex:1;min-width:0;padding:7px 8px;border:1px solid rgba(0,0,0,.1);border-radius:6px;font-size:12px;color:#1a1d21;background:#fafafa;outline:none}',
     '.lzjm-setbtn{flex:none;padding:6px 10px;border:none;border-radius:6px;background:#22c05e;color:#fff;font-size:12px;cursor:pointer}',
     '.lzjm-setpick{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 12px}',
@@ -2526,6 +3466,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     '.lzjm-setdel{flex:none;width:22px;height:22px;color:#c1c6cc;font-size:13px;line-height:22px;text-align:center;cursor:pointer;-webkit-user-select:none;user-select:none}',
     '.lzjm-setdel:active{color:#e64340}',
     '.lzjm-setnote{margin:16px 8px 0;font-size:11px;color:#b0b5bc;line-height:1.7}',
+    '.lzjm-setver{text-align:center;margin-top:24px}',
     '.lzjm-disc-ico{width:38px;height:38px;flex:none;display:flex;align-items:center;justify-content:center}',
     '.lzjm-disc-ico svg{width:30px;height:30px}',
     '.lzjm-disc-main{flex:1;min-width:0}',
@@ -2613,7 +3554,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var ICON_MIC = '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#1a1d21" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
   var ICON_HANG = '<svg width="26" height="26" viewBox="0 0 24 24"><path fill="#fff" d="M6.6 3.2c.5-.2 1.1 0 1.4.5l1.8 2.7c.3.5.2 1.1-.2 1.5L8 9.3a12.8 12.8 0 0 0 6.7 6.7l1.4-1.6c.4-.4 1-.5 1.5-.2l2.7 1.8c.5.3.7.9.5 1.4l-.7 2.1c-.2.6-.8 1-1.4.9C9.6 18.9 5.1 14.4 4.6 5.8c0-.6.4-1.2 1-1.4l1-.2z" transform="rotate(135 12 12)"/></svg>';
   var ICON_BACK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  var ICON_MIN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 9l7 7 7-7" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var ICON_MIN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4.5 7.2l7.5 7.5 7.5-7.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';  // 20px（用户实测最谐）；2.8→2.2 防大尺码下比刷新键粗；路径上移约1.3单位矫正视觉高度
   var ICON_WIFI = '<svg width="15" height="11" viewBox="0 0 16 12" fill="#111"><path d="M8 9.9a1.5 1.5 0 100 3 1.5 1.5 0 000-3zM8 6.2c-1.8 0-3.4.7-4.6 1.9l1.5 1.5a4.5 4.5 0 016.2 0l1.5-1.5A6.5 6.5 0 008 6.2zM8 1.4C4.9 1.4 2.1 2.8.2 5l1.5 1.5A9.2 9.2 0 018 3.8c2.5 0 4.8 1 6.3 2.7L15.8 5A11.4 11.4 0 008 1.4z" transform="scale(0.95)"/></svg>';
   // 电池：iPhone 风格——小圆角细描边、电芯近满内腔、右侧圆帽（依用户参考图，深灰 #2c2c2c）
   var ICON_BATT = '<svg width="21" height="12" viewBox="0 0 26 15" fill="#2c2c2c"><rect x="1" y="1.5" width="20.5" height="12" rx="1.2" fill="none" stroke="#2c2c2c" stroke-width="1.2"/><rect x="2.9" y="3.5" width="12.6" height="8"/><rect x="22.3" y="5.4" width="2.2" height="4.2" rx="1.1"/></svg>';
@@ -2628,7 +3569,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   var ICON_TAB_CONT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 4.2a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6z"/><path d="M3.8 19.4c.5-2.9 2.8-4.6 5.8-4.6s5.3 1.7 5.8 4.6"/><path d="M15.6 5.2a3 3 0 0 1 0 5.6M17.4 14.9c1.9.5 3.3 1.9 3.7 3.9"/></svg>';
   // 发现页里的朋友圈入口（彩色圆标）
   var ICON_MOMENTS = '<svg viewBox="0 0 1024 1024"><path fill="#fff" d="M512 954.24A442.24 442.24 0 1 0 69.76 512 442.08 442.08 0 0 0 512 954.24z m0-30.88a401.12 401.12 0 0 1-137.12-21.92V621.6l274.24 276.64A356 356 0 0 1 512 923.36z m285.28-119.68a400 400 0 0 1-112 81.28L487.2 687.04l389.44 1.92a359.52 359.52 0 0 1-79.2 114.72z m118.24-289.28a400 400 0 0 1-21.92 136.96H613.76l276.8-273.92a355.04 355.04 0 0 1 25.12 136.96z m-232.8-368a355.68 355.68 0 0 1 114.56 79.04 402.88 402.88 0 0 1 81.44 112L680.96 535.52zM512 653.6A141.6 141.6 0 1 1 653.6 512 141.6 141.6 0 0 1 512 653.6z m0-548.32A400 400 0 0 1 649.12 128v280L375.04 130.4A356.32 356.32 0 0 1 512 105.28z m-285.28 119.84a405.44 405.44 0 0 1 112-81.44l198.4 198.08-389.44-2.08a355.68 355.68 0 0 1 79.04-114.56zM108.64 514.4a400 400 0 0 1 21.92-136.96h279.84L133.6 651.36a357.92 357.92 0 0 1-24.96-136.96z m234.72-21.12l-1.92 389.44a357.12 357.12 0 0 1-114.72-79.04 401.76 401.76 0 0 1-81.28-112z"/><path fill="#FC6B4F" d="M649.12 128A400 400 0 0 0 512 105.28a356.32 356.32 0 0 0-137.12 25.12l274.08 276.8z"/><path fill="#7838F2" d="M797.44 225.12a355.68 355.68 0 0 0-114.56-79.04l-1.92 389.44 197.92-198.08a402.88 402.88 0 0 0-81.44-112.32z"/><path fill="#5698F3" d="M893.76 651.36a400 400 0 0 0 21.92-136.96 355.04 355.04 0 0 0-25.12-136.96l-276.8 273.92z"/><path fill="#20E9F4" d="M685.12 884.96a400 400 0 0 0 112-81.28 359.52 359.52 0 0 0 79.2-114.72l-389.44-1.92z"/><path fill="#00FD60" d="M375.04 901.44A401.12 401.12 0 0 0 512 923.36a356 356 0 0 0 136.96-25.12L375.04 621.6z"/><path fill="#ABFB5B" d="M341.44 882.72l1.92-389.44L145.44 691.2a401.76 401.76 0 0 0 81.28 112 357.12 357.12 0 0 0 114.72 79.52z"/><path fill="#F0E254" d="M130.56 377.44a400 400 0 0 0-21.92 136.96 357.92 357.92 0 0 0 24.96 136.96l276.8-273.92z"/><path fill="#F6B351" d="M339.04 144a405.44 405.44 0 0 0-112 81.44 355.68 355.68 0 0 0-79.04 114.56l389.44 2.08z"/></svg>';
-  var ICON_MEMO = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2.2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></svg>';
+  var ICON_MEMO = '<svg width="24" height="24" viewBox="0 0 1024 1024" fill="#fff"><path d="M1021.290408 7.451378C992.839691-17.838148 675.591621 17.16075 404.406615 311.828886c-144.059978 156.478942-191.929438 221.96075-317.699669 513.241897-25.063727 58.03043-50.127453 95.51312-85.577949 197.574421 8.354576 0 46.514664 0.225799 46.514663 0.225799s28.676516-25.063727 92.803529-93.029327C231.218523 834.102756 422.922161 619.819184 455.437266 587.07828c32.515105-32.740904 168.446307-155.124146 226.702536-199.606615 58.256229-44.48247 3.38699 20.32194 3.38699 20.32194L324.022051 784.201103c76.094377 31.611907 268.249614 34.547299 332.376626-55.998236-61.643219-9.709372-97.093716-46.288864-97.093716-46.288865 67.739802 0.903197 235.057111 36.579493 322.893054-174.542888-140.447189 32.515105-151.962955 7.225579-151.962954 7.225578 183.574862-51.482249 172.059096-112.448071 196.219625-148.575964 10.16097-15.128556 24.160529-46.966262 37.708489-79.029769C1014.968026 143.608379 1029.419184 31.160309 1021.290408 7.451378z m-138.640794 921.7129h-602.884234c-25.966924 0-46.966262 20.999338-46.966262 46.966262s20.999338 46.966262 46.966262 46.966263h602.884234c25.966924 0 46.966262-20.999338 46.966263-46.966263s-20.999338-46.966262-46.966263-46.966262z"/></svg>';
+  var ICON_TTSAPP = '<svg width="24" height="24" viewBox="0 0 1024 1024" fill="#fff"><path d="M550.4 113.777778a38.4 38.4 0 0 0-76.8 0v796.444444a38.4 38.4 0 1 0 76.8 0V113.777778zM312.888889 245.987556c21.219556 0 38.4 17.180444 38.4 38.4v455.111111a38.4 38.4 0 1 1-76.8 0V284.444444c0-21.219556 17.180444-38.4 38.4-38.4zM113.777778 359.765333c21.219556 0 38.4 17.180444 38.4 38.4v227.555556a38.4 38.4 0 1 1-76.8 0V398.222222c0-21.219556 17.180444-38.4 38.4-38.4zM711.111111 245.987556c21.219556 0 38.4 17.180444 38.4 38.4v455.111111a38.4 38.4 0 1 1-76.8 0V284.444444c0-21.219556 17.180444-38.4 38.4-38.4zM948.622222 398.222222a38.4 38.4 0 1 0-76.8 0v227.555556a38.4 38.4 0 1 0 76.8 0V398.222222z"/></svg>';
   var ICON_CHEV = '<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#c3c7cd" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>';
   var ICON_CAM = '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#454545" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h2.2l1.6-2.4A1.5 1.5 0 0 1 9 5h6a1.5 1.5 0 0 1 1.2.6L17.8 8H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="12.5" r="3.2"/></svg>';
   // ⋯菜单里的爱心/对话线条图标（仿微信，深底上用白色描边）
@@ -2860,6 +3802,22 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (p) p.remove();
     },
 
+    // 音色 app：先确保角色卡配置读入再渲染（首次打开异步，后续走缓存）
+    openTts: function () {
+      var self = this;
+      this.screen = 'tts';
+      this.panel = null;
+      this.render();
+      if (!this._ttsWarmed) {
+        this._ttsWarmed = true;
+        try {
+          window.LZJM.Tts.ready().then(function () {
+            if (self.screen === 'tts') self.render();
+          });
+        } catch (e) {}
+      }
+    },
+
     toggle: function () {
       var ph = pdoc().getElementById(ID.phone);
       if (!ph) return;
@@ -3049,7 +4007,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var sbar =
         '<div class="lzjm-sbar"><span class="lzjm-clock">' + esc(clock) + '</span>' +
         '<span class="lzjm-island"></span>' +
-        '<span class="lzjm-sicons"><span class="lzjm-sig"><i></i><i></i><i></i><i></i></span>' +
+        '<span class="lzjm-sicons"><span class="lzjm-sig"><span></span><span></span><span></span><span></span></span>' +
         ICON_WIFI +
         ICON_BATT + '</span></div>';
 
@@ -3088,12 +4046,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           '<div class="lzjm-app" data-app="wechat"><div class="lzjm-app-ico" style="background:#22c05e;border:none;position:relative">' + ICON_WECHAT +
           (totalUn ? '<span class="lzjm-appdot">' + (totalUn > 99 ? '99+' : totalUn) + '</span>' : '') + '</div><span>微信</span></div>' +
           '<div class="lzjm-app" data-app="diary"><div class="lzjm-app-ico" style="background:#d9930d;border:none;color:#fff">' + ICON_MEMO + '</div><span>备忘录</span></div>' +
+          '<div class="lzjm-app" data-app="tts"><div class="lzjm-app-ico" style="background:#5b7bd5;border:none;color:#fff">' + ICON_TTSAPP + '</div><span>音色</span></div>' +
           '<div class="lzjm-app" data-app="settings"><div class="lzjm-app-ico" style="background:#8e97a8;border:none;color:#fff">' + ICON_GEAR + '</div><span>设置</span></div>' +
           '<div class="lzjm-app" data-app="close" title="收起手机"><div class="lzjm-app-ico" style="background:#e5484d;border:none;color:#fff">' + ICON_POWEROFF + '</div><span>关闭</span></div>' +
           '</div></div></div>';
 
       } else if (this.screen === 'settings') {
         body = settingsHtml();
+      } else if (this.screen === 'tts') {
+        body = ttsHtml();
       } else if (this.screen === 'list') {
         var sec = eng.section();
         var rowsHtml = '';
@@ -3293,7 +4254,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
                 (x.s.dur || (x.s.interrupted ? '中断' : '已接通')) + ' · ' + x.s.count + '条';
               return '<div class="lzjm-chistrow" data-chv="' + x.idx + '">' +
                 '<span class="lzjm-chist-ico">' + (mode === 'video' ? ICON_VCALL : ICON_CALL) + '</span>' +
-                '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><i>' + esc(meta) + '</i></span>' +
+                '<span class="lzjm-chist-main"><b>' + esc(when || '时间未知') + '</b><span class="chm">' + esc(meta) + '</span></span>' +
                 '<span class="lzjm-cdetcv">' + ICON_CHEV + '</span></div>';
             }).join('');
         };
@@ -3322,7 +4283,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             (sv.interrupted ? ' · 中断' : '');
           var bub = seg.map(function (m) {
             if (m.kind === 'scene') return '<div class="lzjm-callscene">' + esc(m.text || '').replace(/\n/g, '<br>') + '</div>';
-            return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '">' + esc(m.text || '') + '</div>';
+            // data-cpt/cpx：回放页点按重播的数据源（行内嵌文本，不依赖下标；换音色即用新音色重合成）
+            return '<div class="lzjm-sub' + (m.who === 'user' ? ' me' : '') + '" data-cpt="' + esc(m.who) + '" data-cpx="' + esc(m.text || '') + '">' + esc(m.text || '') + '</div>';
           }).join('');
           // 与通话界面同构：音频=头像即身份；视频=头像化作背景大图，保留名字
           body = '<div class="lzjm-callbody">' +
@@ -3360,7 +4322,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
           return pre + chatRowHtml(m, userName, contactMap, disp, i, !!this.peek[key + ':' + i], this.isGroup);
         }, this).join('');
-        if (this.failed && this.canRetry()) rows += '<div class="lzjm-sysrow">⚠ 对方暂时没有回复（生成失败）<br>点右上角刷新图标，或再点小飞机重试</div>';
+        if (this.busy) rows += '<div class="lzjm-sysrow">对方正在输入中…</div>';   // 生成中优先于报错提示：请求在途可见，不会误以为没点上
+        else if (this.failed && this.canRetry()) rows += '<div class="lzjm-sysrow">⚠ 对方暂时没有回复（生成失败）<br>点右上角刷新图标，或再点小飞机重试</div>';
         if (this.staged.length) rows += stagedHtml(userName);
         body = '<div class="lzjm-body"><div class="lzjm-chatbg" id="lzjm-chatbody">' + rows + '</div></div>' +
           '<div class="lzjm-bottom">' +
@@ -3493,9 +4456,56 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       ph.querySelectorAll('[data-app="settings"]').forEach(function (el) {
         el.onclick = function () { UI.screen = 'settings'; UI._setpick = null; UI.render(); };
       });
+      // 音色 app：开关/来源/密钥/音色映射即时保存（写角色卡扩展，key 落本机）
+      ph.querySelectorAll('[data-tgl]').forEach(function (el) {
+        el.onchange = function () { var p2 = {}; p2[el.dataset.tgl] = el.checked; window.LZJM.Tts.save(p2); };
+      });
+      // 语速三件套：滑块拖动实时改数字（不发请求），松手/数字确认才保存；复位一键回 1
+      (function () {
+        var rg = ph.querySelector('[data-tspeed]'), numEl = ph.querySelector('[data-tspeednum]'), rst = ph.querySelector('[data-tspeedreset]');
+        if (!rg || !numEl) return;
+        var norm = function (v) { v = Math.round(Number(v) * 10) / 10; if (!isFinite(v) || v <= 0) v = 1; return Math.min(2, Math.max(0.5, v)); };
+        var apply = function (v, doSave) { v = norm(v); rg.value = v; numEl.value = v.toFixed(1); if (doSave) window.LZJM.Tts.save({ speed: v }); };
+        rg.oninput = function () { numEl.value = norm(rg.value).toFixed(1); };
+        rg.onchange = function () { apply(rg.value, true); };
+        numEl.onchange = function () { apply(numEl.value, true); };
+        if (rst) rst.onclick = function () { apply(1, true); };
+      })();
+      ph.querySelectorAll('[data-tprov]').forEach(function (el) {
+        el.onchange = function () { window.LZJM.Tts.save({ provider: el.value }); };
+      });
+      ph.querySelectorAll('[data-tcfg]').forEach(function (el) {
+        el.onchange = function () { var p2 = {}; p2[el.dataset.tcfg] = el.value.trim(); window.LZJM.Tts.save(p2); };
+      });
+      ph.querySelectorAll('[data-tkey]').forEach(function (el) {
+        el.onchange = function () { window.LZJM.Tts.setApiKey(el.value.trim()); };
+      });
+      ph.querySelectorAll('[data-tvoice]').forEach(function (el) {
+        el.onchange = function () {
+          var v = {}; v[el.dataset.tvoice] = el.value.trim();
+          window.LZJM.Tts.save({ voices: v });
+        };
+      });
+      ph.querySelectorAll('[data-ttest]').forEach(function (el) {
+        el.onclick = function () {
+          try {
+            var W = window.LZJM;
+            var nm = el.dataset.ttest;
+            var inp = ph.querySelector('[data-tvoice="' + nm + '"]');
+            var voice = inp ? inp.value.trim() : '';
+            if (!voice) { try { toastr.info('先填音色ID再试音', '📱 霖州引擎'); } catch (e) {} return; }
+            W.Tts.play('你好，我是' + nm + '。这句是试音。', voice).catch(function (e) {
+              try { toastr.error('试音失败：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
+            });
+          } catch (e) {}
+        };
+      });
       // 备忘录 app：进列表（选人 chips + 存档 + 写一篇）；其余交互绑在 DiaryApp.bind
       ph.querySelectorAll('[data-app="diary"]').forEach(function (el) {
         el.onclick = function () { UI.openDiary(); };
+      });
+      ph.querySelectorAll('[data-app="tts"]').forEach(function (el) {
+        el.onclick = function () { UI.openTts(); };
       });
       if (window.LZJM.DiaryApp) window.LZJM.DiaryApp.bind(ph, UI);
       if (UI.screen === 'settings') {
@@ -3510,6 +4520,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             saveApi({ mode: el.dataset.amode });
             UI._setpick = null;
             UI.render();
+          };
+        });
+        ph.querySelectorAll('[data-syncsw]').forEach(function (el) {
+          el.onclick = function () {
+            try { if (window.LZJM.Sync) window.LZJM.Sync.setSyncEnabled(el.dataset.syncsw === '1'); } catch (e) {}
+            UI.render();
+          };
+        });
+        ph.querySelectorAll('[data-syncnow]').forEach(function (el) {
+          el.onclick = function () {
+            try { if (window.LZJM.Sync) window.LZJM.Sync.run(true); } catch (e) {}
           };
         });
         ph.querySelectorAll('[data-num]').forEach(function (el) {
@@ -3768,8 +4789,59 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       };
       ph.ontouchend = function () { clearTimeout(lpTimer); };
       ph.ontouchmove = function () { clearTimeout(lpTimer); };
+          // 通话字幕行点按：配音色的台词逐条重播（IndexedDB 命中即播，未命中即时重合成）
+          ph.querySelectorAll('.lzjm-callsubs .lzjm-sub').forEach(function (el) {
+            el.onclick = function () {
+              try {
+                var W2 = window.LZJM;
+                if (!W2.Tts) return;
+                var text = '', who = '';
+                var inline = el.getAttribute('data-cpx');      // 回放页：行内嵌文本
+                if (inline && inline.trim()) {
+                  text = inline.trim();
+                  var wAttr = el.getAttribute('data-cpt');
+                  who = (wAttr === 'user') ? W2.Engine.userName() : (wAttr || UI.histName || '');
+                } else {                                        // 实时通话页：按下标寻址
+                  if (!UI.call) return;
+                  var idx = parseInt(el.getAttribute('data-cdel'), 10);
+                  var h2 = W2.Store.history(W2.Engine.callKey(UI.call.name));
+                  var en = h2[idx];
+                  if (!en || en.kind !== 'text' || !String(en.text || '').trim()) return;
+                  text = String(en.text).trim();
+                  who = en.who === 'user' ? W2.Engine.userName() : UI.call.name;
+                }
+                if (!text) return;
+                W2.Tts.ready().then(function (cfg) {
+                  var meN = '';
+                  try { meN = W2.Engine.userName(); } catch (e) {}
+                  // 默认音色只兜 NPC：机主行没有显式映射就静默（与撤机主配音的决策一致）
+                  var v = (cfg.voices || {})[who] || (who === meN ? '' : cfg.defaultVoice);
+                  if (cfg.enabled && v) W2.Tts.play(text, v).catch(function () {});
+                });
+              } catch (e) {}
+                    };
+          });
+
+      // 语音气泡：点整泡=展开/收起文字；点喇叭图标=朗读（配音色才播，避免展开收起都响）
       ph.querySelectorAll('[data-voice]').forEach(function (el) {
         el.onclick = function () { el.classList.toggle('open'); };
+        var vp = el.querySelector('.lzjm-voice-play');
+        if (vp) vp.onclick = function (ev) {
+          try { if (ev && ev.stopPropagation) ev.stopPropagation(); } catch (e) {}
+          try {
+            var W = window.LZJM;
+            if (!W.Tts) return;
+            var row = el.closest('.lzjm-chatrow');
+            var isMe = !!(row && row.classList.contains('me'));
+            var who = isMe ? W.Engine.userName() : UI.chatKey;
+            var txt = (el.querySelector('.lzjm-voicetxt') || {}).textContent || '';
+            W.Tts.ready().then(function (cfg) {
+              // 默认音色只兜 NPC；机主的消息没有显式映射就静默
+              var v = (cfg.voices || {})[who] || (isMe ? '' : cfg.defaultVoice);
+              if (cfg.enabled && v && txt.trim()) W.Tts.play(txt.trim(), v).catch(function (e) { console.warn('[霖州引擎] 语音播放失败', e); });
+            });
+          } catch (e) {}
+        };
       });
       ph.querySelectorAll('[data-poke]').forEach(function (el) {
         el.onclick = function () {
@@ -3932,7 +5004,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           }
           else if (a === 'popcancel') { UI.callPop = false; UI.render(); }
           else if (a === 'delok') {
-            if (UI.callDel != null) { try { window.LZJM.Store.removeAt(window.LZJM.Engine.callKey(UI.call.name), UI.callDel); } catch (e) {} }
+            if (UI.callDel != null) {
+              try {
+                var _W = window.LZJM;
+                var _ck = _W.Engine.callKey(UI.call.name);
+                var _en = _W.Store.history(_ck)[UI.callDel];
+                _W.Store.removeAt(_ck, UI.callDel);
+                if (_en && _W.Tts) _W.Tts.purgeByText(_en.text); // 删条目同步删音频
+              } catch (e) {}
+            }
             UI.callDel = null; UI.render();
           }
           else if (a === 'delno') { UI.callDel = null; UI.render(); }
@@ -4063,6 +5143,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         this.render();
         // 联动归位主聊天里的记录楼层（正文上下文同步清掉）
         try { W.Floor.deleteFloorsFor(this.chatKey, [m]); } catch (e) {}
+        // 语音音频同步清（文本驱动的派生物，删了条目就该删声音）
+        try { if (m && m.text && W.Tts) W.Tts.purgeByText(m.text); } catch (e) {}
       }
     },
 
@@ -4110,6 +5192,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     generate: async function (userName) {
       if (this.busy) return;
       this.busy = true;
+      this.render();   // 立即渲染"对方正在输入中"——生成期间状态可见，结束才二次渲染出回复
       var W = window.LZJM;
       var eng = W.Engine;
       // 生成是异步的，期间用户可能已切到别的会话——key 必须先抓快照，
@@ -4128,17 +5211,18 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           try { eng.markTransfersAccepted(key); } catch (e) {}
           // 生成是异步的：发出后生成了回复、人已经切去别的会话/主页 → 记未读红点
           if (this.screen !== 'chat' || this.chatKey !== key) W.Store.bumpUnread(key, result.msgs.length);
-          // 正在看别的会话时不刷它的屏；列表/主页则刷新让预览跟上
-          if (this.screen !== 'chat' || this.chatKey === key) this.render();
         }
       } catch (e) {
         // API 故障有两类：直接报错、或永远挂起（由 withTimeout 兜底）。两种都要能重试。
         this.failed = true;
         console.warn('[霖州引擎] 生成失败', e);
         try { toastr.error('手机消息生成失败：' + (e && e.message || e), '📱 霖州引擎'); } catch (e2) {}
-        if (this.screen === 'chat') this.render();
       } finally {
+        // 先清 busy 再终态渲染（渲染分支 busy 优先于 failed：busy 没清就渲染，
+        // 「对方正在输入中」会被钉死在消息末尾——成功/失败/空回复无一例外）
         this.busy = false;
+        // 正在看别的会话时不刷它的屏；列表/主页则刷新让预览跟上
+        if (this.screen !== 'chat' || this.chatKey === key) this.render();
       }
     },
 
@@ -4193,6 +5277,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           vl0.slice(0, cap0).forEach(function (l) { entries.push({ who: name, kind: 'text', text: l }); });
         }
         if (entries.length) W.Store.push(eng.callKey(name), entries, 200);
+        try { if (W.Tts) W.Tts.speakLines(name, entries); } catch (e) {} // 开场白连播
         this.call.phase = 'active';
         this.call.startAt = Date.now();
         this._callNew = true; // 开场内容到达，滚到底
@@ -4212,6 +5297,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!lines.length) return;
       var key = eng.callKey(call.name);
       W.Store.push(key, lines.map(function (l) { return { who: 'user', kind: 'text', text: l }; }), 200);
+      try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 机主开口，打断对方朗读
       this._callNew = true; // 机主的话上屏，滚到底
       call.busy = true;
       this.render();
@@ -4222,6 +5308,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
         });
         if (entries.length) W.Store.push(key, entries, 200);
+        try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 对方回复连播
       } catch (e) {
         try { toastr.error('对方信号不好，再试一次', '📱 霖州引擎'); } catch (e2) {}
       }
@@ -4237,23 +5324,39 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (!call || call.phase !== 'active' || call.busy) return;
       var key = eng.callKey(call.name);
       var h = W.Store.history(key);
+      var self = this;
+      // 再生：userSays='' = 重说式——transcript 里的机主末句保留作上下文，重新生成对方回应
+      var regen = async function () {
+        call.busy = true;
+        self.render();
+        try {
+          var ret = await withTimeout(eng.callTurn(call.name, call.mode, ''), 90000);
+          var entries = [];
+          (ret.entries || []).forEach(function (en) {
+            entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
+          });
+          if (entries.length) W.Store.push(key, entries, 200);
+          try { if (W.Tts) W.Tts.speakLines(call.name, entries); } catch (e) {} // 结果自动连播
+        } catch (e) {
+          try { toastr.error('对方信号不好，再试一次', '📱 霖州引擎'); } catch (e2) {}
+        }
+        if (self.call === call) { self._callNew = true; call.busy = false; self.render(); } // 结果上屏，滚到底
+      };
       var n = 0;
       for (var i = h.length - 1; i >= 0 && h[i].who !== 'user' && h[i].who !== 'sys'; i--) n++;
-      if (!n) return;
-      W.Store.popLast(key, n);
-      call.busy = true;
-      this.render();
-      try {
-        var ret = await withTimeout(eng.callTurn(call.name, call.mode, ''), 90000);
-        var entries = [];
-        (ret.entries || []).forEach(function (en) {
-          entries.push({ who: call.name, kind: en.kind === 'scene' ? 'scene' : 'text', text: en.text });
-        });
-        if (entries.length) W.Store.push(key, entries, 200);
-      } catch (e) {
-        try { toastr.error('重说失败，再试一次', '📱 霖州引擎'); } catch (e2) {}
+      if (!n) {
+        // 末尾没有可弹的对方回复：若是机主末句（=上次回复生成失败/被删），↻ 充当重试——
+        // 不用再发一遍话（与聊天页 canRetry 同语义）；其余情况（空通/末尾系统行）无事可做
+        var tail = h.length ? h[h.length - 1] : null;
+        if (!tail || tail.who !== 'user') return;
+        try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {}
+        regen();
+        return;
       }
-      if (this.call === call) { this._callNew = true; call.busy = false; this.render(); } // 重说结果上屏，滚到底
+      var popped = W.Store.popLast(key, n);
+      try { if (popped && W.Tts) popped.forEach(function (m) { if (m && m.text) W.Tts.purgeByText(m.text); }); } catch (e) {} // 旧回复作废，音频同步清
+      try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 旧回复作废，朗读一并停
+      regen();
     },
 
     // 挂断：transcript 末尾写时长；私聊里由发起方留一条通话记录灰泡（微信真实样式：
@@ -4265,6 +5368,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       if (this._ct) { clearInterval(this._ct); this._ct = null; }
       var who = call.by === 'user' ? 'user' : call.name;
       var kindCn2 = call.mode === 'video' ? '视频通话' : '语音通话';
+      try { if (W.Tts) W.Tts.stopQueue(); } catch (e) {} // 挂断即停朗读
       if (call.phase === 'active') {
         var sec = Math.max(1, Math.round((Date.now() - call.startAt) / 1000));
         var dur = fmtDur(sec);
@@ -4454,6 +5558,62 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
   // 设置屏：生成 API（跟随正文/只换模型/自定义+可存预设）+ 提示词携带量。全部即时保存。
   var SET_NRANGES = { plotFloors: [1, 20], plotCap: [100, 2000], histPriv: [10, 100], histGroup: [10, 100], crossMax: [1, 6], crossLines: [5, 50], injRecent: [1, 30], injMention: [1, 20], injMax: [1, 6], injRounds: [10, 100] };
+  // 音色 app：生成源配置 + 通讯录逐人音色映射 + 试音。配置存角色卡扩展（跟卡走），key 存本机。
+  function ttsHtml() {
+    var W = window.LZJM;
+    var cfg = (W.Tts && W.Tts.cfgCache) || { enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', speed: 1, voices: {} };
+    var eng = W.Engine;
+    var names = [];
+    try {
+      var sec = eng.section() || {};
+      (sec.contacts || []).forEach(function (c) { if (c && c.name) names.push(c.name); });
+    } catch (e0) {}
+    var meName = '';
+    try { meName = eng.userName(); } catch (e0) {}
+    var key = W.Tts ? W.Tts.apiKey() : '';
+    var spv = (function () { var s = Number(cfg.speed); if (!isFinite(s) || s <= 0) s = 1; return (Math.round(Math.min(2, Math.max(0.5, s)) * 10) / 10).toFixed(1); })();
+    function vrow(nm) {
+      var v = (cfg.voices || {})[nm] || '';
+      var isMe = nm === meName;
+      return '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">' + esc(nm) + (isMe ? '（机主）' : '') + '</div>' +
+        '<div class="lzjm-setrow2"><input class="lzjm-settxt" data-tvoice="' + esc(nm) + '" value="' + esc(v) + '" placeholder="音色ID：fish 填 reference_id，OpenAI 兼容填 voice 名">' +
+        '<button class="lzjm-setbtn" data-ttest="' + esc(nm) + '">试音</button></div></div></div>';
+    }
+    var srcOpts = [['fish', 'Fish Audio（reference_id 音色）'], ['openai', 'OpenAI 兼容（公益站/OpenAI 系）']];
+    var srcSel = srcOpts.map(function (o) {
+      return '<option value="' + o[0] + '"' + ((cfg.provider || 'fish') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+    }).join('');
+    return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
+      '<div class="lzjm-setsec">播放</div><div class="lzjm-setcard">' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">语音播放总开关</div></div>' +
+      '<input type="checkbox" data-tgl="enabled"' + (cfg.enabled ? ' checked' : '') + '></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">通话自动连播</div>' +
+      '<div class="lzjm-setdesc">语音通话中 AI 的台词逐条朗读；挂断/你说话/重说即打断</div></div>' +
+      '<input type="checkbox" data-tgl="autoCall"' + (cfg.autoCall ? ' checked' : '') + '></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">语速（全局）</div>' +
+      '<div class="lzjm-setdesc">0.5~2.0，1 为厂商默认；克隆音色太快易破音</div>' +
+      '<div class="lzjm-setrow2"><input type="range" class="lzjm-speedrg" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeed>' +
+      '<input type="number" class="lzjm-setnum" min="0.5" max="2" step="0.1" value="' + spv + '" data-tspeednum>' +
+      '<button class="lzjm-setbtn" data-tspeedreset>复位</button></div></div></div>' +
+      '</div>' +
+      '<div class="lzjm-setsec">生成源</div><div class="lzjm-setcard">' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">提供商</span><div class="lzjm-setrow2"><select class="lzjm-settxt" data-tprov>' + srcSel + '</select></div></div>' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">接口地址（仅 OpenAI 兼容，含 https://）</span><div class="lzjm-setrow2">' +
+      '<input class="lzjm-settxt" data-tcfg="endpoint" value="' + esc(cfg.endpoint || '') + '" placeholder="https://api.example.com"></div></div>' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">模型（可空：fish 走默认，OpenAI 兼容默认 tts-1）</span><div class="lzjm-setrow2">' +
+      '<input class="lzjm-settxt" data-tcfg="model" value="' + esc(cfg.model || '') + '" placeholder="模型名"></div></div>' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">API 密钥（只存本机浏览器）</span><div class="lzjm-setrow2">' +
+      '<input class="lzjm-settxt" data-tkey type="password" value="' + esc(key) + '" placeholder="sk-..."></div></div>' +
+      '</div>' +
+      '<div class="lzjm-setsec">音色映射（跟世界书走，全聊天通用）</div><div class="lzjm-setcard">' +
+      '<div class="lzjm-setcol"><span class="lzjm-setlbl">默认音色（没单独配音色的角色走这个；留空则不发声）</span><div class="lzjm-setrow2">' +
+      '<input class="lzjm-settxt" data-tcfg="defaultVoice" value="' + esc(cfg.defaultVoice || '') + '" placeholder="音色ID，可空"></div></div>' +
+      (names.length ? names.map(vrow).join('') : '<div class="lzjm-sysrow">未定位到当前世界线</div>') +
+      '</div>' +
+      '<div class="lzjm-setnote">fish 音色：fish.audio 音色库页面复制 reference_id（一串 UUID）。没配音色的角色不发声，其余功能不受影响。</div>' +
+      '</div></div>';
+  }
+
   function settingsHtml() {
     var W = window.LZJM;
     var cfg = W.Store.cfg();
@@ -4519,6 +5679,21 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
+    // 角色卡自动更新：开/关 + 手动兜底按钮（写 localStorage，Sync 读取；手机端没有控制台，必须给可点入口）
+    var syncOn = true;
+    try { if (W.Sync && W.Sync.syncEnabled) syncOn = W.Sync.syncEnabled(); } catch (e) {}
+    var swModes = [
+      ['1', '开启', '设定有更新时自动同步进卡，toast 告知更新了什么'],
+      ['0', '关闭', '这张卡保持现状，不再接收任何设定更新']
+    ];
+    var csRows = swModes.map(function (m) {
+      return '<div class="lzjm-setrow' + (syncOn === (m[0] === '1') ? ' on' : '') + '" data-syncsw="' + m[0] + '">' +
+        '<div class="lzjm-setmain"><div class="lzjm-setname">' + m[1] + '</div><div class="lzjm-setdesc">' + m[2] + '</div></div>' +
+        '<span class="lzjm-setck">' + ICON_TOK + '</span></div>';
+    }).join('') +
+      '<div class="lzjm-setrow" data-syncnow="1"><div class="lzjm-setmain"><div class="lzjm-setname">立刻检查更新</div>' +
+      '<div class="lzjm-setdesc">网络异常或长期未更新时点这里，强制与最新版对齐（关闭状态下也可用）</div></div>' +
+      '<span class="lzjm-setck">↻</span></div>';
     var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
@@ -4526,12 +5701,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
+      '<div class="lzjm-setsec">角色卡自动更新</div><div class="lzjm-setcard">' + csRows + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
       '<div class="lzjm-setsec">正文生成 · 手机注入（正文 AI 对手机的知情度）</div><div class="lzjm-setcard">' + numsInj + '</div>' +
       '<div class="lzjm-setnote">跨会话：生成私聊时，顺带带对方今天在的群的记录；生成群时，顺带带成员今天与机主的私聊，让对方接得上别处的梗。</div>' +
       '<div class="lzjm-setnote">数值改动立即生效；API 改动作用于之后的每次手机生成。携带量与 API 配置（含自定义预设，密钥除外）随聊天变量保存（明文、随卡走）；密钥按预设名各存一份，只留在本机浏览器。</div>' +
+      '<div class="lzjm-setnote lzjm-setver">霖州引擎 v' + (W.VERSION || '?') + '</div>' +
       '</div></div>';
   }
 
@@ -4539,6 +5716,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     if (UI.call) return ''; // 通话界面：无顶栏（名字在通话屏里）
     if (screen === 'home') return ''; // 真手机主屏没有标题栏
     if (screen === 'settings') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="home">' + ICON_BACK + '</span><span class="lzjm-appbar-t">设置</span><span class="lzjm-appbar-r"></span></div>';
+    if (screen === 'tts') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="home">' + ICON_BACK + '</span><span class="lzjm-appbar-t">音色</span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'list') return '<div class="lzjm-appbar"><span class="lzjm-back" data-act="home">' + ICON_BACK + '</span><span class="lzjm-appbar-t">微信</span><span class="lzjm-appbar-r"></span></div>';
     if (screen === 'moments') return '<div class="lzjm-appbar lzjm-appbar-ovl"><span class="lzjm-back" data-act="list">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"><span class="lzjm-reroll" data-mcam="1" title="相机">' + ICON_CAM + '</span></span></div>';
     if (screen === 'mprofile') return '<div class="lzjm-appbar lzjm-appbar-ovl"><span class="lzjm-back" data-act="mback">' + ICON_BACK + '</span><span class="lzjm-appbar-t"></span><span class="lzjm-appbar-r"></span></div>';
@@ -4706,8 +5884,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var h = Math.max(420, Math.min(680, vh - 20));
     ph.style.width = w + 'px';
     ph.style.height = h + 'px';
-    var left = savedPos ? savedPos.left : (vp ? vp.offsetLeft : 0) + vw - w - 8;
-    var top = savedPos ? savedPos.top : (vp ? vp.offsetTop : 0) + vh - h - 8;
+    // 默认位置：左侧贴边、垂直居中（拖动过后记住手动位置，不再回默认）——移植自东海往事
+    var left = savedPos ? savedPos.left : (vp ? vp.offsetLeft : 0) + 8;
+    var top = savedPos ? savedPos.top : (vp ? vp.offsetTop : 0) + (vh - h) / 2;
     ph.style.left = Math.max(4, Math.min(left, vw - w - 4)) + 'px';
     ph.style.top = Math.max(4, Math.min(top, vh - h - 4)) + 'px';
     ph.style.right = 'auto';
@@ -5020,6 +6199,11 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 音色配置（世界书「霖州蒋默::音色」JSON）：跟世界书走，全聊天通用，卡作者可预置。
+    ttsConfig: function () {
+      return state.ttsCfg || null;
+    },
+
     // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
     // 全文原样（{{user}} 宏在注入时 deref）。
     nsfwText: function () {
@@ -5243,6 +6427,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       state.nsfwRaw = data.nsfwRaw || '';
+      state.ttsCfg = data.ttsCfg || null;
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
@@ -6374,6 +7559,24 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       };
     },
 
+    // 排除清单只留"可选窗口附近"的日期：写作是当天优先、至多回溯 7 天，窗口外的旧日期
+    // 永远不会撞车——全量罗列只会随时间无限膨胀。窗口 = 未来1天 ~ 过去9天，再封顶 8 条。
+    _diaryWindowDates: function (dates, todayText) {
+      var list = (dates || []).slice();
+      try {
+        var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(String(todayText || ''));
+        if (!dm) return list.slice(0, 8);
+        var t0 = new Date(+dm[1], +dm[2] - 1, +dm[3]).getTime();
+        list = list.filter(function (dstr) {
+          var di = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(dstr || ''));
+          if (!di) return false;
+          var dd = Math.round((t0 - new Date(+di[1], +di[2] - 1, +di[3]).getTime()) / 86400000);
+          return dd >= -1 && dd <= 9;
+        });
+      } catch (e) {}
+      return list.slice(0, 8);
+    },
+
     // 生成一篇（手动「写一篇/重roll」，无当日判重）。正文过短（<300字）带补强要求重试一次。
     // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
     diaryWrite: async function (name) {
@@ -6383,7 +7586,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var key = this.diaryKey(name);
       var snap = W.Status.snapshot(name);
       var today = (snap && snap.dateText) || '';
-      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var usedDates = this._diaryWindowDates(W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean), today);
       var hist = W.Store.history(name).slice(-20);
       var profile = this.profileFor(name);
       var self = this;
@@ -6763,10 +7966,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
           try {
             var bar = doc.getElementById('qr--bar');
             if (!bar) return;
-            // 挂载点 = 最后一个原生 QR 按钮的父级：combined/非 combined、有无内层
-            // 容器、版本差异全都不用猜，原生按钮排得进一行，我们就跟得上
-            var natives = bar.querySelectorAll('.qr--button:not(.lzjm-qr)');
-            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar.querySelector('.qr--buttons') || bar;
+            // 挂载点 = 最后一个【可见】原生 QR 按钮的父级。可见性含祖先链：QR 收纳类插件
+            //（如 uhhhh15/QR）把白名单外的集合容器 display:none 收进自家菜单，按钮追加进
+            // 这类容器会跟着蒸发（东海往事实测反馈）——只看按钮自身没用，容器被藏时子元素
+            // 自己的 display 仍是 flex。全不可见时直接挂 bar 本体。
+            var visOk = function (el) {
+              while (el && el.nodeType === 1 && el !== doc.body) {
+                try { if (window.parent.getComputedStyle(el).display === 'none') return false; } catch (e) {}
+                el = el.parentNode;
+              }
+              return true;
+            };
+            var natives = Array.prototype.slice.call(bar.querySelectorAll('.qr--button:not(.lzjm-qr)')).filter(visOk);
+            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar;
             // 一次性结构日志（排查换行/挂载问题用，F12 控制台可见）
             if (!self._qrLogged) {
               self._qrLogged = true;
@@ -6774,12 +7986,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
                 var cs = window.parent.getComputedStyle(holder);
                 console.log('[霖州引擎] QR 挂载点 class=' + holder.className +
                   ' disp=' + cs.display + ' wrap=' + cs.flexWrap + ' w=' + holder.offsetWidth +
-                  ' / bar w=' + bar.offsetWidth + ' / 原生按钮数=' + natives.length);
+                  ' / bar w=' + bar.offsetWidth + ' / 可见原生按钮数=' + natives.length);
               } catch (e9) {}
             }
             // 古代线（无手机世界线）不显示手机按钮，只留世界线入口（靠它切回现代线）
             var wantPhone = !!W.Engine.section();
-            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder; }));
+            // alive 额外要求按钮自身可见：插件中途把容器藏起来后，下个巡检 tick 自动迁到新挂载点
+            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder && visOk(b); }));
             if (alive && (self._qrBtns.length === (wantPhone ? 3 : 2))) return;
             if (self._qrBtns) self._qrBtns.forEach(function (b) { if (b.parentNode) b.remove(); });
             var btns = [mkBtn('\uD83E\uDDED世界线', '切换 IF 世界线（五条线选一，代劳开关世界书并记入本聊天）', function () { W.Engine.qrLines(); }),
@@ -7200,6 +8413,9 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
       await this.load();
 
+      // 设定同步：异步静默跑，失败不影响任何本地功能
+      try { if (W.Sync) W.Sync.run(); } catch (e) {}
+
       this.locateLine();
       // 刷新丢半边标注的根因修复：不依赖 0 楼渲染，直接从卡内嵌正则文本预载开场白配置
       try { this._preloadOpeningsCfg(); } catch (e) {}
@@ -7268,6 +8484,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   };
 
   window.LZJM = window.LZJM || {};
+  window.LZJM.VERSION = '1.2.0';   // 插件版本：同步清单的 minPlugin 与它比较（1.2.0 起支持角色卡字段同步）
   window.LZJM.Engine = Engine;
 
   // 启动

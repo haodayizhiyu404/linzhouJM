@@ -123,6 +123,11 @@
     lineLore: function () {
       return (state.line && state.dlcLore[state.line]) || '';
     },
+    // 音色配置（世界书「霖州蒋默::音色」JSON）：跟世界书走，全聊天通用，卡作者可预置。
+    ttsConfig: function () {
+      return state.ttsCfg || null;
+    },
+
     // 卡的亲密文风条目（世界书「霖州蒋默::NSFW」）：口味层由卡维护，引擎只负责注入。
     // 全文原样（{{user}} 宏在注入时 deref）。
     nsfwText: function () {
@@ -346,6 +351,7 @@
       // 各线各读各的，根治「同一个人两条线共用一版档案」的串线
       state.npcLine = {}; state.evolLine = {}; state.userEvol = {}; state.dlcLore = {};
       state.nsfwRaw = data.nsfwRaw || '';
+      state.ttsCfg = data.ttsCfg || null;
       var raws = [{ list: data.npcLineRaw, into: 'npc' }, { list: data.evolLineRaw, into: 'evol' }];
       for (var ri = 0; ri < raws.length; ri++) {
         for (var rj = 0; rj < (raws[ri].list || []).length; rj++) {
@@ -1477,6 +1483,24 @@
       };
     },
 
+    // 排除清单只留"可选窗口附近"的日期：写作是当天优先、至多回溯 7 天，窗口外的旧日期
+    // 永远不会撞车——全量罗列只会随时间无限膨胀。窗口 = 未来1天 ~ 过去9天，再封顶 8 条。
+    _diaryWindowDates: function (dates, todayText) {
+      var list = (dates || []).slice();
+      try {
+        var dm = /(\d{4})年(\d{1,2})月(\d{1,2})日/.exec(String(todayText || ''));
+        if (!dm) return list.slice(0, 8);
+        var t0 = new Date(+dm[1], +dm[2] - 1, +dm[3]).getTime();
+        list = list.filter(function (dstr) {
+          var di = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(dstr || ''));
+          if (!di) return false;
+          var dd = Math.round((t0 - new Date(+di[1], +di[2] - 1, +di[3]).getTime()) / 86400000);
+          return dd >= -1 && dd <= 9;
+        });
+      } catch (e) {}
+      return list.slice(0, 8);
+    },
+
     // 生成一篇（手动「写一篇/重roll」，无当日判重）。正文过短（<300字）带补强要求重试一次。
     // 重roll 的删旧由 UI 先行（见 wechat diaryReroll），这里只负责写。
     diaryWrite: async function (name) {
@@ -1486,7 +1510,7 @@
       var key = this.diaryKey(name);
       var snap = W.Status.snapshot(name);
       var today = (snap && snap.dateText) || '';
-      var usedDates = W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean);
+      var usedDates = this._diaryWindowDates(W.Store.history(key).map(function (e) { return e.date; }).filter(Boolean), today);
       var hist = W.Store.history(name).slice(-20);
       var profile = this.profileFor(name);
       var self = this;
@@ -1866,10 +1890,19 @@
           try {
             var bar = doc.getElementById('qr--bar');
             if (!bar) return;
-            // 挂载点 = 最后一个原生 QR 按钮的父级：combined/非 combined、有无内层
-            // 容器、版本差异全都不用猜，原生按钮排得进一行，我们就跟得上
-            var natives = bar.querySelectorAll('.qr--button:not(.lzjm-qr)');
-            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar.querySelector('.qr--buttons') || bar;
+            // 挂载点 = 最后一个【可见】原生 QR 按钮的父级。可见性含祖先链：QR 收纳类插件
+            //（如 uhhhh15/QR）把白名单外的集合容器 display:none 收进自家菜单，按钮追加进
+            // 这类容器会跟着蒸发（东海往事实测反馈）——只看按钮自身没用，容器被藏时子元素
+            // 自己的 display 仍是 flex。全不可见时直接挂 bar 本体。
+            var visOk = function (el) {
+              while (el && el.nodeType === 1 && el !== doc.body) {
+                try { if (window.parent.getComputedStyle(el).display === 'none') return false; } catch (e) {}
+                el = el.parentNode;
+              }
+              return true;
+            };
+            var natives = Array.prototype.slice.call(bar.querySelectorAll('.qr--button:not(.lzjm-qr)')).filter(visOk);
+            var holder = (natives.length ? natives[natives.length - 1].parentNode : null) || bar;
             // 一次性结构日志（排查换行/挂载问题用，F12 控制台可见）
             if (!self._qrLogged) {
               self._qrLogged = true;
@@ -1877,12 +1910,13 @@
                 var cs = window.parent.getComputedStyle(holder);
                 console.log('[霖州引擎] QR 挂载点 class=' + holder.className +
                   ' disp=' + cs.display + ' wrap=' + cs.flexWrap + ' w=' + holder.offsetWidth +
-                  ' / bar w=' + bar.offsetWidth + ' / 原生按钮数=' + natives.length);
+                  ' / bar w=' + bar.offsetWidth + ' / 可见原生按钮数=' + natives.length);
               } catch (e9) {}
             }
             // 古代线（无手机世界线）不显示手机按钮，只留世界线入口（靠它切回现代线）
             var wantPhone = !!W.Engine.section();
-            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder; }));
+            // alive 额外要求按钮自身可见：插件中途把容器藏起来后，下个巡检 tick 自动迁到新挂载点
+            var alive = !!(self._qrBtns && self._qrBtns.length && self._qrBtns.every(function (b) { return b.parentNode === holder && visOk(b); }));
             if (alive && (self._qrBtns.length === (wantPhone ? 3 : 2))) return;
             if (self._qrBtns) self._qrBtns.forEach(function (b) { if (b.parentNode) b.remove(); });
             var btns = [mkBtn('\uD83E\uDDED世界线', '切换 IF 世界线（五条线选一，代劳开关世界书并记入本聊天）', function () { W.Engine.qrLines(); }),
@@ -2303,6 +2337,9 @@
 
       await this.load();
 
+      // 设定同步：异步静默跑，失败不影响任何本地功能
+      try { if (W.Sync) W.Sync.run(); } catch (e) {}
+
       this.locateLine();
       // 刷新丢半边标注的根因修复：不依赖 0 楼渲染，直接从卡内嵌正则文本预载开场白配置
       try { this._preloadOpeningsCfg(); } catch (e) {}
@@ -2371,6 +2408,7 @@
   };
 
   window.LZJM = window.LZJM || {};
+  window.LZJM.VERSION = '1.2.0';   // 插件版本：同步清单的 minPlugin 与它比较（1.2.0 起支持角色卡字段同步）
   window.LZJM.Engine = Engine;
 
   // 启动

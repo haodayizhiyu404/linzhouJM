@@ -16,7 +16,7 @@ const ctx = {
 };
 vm.createContext(ctx);
 // 装载顺序与 build/build.js 的 ORDER 一致（含 apps/ UI 层，供引擎侧调用 UI 的用例）
-for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
+for (const f of ['src/store.js', 'src/status.js', 'src/worldbook.js', 'src/prompt.js', 'src/floor.js', 'src/tts.js', 'src/sync.js', 'src/apps/uikit.js', 'src/apps/wechat.js', 'src/apps/diary.js', 'src/engine.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
 }
 const LW = ctx.window.LZJM;
@@ -221,7 +221,8 @@ ctx.getWorldbook = async () => [
   { comment: '主角人设（DLC·成人-同路而行）', enabled: true, content: '# II. 角色演化档案\n\n[MAIN·周言·演化后]\n- 已婚设定（同路线）。\n\n[MAIN·{{user}}·演化后]\n- 与周言同居（同路线）。' },
   { comment: 'DLC扩展：大学篇', enabled: true, content: '本模块为大学阶段扩展资料库。\n\n---\n\n一、 既往因果\n- 大一时两人曾因误会冷战半年。\n\n二、 周言·角色叠加演化档案\n1. 身份变化：法学院学生，住校内宿舍。' },
   { comment: '霖州蒋默::人设::林溪', enabled: true, content: '林溪的手机专用档案' },
-  { comment: '霖州蒋默::NSFW', enabled: true, content: '[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，情欲描写以克制与留白为先。' }
+  { comment: '霖州蒋默::NSFW', enabled: true, content: '[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，情欲描写以克制与留白为先。' },
+  { comment: '霖州蒋默::音色', enabled: true, content: JSON.stringify({ enabled: true, autoCall: true, provider: 'fish', endpoint: '', model: '', voices: { '沈锡元': 'uuid-xsy-1' } }) },
 ];
 (async () => {
   const wb = await LW.Worldbook.load();
@@ -831,6 +832,9 @@ ctx.getWorldbook = async () => [
   eq('备忘录·短重试标记', dreq2.ordered_prompts[2].content.indexOf('过短被驳回') !== -1, true);
   const dreq3 = LW.Prompt.diary({ name: '周言' }, [], null, '', [], false);
   eq('备忘录·无存量日期不注排除', dreq3.ordered_prompts[2].content.indexOf('不可使用已存在的日期') === -1, true);
+  // 日期窗口过滤：排除清单只留可选窗口附近（未来1天~过去9天）的日期，旧日期不罗列防无限膨胀
+  const _dw = LW.Engine._diaryWindowDates(['2034-08-01', '2034-08-19', '2034-08-24', '2034-08-26', '2034-08-27', 'bad'], '2034年8月26日 星期五');
+  eq('备忘录·日期窗口过滤', JSON.stringify(_dw), JSON.stringify(['2034-08-19', '2034-08-24', '2034-08-26', '2034-08-27']));
   // 聊天记录走 chat_history 标准槽位（与主生成同一管线）：order 含槽位；不设楼数上限——
   // 截断只会从最旧侧砍掉 summary 衔接带，用户自有压缩体系兜底
   const dreq4 = LW.Prompt.diary({ name: '周言' }, [], { dateText: '2034年8月26日 星期五' }, '', ['2034-08-25'], false);
@@ -894,6 +898,7 @@ ctx.getWorldbook = async () => [
   console.log('[UI 源码]');
   const wsrc = fs.readFileSync(path.join(ROOT, 'src/apps/wechat.js'), 'utf8');
   const usrc = fs.readFileSync(path.join(ROOT, 'src/apps/uikit.js'), 'utf8');
+  const tsrc = fs.readFileSync(path.join(ROOT, 'src/tts.js'), 'utf8');
   const dsrc = fs.readFileSync(path.join(ROOT, 'src/apps/diary.js'), 'utf8');
   eq('关闭app·有点击绑定', wsrc.includes('ph.querySelectorAll(\'[data-app="close"]\').forEach'), true);
   eq('关闭app·绑定未被误改成正则字面量（fdb0520 事故）', /^\s*\/\s*ph\\\./m.test(wsrc), false);
@@ -925,6 +930,152 @@ ctx.getWorldbook = async () => [
   eq('通话·回看返回键反白', wsrc.indexOf('.lzjm-scr-chv .lzjm-appbar .lzjm-back path{stroke:#fff}') !== -1, true); // SVG 描边写死，color 覆不到
   eq('朋友圈·热度与虚构人物条款', psrc.indexOf('至多 12 人') !== -1 && psrc.indexOf('可虚构次要人物') !== -1, true);
   eq('朋友圈·身份号召力标度', psrc.indexOf('动态分量 × 发动态者的号召力') !== -1 && psrc.indexOf('动态分量 × 号召力') !== -1, true);
+  // ── TTS 语音：模块/哈希/配置兜底/适配器与播放链在位 ──
+  eq('TTS·模块与哈希', typeof LW.Tts === 'object'
+    && LW.Tts.hash('你好') === LW.Tts.hash('你好')
+    && LW.Tts.hash('你好') !== LW.Tts.hash('你好!')
+    && /^[0-9a-f]{8}$/.test(LW.Tts.hash('蒋默')), true);
+  const _tcfg = await LW.Tts.ready();
+  eq('TTS·配置源为世界书条目', _tcfg.enabled === true && _tcfg.provider === 'fish' && _tcfg.voices['沈锡元'] === 'uuid-xsy-1', true);
+  eq('TTS·引擎ttsConfig在位', !!(LW.Engine.ttsConfig() && LW.Engine.ttsConfig().voices), true);
+  await LW.Tts.save({ voices: { '蒋默': 'abc-123' } });
+  eq('TTS·音色映射会话内生效', LW.Tts.cfgCache.voices['蒋默'] === 'abc-123' && LW.Tts.cfgCache.voices['沈锡元'] === 'uuid-xsy-1', true);
+  eq('TTS·双适配器与proxy', tsrc.indexOf('/proxy/https://api.fish.audio/v1/tts') !== -1 && tsrc.indexOf('/v1/audio/speech') !== -1 && tsrc.indexOf('X-CSRF-Token') !== -1, true);
+  eq('TTS·请求超时在位', tsrc.indexOf('_fetchT') !== -1 && tsrc.indexOf('AbortController') !== -1, true);
+  eq('TTS·世界书配置读写', (function () { var w = fs.readFileSync(path.join(ROOT, 'src/worldbook.js'), 'utf8'); return w.indexOf('MARK_VOICE') !== -1 && w.indexOf('setEntryJson') !== -1 && w.indexOf('ttsCfg') !== -1; })(), true);
+  eq('TTS·持久化与清理', tsrc.indexOf('indexedDB') !== -1 && tsrc.indexOf('purgeByText') !== -1 && tsrc.indexOf('stopQueue') !== -1, true);
+  eq('TTS·音频双上限', tsrc.indexOf('CAP_COUNT = 500') !== -1 && tsrc.indexOf('100 * 1024 * 1024') !== -1 && tsrc.indexOf('idbEvict') !== -1, true);
+  eq('TTS·音色app与通话连播接线', wsrc.indexOf('data-app="tts"') !== -1 && wsrc.indexOf('Tts.stopQueue') !== -1 && wsrc.indexOf('purgeByText') !== -1 && wsrc.indexOf('data-tvoice') !== -1, true);
+  eq('TTS·连播三出口在位', (wsrc.match(/Tts\.speakLines/g) || []).length >= 3, true); // 开场/回复/重说各一
+  eq('TTS·重说音频清理', wsrc.indexOf('popped.forEach') !== -1, true);
+  eq('TTS·回放页重播接线', wsrc.indexOf('data-cpx') !== -1 && wsrc.indexOf('histName') !== -1, true);
+  eq('TTS·默认音色fallback', tsrc.indexOf('cfg.voices[who] || cfg.defaultVoice') !== -1 && wsrc.indexOf('cfg.defaultVoice') !== -1 && wsrc.indexOf('data-tcfg="defaultVoice"') !== -1, true);
+  eq('TTS·撤机主配音行', wsrc.indexOf('names.push(meName)') === -1, true);
+  eq('TTS·默认音色不兜机主', wsrc.indexOf('who === meN') !== -1 && wsrc.indexOf("(isMe ? '' : cfg.defaultVoice)") !== -1, true);
+  eq('TTS·语速规范化', LW.Tts._normSpeed({ speed: 0.8 }) === 0.8 && LW.Tts._normSpeed({ speed: 99 }) === 2 && LW.Tts._normSpeed({ speed: 0.1 }) === 0.5 && LW.Tts._normSpeed({ speed: 'x' }) === 1 && LW.Tts._normSpeed({}) === 1, true);
+  eq('TTS·语速双适配器透传', (tsrc.match(/body\.speed = sp/g) || []).length === 2 && tsrc.indexOf('speed: 1') !== -1, true);
+  eq('TTS·语速进缓存键', tsrc.indexOf("this._normSpeed(cfg) + '|' + text") !== -1, true);
+  eq('TTS·语速UI三件套', wsrc.indexOf('data-tspeed') !== -1 && wsrc.indexOf('data-tspeednum') !== -1 && wsrc.indexOf('data-tspeedreset') !== -1 && wsrc.indexOf('class="lzjm-speedrg"') !== -1, true);
+  await LW.Tts.save({ speed: 0.8 });
+  eq('TTS·语速保存即生效', LW.Tts.cfgCache.speed === 0.8, true);
+  await LW.Tts.save({ speed: 1 });
+
+  // ── 设定同步（一期：世界书托管条目）──
+  console.log('[同步]');
+  // 可写世界书 mock（酒馆助手 WorldbookEntry 真实结构：name/enabled/strategy{}/position{order嵌套}）
+  const syncStore = [
+    { uid: 0, name: 'NPC（DLC·大学）', enabled: false, content: '旧版大学档案',
+      strategy: { type: 'vectorized', keys: [], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+      position: { type: 'after_character_definition', role: 'system', depth: 4, order: 151 } },
+    { uid: 1, name: '霖州蒋默::音色', enabled: true, content: '{"voices":{"沈锡元":"uuid-xsy-1"}}',
+      strategy: { type: 'selective', keys: ['音色'], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+      position: { type: 'before_character_definition', role: 'system', depth: 4, order: 100 } },
+  ];
+  ctx.updateWorldbookWith = async (name, fn) => { fn(syncStore); };
+  ctx.getWorldbook = async () => syncStore;
+  // 故意不提供 createWorldbookEntries：创建走 updateWorldbookWith 推送兜底，顺便覆盖这条路径
+  eq('同步·semver比较', LW.Sync.semverLTE('1.9.0', '1.10.0') === true && LW.Sync.semverLTE('1.10.0', '1.9.0') === false && LW.Sync.semverLTE('1.1.0', '1.1.0') === true, true);
+  const rBad = await LW.Sync.apply({ version: 9, minPlugin: '99.0.0', entries: [{ title: 'NPC（DLC·大学）', content: '不该写入' }] });
+  eq('同步·门槛拒收', rBad.applied === false && syncStore[0].content === '旧版大学档案' && syncStore.length === 2, true);
+  const rOk = await LW.Sync.apply({ version: 2, minPlugin: '1.0.0', entries: [
+    { title: 'NPC（DLC·大学）', content: '新版大学档案v2', keys: ['大学'], order: 155, position: 0, constant: true },
+    { title: '霖州蒋默::音色', content: '{"voices":{}}' },   // 清单误带的运行时条目，必须被拒
+    { title: '新NPC条目', content: '全新内容', enabled: false, constant: true, keys: ['新'], order: 33, position: 1, depth: 2, role: 1 },
+  ] });
+  eq('同步·应用成功', rOk.applied === true && rOk.updated === 1 && rOk.created === 1, true);
+  eq('同步·内容已更新', syncStore[0].content, '新版大学档案v2');
+  eq('同步·触发键已同步', JSON.stringify(syncStore[0].strategy.keys), '["大学"]');
+  eq('同步·顺序写入嵌套position.order', syncStore[0].position.order, 155);
+  eq('同步·位置数字转枚举', syncStore[0].position.type, 'before_character_definition');
+  eq('同步·向量化策略不被压平', syncStore[0].strategy.type, 'vectorized');
+  eq('同步·enabled保留原值', syncStore[0].enabled, false);
+  eq('同步·::条目不触碰', syncStore[1].content.indexOf('uuid-xsy-1') !== -1, true);
+  const neoEntry = syncStore.filter(e => e.name === '新NPC条目')[0];
+  eq('同步·新条目用name标题且尊重enabled', !!neoEntry && neoEntry.content === '全新内容' && neoEntry.enabled === false, true);
+  eq('同步·新条目策略与顺序', !!neoEntry && neoEntry.strategy.type === 'constant' && JSON.stringify(neoEntry.strategy.keys) === '["新"]' && neoEntry.position.order === 33 && neoEntry.position.type === 'after_character_definition', true);
+  eq('同步·新条目深度与身份', !!neoEntry && neoEntry.position.depth === 2 && neoEntry.position.role === 'user', true);
+  const verEntry = syncStore.filter(e => e.name === '霖州蒋默::版本')[0];
+  eq('同步·版本号落库且关闭', !!verEntry && verEntry.content === '2' && verEntry.enabled === false, true);
+  const rSame = await LW.Sync.apply({ version: 2, entries: [] });
+  eq('同步·无差异跳过', rSame.applied === false, true);
+  const rNewer = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·更高版本再更新', rNewer.applied === true && syncStore[0].content === 'v3', true);
+  // 差异驱动关键行为：版本号不变，用户本地删改也必须复原（不等新版本发布）
+  syncStore[0].content = '用户手贱改掉的';
+  const rRestore = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·无新版本也复原用户改动', rRestore.applied === true && syncStore[0].content === 'v3', true);
+  const rNoDiff = await LW.Sync.apply({ version: 3, entries: [{ title: 'NPC（DLC·大学）', content: 'v3' }] });
+  eq('同步·无差异不误报不重写', rNoDiff.applied === false, true);
+  // setEntryJson 缺失才建条目（:: 用户空间：不存在→创建禁用态；存在→只改内容，enabled/其余不动）
+  const voice0 = syncStore.filter(e => e.name === '霖州蒋默::音色')[0];
+  voice0.enabled = false;   // 模拟用户关掉了这条
+  const voiceLen = syncStore.length;
+  await LW.Worldbook.setEntryJson('霖州蒋默::音色', { enabled: true, voices: { '蒋默': 'uuid-jm' } });
+  eq('音色·已存在不另建条目', syncStore.length === voiceLen && syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1, true);
+  eq('音色·已存在enabled不动', syncStore.filter(e => e.name === '霖州蒋默::音色')[0].enabled === false, true);
+  eq('音色·内容已写入', syncStore.filter(e => e.name === '霖州蒋默::音色')[0].content.indexOf('uuid-jm') !== -1, true);
+  syncStore.splice(syncStore.findIndex(e => e.name === '霖州蒋默::音色'), 1);   // 删掉条目，模拟旧卡
+  await LW.Worldbook.setEntryJson('霖州蒋默::音色', { enabled: true, voices: {} });
+  const voiceRe = syncStore.filter(e => e.name === '霖州蒋默::音色')[0];
+  eq('音色·缺失时新建一条', !!voiceRe && syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1, true);
+  eq('音色·新建即禁用态', !!voiceRe && voiceRe.enabled === false, true);
+  eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
+  const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
+  const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');
+  const xsrc = fs.readFileSync(path.join(ROOT, 'tools/publish.js'), 'utf8');
+  const ssrc = fs.readFileSync(path.join(ROOT, 'src/sync.js'), 'utf8');
+  eq('同步·装载器暴露ref与branch', lsrc.indexOf('window[NS].ref = ref') !== -1 && lsrc.indexOf('window[NS].branch = BRANCH') !== -1, true);
+  eq('同步·构建挂载sync.js', bsrc.indexOf("'src/sync.js'") !== -1, true);
+  eq('同步·导出工具排除::条目', xsrc.indexOf("indexOf('::')") !== -1, true);
+  eq('同步·发布直读酒馆母本', xsrc.indexOf("SillyTavern', 'data'") !== -1 && xsrc.indexOf('worlds') !== -1 && xsrc.indexOf('st-world.local.txt') !== -1, true);
+  eq('同步·发布精确名优先防同名片', xsrc.indexOf('EXACT') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
+  eq('同步·发布保留下载夹兜底', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1, true);
+  eq('同步·发布bat在位', fs.existsSync(path.join(ROOT, '发布设定.bat')), true);
+  const pmsrc = fs.readFileSync(path.join(ROOT, 'tools/push-manifest.js'), 'utf8');
+  eq('同步·发布可一键推送', xsrc.indexOf("require('./push-manifest')") !== -1 && xsrc.indexOf('isTTY') !== -1, true);
+  eq('同步·推送管道不碰分支与工作区', pmsrc.indexOf('commit-tree') !== -1 && pmsrc.indexOf('update-index') !== -1 && pmsrc.indexOf("read-tree', 'HEAD'") !== -1, true);
+  eq('同步·拉取链同装载器源系', ssrc.indexOf('raw.githubusercontent.com') !== -1 && ssrc.indexOf('fastly.jsdelivr.net') !== -1 && ssrc.indexOf('content/manifest.json') !== -1, true);
+  eq('同步·失败静默不抛', ssrc.indexOf('全程失败静默') !== -1, true);
+
+  // ── 二期·角色卡字段同步 ──
+  const SH = LW.Sync.stableHash;
+  eq('卡同步·哈希稳定且归一化换行', SH({ b: 1, a: [2] }) === SH({ a: [2], b: 1 }) && SH('x\r\ny') === SH('x\ny'), true);
+  const cardMf = { fields: { first_mes: '新开场', alternate_greetings: ['甲', '乙'], description: '新描述', character_version: '2026.10.17' }, regex: [{ id: 1, find: 'x' }] };
+  const gfSame = k => k === 'greetings' ? { first_mes: '新开场', alternate_greetings: ['甲', '乙'] } : k === 'regex' ? cardMf.regex : ({ description: '新描述', character_version: '2026.10.17' })[k];
+  const pSame = LW.Sync.planCardUpdates(cardMf, gfSame);
+  eq('卡同步·无差异不出计划', pSame.planned.length === 0 && pSame.unchanged === 4, true);
+  const gfOld = k => k === 'greetings' ? { first_mes: '旧开场', alternate_greetings: ['旧'] } : k === 'regex' ? [] : ({ description: '旧描述', character_version: '旧版' })[k];
+  const pFirst = LW.Sync.planCardUpdates(cardMf, gfOld);
+  eq('卡同步·有差异全部进计划', pFirst.planned.length === 4, true);
+  const gPlan = pFirst.planned.filter(p => p.key === 'greetings')[0];
+  eq('卡同步·开场白整组替换（增删改一次覆盖）', !!gPlan && gPlan.value.first_mes === '新开场' && JSON.stringify(gPlan.value.alternate_greetings) === '["甲","乙"]', true);
+  const pUser = LW.Sync.planCardUpdates(cardMf, k => k === 'description' ? '用户自己改的描述' : gfSame(k));
+  eq('卡同步·作者赢（用户改动照计划覆盖，与世界书同哲学）', pUser.planned.length === 1 && pUser.planned[0].key === 'description', true);
+  const up = LW.Sync.buildCardUpdate('蒋默.png', [
+    { key: 'greetings', label: '开场白', value: { first_mes: '新开场', alternate_greetings: ['甲'] } },
+    { key: 'description', label: '角色描述', value: '新描述' },
+    { key: 'regex', label: '卡面正则', value: [{ id: 1 }] },
+  ]);
+  eq('卡同步·写请求顶层与data镜像', up.avatar === '蒋默.png' && up.first_mes === '新开场' && up.data.first_mes === '新开场' && up.description === '新描述' && up.data.description === '新描述' && JSON.stringify(up.data.alternate_greetings) === '["甲"]', true);
+  eq('卡同步·正则只动extensions.regex_scripts', JSON.stringify(up.data.extensions) === '{"regex_scripts":[{"id":1}]}', true);
+  eq('卡同步·白名单不外溢', Object.keys(up.data).sort().join(','), 'alternate_greetings,description,extensions,first_mes');
+  eq('卡同步·默认自动更新且作者赢', ssrc.indexOf("lzjm-sync") !== -1 && ssrc.indexOf('作者赢') !== -1 && ssrc.indexOf("|| 'dry'") === -1 && ssrc.indexOf('cardsync-mode') === -1, true);
+  eq('卡同步·更新报告常驻不闪退', ssrc.indexOf('timeOut: 0') !== -1 && ssrc.indexOf('closeButton: false') !== -1 && ssrc.indexOf('tapToDismiss: true') !== -1, true);
+  eq('卡同步·写卡走merge-attributes', ssrc.indexOf('/api/characters/merge-attributes') !== -1, true);
+  eq('卡同步·写后重读盘并广播', ssrc.indexOf('/api/characters/get') !== -1 && ssrc.indexOf('CHARACTER_EDITED') !== -1 && ssrc.indexOf('reloadCardFromDisk') !== -1, true);
+  eq('卡同步·写后重选角色刷面板', ssrc.indexOf('selectCharacterById') !== -1 && ssrc.indexOf('switchMenu: false') !== -1, true);
+  eq('卡同步·发布抠卡白名单', xsrc.indexOf('CARD_FIELDS') !== -1 && xsrc.indexOf('regex_scripts') !== -1 && xsrc.indexOf('readCardPng') !== -1, true);
+  eq('卡同步·设置屏开关与手动兜底', wsrc.indexOf('角色卡自动更新') !== -1 && wsrc.indexOf('data-syncsw') !== -1 && wsrc.indexOf('data-syncnow') !== -1 && wsrc.indexOf('立刻检查更新') !== -1 && ssrc.indexOf('setSyncEnabled') !== -1 && ssrc.indexOf('syncEnabled') !== -1, true);
+  eq('设置屏·插件版本页脚', wsrc.indexOf('lzjm-setver') !== -1 && wsrc.indexOf('霖州引擎 v') !== -1 && wsrc.indexOf('W.VERSION') !== -1, true);
+  eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
+  eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1 && wsrc.indexOf("var ICON_MEMO = '<svg width=\"24\" height=\"24\"") !== -1, true);
+  eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);
+  // generate 的终态渲染必须在 busy=false 之后（否则 busy 优先于 failed，「输入中」被钉死在消息末尾）
+  eq('重试·终态渲染先清busy', /this\.busy = false;[\s\S]{0,400}?this\.screen !== 'chat' \|\| this\.chatKey === key\) this\.render\(\);/.test(wsrc), true);
+  // 主题斜体污染：嘎嘎灰/棉花糖等主题给裸 i/em 套气泡底色，特异性碾压 CSS——结构性小元素禁用 i 标签
+  eq('状态栏·信号格用span免疫主题', wsrc.indexOf('lzjm-sig"><span></span>') !== -1 && wsrc.indexOf('.lzjm-sig i{') === -1 && wsrc.indexOf('.lzjm-sig span{') !== -1, true);
+  eq('通话记录·meta不用i标签', wsrc.indexOf('.lzjm-chist-main i{') === -1 && wsrc.indexOf('<span class="chm">') !== -1, true);
+  eq('通话重试双模式', wsrc.indexOf('↻ 充当重试') !== -1 && wsrc.indexOf('var regen = async function') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
   eq('朋友圈·赞显示压缩', wsrc.indexOf("等 ' + lk.length + ' 人") !== -1, true);
@@ -972,6 +1123,8 @@ ctx.getWorldbook = async () => [
   eq('备忘录·当日判重已清除', esrc.indexOf('lastGenDay') === -1 && esrc.includes('diaryWrite'), true);
   eq('备忘录·无自动补写', wsrc.indexOf('diaryEnsure') === -1 && dsrc.indexOf('diaryEnsure') === -1, true);
   eq('备忘录·usedDates注入排除', esrc.includes('usedDates') && psrc.includes('不可使用已存在的日期'), true);
+  eq('备忘录·当天优先与张冠李戴禁令', psrc.indexOf('优先写当天') !== -1 && psrc.indexOf('张冠李戴是备忘录的头号事故') !== -1 && esrc.includes('_diaryWindowDates'), true);
+  eq('QR·收纳插件兼容三机制', esrc.indexOf('visOk') !== -1 && esrc.indexOf('可见原生按钮数') !== -1 && esrc.indexOf('parentNode === holder && visOk(b)') !== -1, true);
   eq('备忘录·契约标记', psrc.includes('※备忘录※|日期|标题') && psrc.includes('※完※'), true);
   eq('备忘录·短重试补强', esrc.indexOf('正文过短') !== -1 && psrc.indexOf('过短被驳回') !== -1, true);
   // 日记历史回归保险丝：必须走 chat_history 标准槽位（与主生成同管线），自拼残留清零
