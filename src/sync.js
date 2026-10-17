@@ -336,7 +336,7 @@
         if (mf.card) {
           try { cr = await applyCard(mf); } catch (e) { log('卡同步异常：' + (e && e.message || e)); }
         }
-        // 统一报告：两端差异驱动，任何一处有实际变化 → 一条常驻 toast 说完，用户 × 掉才关；
+        // 统一报告：两端差异驱动，任何一处有实际变化 → 一条常驻 toast 说完，点一下即关（不自动消失）；
         // 全无变化 → 自动模式完全静默；手动模式报「已是最新」给用户一个交代
         var parts = [];
         if (r.applied) parts.push('更新' + r.updated + '条' + (r.created ? '·新增' + r.created + '条' : '') + '设定');
@@ -344,7 +344,7 @@
         if (parts.length) {
           var msg = '设定已同步：' + parts.join('；');
           log(msg);
-          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: true }); } catch (e) {}
+          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: false, tapToDismiss: true }); } catch (e) {}
         } else {
           log('无差异，无需更新');
           if (manual) { try { toastr.info('已是最新，无需更新', '📱 霖州引擎'); } catch (e) {} }
