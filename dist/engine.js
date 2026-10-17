@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-18 01:12
+//  构建时间（本地）：2026-10-18 01:42
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-18 01:12';
+var __LZJM_BUILD__ = '2026-10-18 01:42';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2835,6 +2835,15 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       var et = (typeof event_types !== 'undefined') ? event_types : (p && p.event_types);
       if (es && et && et.CHARACTER_EDITED) es.emit(et.CHARACTER_EDITED, { detail: { id: ctx.characterId != null ? ctx.characterId : ctx.this_chid } });
     } catch (e) {}
+    // 面板刷新：角色编辑器是「打开时快照」，CHARACTER_EDITED 只有 PromptManager 在听，
+    // 开着的面板不会自己重填。重选当前角色（switchMenu:false 不弹菜单、不切聊天），
+    // 走 ST 自己的 select_selected_character 从新数据重填全部字段（版本号/正则同理）。
+    try {
+      var stx = (typeof SillyTavern !== 'undefined' && SillyTavern && SillyTavern.getContext) ? SillyTavern.getContext()
+        : (p && p.SillyTavern && p.SillyTavern.getContext && p.SillyTavern.getContext());
+      var cid = ctx.characterId != null ? ctx.characterId : ctx.this_chid;
+      if (stx && stx.selectCharacterById && cid != null) stx.selectCharacterById(String(cid), { switchMenu: false });
+    } catch (e) {}
   }
 
   // 兜底：重读盘失败时手补内存里的卡对象
@@ -2939,7 +2948,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         if (parts.length) {
           var msg = '设定已同步：' + parts.join('；');
           log(msg);
-          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false }); } catch (e) {}
+          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: true }); } catch (e) {}
         } else {
           log('无差异，无需更新');
           if (manual) { try { toastr.info('已是最新，无需更新', '📱 霖州引擎'); } catch (e) {} }
@@ -5655,7 +5664,10 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     }).join('') +
       '<div class="lzjm-setrow" data-syncnow="1"><div class="lzjm-setmain"><div class="lzjm-setname">立刻检查更新</div>' +
       '<div class="lzjm-setdesc">网络异常或长期未更新时点这里，强制与最新版对齐（关闭状态下也可用）</div></div>' +
-      '<span class="lzjm-setck">↻</span></div>';
+      '<span class="lzjm-setck">↻</span></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">插件版本</div>' +
+      '<div class="lzjm-setdesc">当前加载的引擎版本号，用于确认手机缓存是否已刷新</div></div>' +
+      '<span class="lzjm-setck">v' + (W.VERSION || '?') + '</span></div>';
     var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');

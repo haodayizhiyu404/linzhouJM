@@ -2645,7 +2645,10 @@
     }).join('') +
       '<div class="lzjm-setrow" data-syncnow="1"><div class="lzjm-setmain"><div class="lzjm-setname">立刻检查更新</div>' +
       '<div class="lzjm-setdesc">网络异常或长期未更新时点这里，强制与最新版对齐（关闭状态下也可用）</div></div>' +
-      '<span class="lzjm-setck">↻</span></div>';
+      '<span class="lzjm-setck">↻</span></div>' +
+      '<div class="lzjm-setrow"><div class="lzjm-setmain"><div class="lzjm-setname">插件版本</div>' +
+      '<div class="lzjm-setdesc">当前加载的引擎版本号，用于确认手机缓存是否已刷新</div></div>' +
+      '<span class="lzjm-setck">v' + (W.VERSION || '?') + '</span></div>';
     var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');

@@ -1047,11 +1047,13 @@ ctx.getWorldbook = async () => [
   eq('卡同步·正则只动extensions.regex_scripts', JSON.stringify(up.data.extensions) === '{"regex_scripts":[{"id":1}]}', true);
   eq('卡同步·白名单不外溢', Object.keys(up.data).sort().join(','), 'alternate_greetings,description,extensions,first_mes');
   eq('卡同步·默认自动更新且作者赢', ssrc.indexOf("lzjm-sync") !== -1 && ssrc.indexOf('作者赢') !== -1 && ssrc.indexOf("|| 'dry'") === -1 && ssrc.indexOf('cardsync-mode') === -1, true);
-  eq('卡同步·更新报告常驻不闪退', ssrc.indexOf('timeOut: 0') !== -1 && ssrc.indexOf('closeButton: true') !== -1, true);
+  eq('卡同步·更新报告常驻不闪退', ssrc.indexOf('timeOut: 0') !== -1 && ssrc.indexOf('closeButton: true') !== -1 && ssrc.indexOf('tapToDismiss: true') !== -1 && ssrc.indexOf('tapToDismiss: false') === -1, true);
   eq('卡同步·写卡走merge-attributes', ssrc.indexOf('/api/characters/merge-attributes') !== -1, true);
   eq('卡同步·写后重读盘并广播', ssrc.indexOf('/api/characters/get') !== -1 && ssrc.indexOf('CHARACTER_EDITED') !== -1 && ssrc.indexOf('reloadCardFromDisk') !== -1, true);
+  eq('卡同步·写后重选角色刷面板', ssrc.indexOf('selectCharacterById') !== -1 && ssrc.indexOf('switchMenu: false') !== -1, true);
   eq('卡同步·发布抠卡白名单', xsrc.indexOf('CARD_FIELDS') !== -1 && xsrc.indexOf('regex_scripts') !== -1 && xsrc.indexOf('readCardPng') !== -1, true);
   eq('卡同步·设置屏开关与手动兜底', wsrc.indexOf('角色卡自动更新') !== -1 && wsrc.indexOf('data-syncsw') !== -1 && wsrc.indexOf('data-syncnow') !== -1 && wsrc.indexOf('立刻检查更新') !== -1 && ssrc.indexOf('setSyncEnabled') !== -1 && ssrc.indexOf('syncEnabled') !== -1, true);
+  eq('设置屏·插件版本可见', wsrc.indexOf('插件版本') !== -1 && wsrc.indexOf('W.VERSION') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);

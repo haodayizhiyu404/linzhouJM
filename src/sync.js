@@ -231,6 +231,15 @@
       var et = (typeof event_types !== 'undefined') ? event_types : (p && p.event_types);
       if (es && et && et.CHARACTER_EDITED) es.emit(et.CHARACTER_EDITED, { detail: { id: ctx.characterId != null ? ctx.characterId : ctx.this_chid } });
     } catch (e) {}
+    // 面板刷新：角色编辑器是「打开时快照」，CHARACTER_EDITED 只有 PromptManager 在听，
+    // 开着的面板不会自己重填。重选当前角色（switchMenu:false 不弹菜单、不切聊天），
+    // 走 ST 自己的 select_selected_character 从新数据重填全部字段（版本号/正则同理）。
+    try {
+      var stx = (typeof SillyTavern !== 'undefined' && SillyTavern && SillyTavern.getContext) ? SillyTavern.getContext()
+        : (p && p.SillyTavern && p.SillyTavern.getContext && p.SillyTavern.getContext());
+      var cid = ctx.characterId != null ? ctx.characterId : ctx.this_chid;
+      if (stx && stx.selectCharacterById && cid != null) stx.selectCharacterById(String(cid), { switchMenu: false });
+    } catch (e) {}
   }
 
   // 兜底：重读盘失败时手补内存里的卡对象
@@ -335,7 +344,7 @@
         if (parts.length) {
           var msg = '设定已同步：' + parts.join('；');
           log(msg);
-          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false }); } catch (e) {}
+          try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: true }); } catch (e) {}
         } else {
           log('无差异，无需更新');
           if (manual) { try { toastr.info('已是最新，无需更新', '📱 霖州引擎'); } catch (e) {} }
