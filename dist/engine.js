@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-17 23:07
+//  构建时间（本地）：2026-10-17 23:20
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-17 23:07';
+var __LZJM_BUILD__ = '2026-10-17 23:20';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2678,14 +2678,14 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   //   作者名/创作者注释/版本号/标签 + 卡面正则 regex_scripts）
   //
   // 【纪律】只写白名单字段；其他插件挂在 data.extensions 下的数据永不触碰。
-  // 三路保护：localStorage 记「上次同步/观察值」哈希——当前值≠基线 = 用户自己改过 → 跳过不动。
+  // 主权与世界书统一为「作者赢」：清单值 ≠ 本地值就照清单覆盖，无基线、无锁死、无留底——
+  //   用户自定义走用户空间（自建条目/::条目/自己的正则），设定本身以作者发布为准。
   // 开场白整组处理（first_mes + alternate_greetings 一起比对一起换）：
   //   作者增/删/改开场白都只是「新数组≠旧数组」，一次覆盖全部到位。
-  // 模式（localStorage lzjm-cardsync-mode）：dry（默认）= 干跑只报告不落盘；
+  // 模式（localStorage lzjm-cardsync-mode）：dry（默认）= 干跑只报告不落盘（发布验证用）；
   //   on = 静默直写（与世界书同待遇）；off = 全关。
   // ─────────────────────────────────────────────
   var MODE_KEY = 'lzjm-cardsync-mode';
-  var BASE_KEY = 'lzjm-cardsync-base';
   var CARD_GROUPS = [
     { key: 'greetings', label: '开场白', fields: ['first_mes', 'alternate_greetings'] },
     { key: 'description', label: '角色描述' },
@@ -2727,23 +2727,17 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     return f[g.key];
   }
 
-  // 纯函数（测试直调）：比对清单卡字段 vs 本地值 vs 基线，产出更新计划。
-  // getField(key) 取本地当前值；base = {key: 上次同步/观察哈希}。
-  // 返回 {planned:[{key,label,value}], kept:[{key,label}], unchanged}。
-  // planned = 该写的；kept = 用户自己改过的（跳过不动）；unchanged = 已一致的数量。
-  function planCardUpdates(card, getField, base) {
-    base = base || {};
-    var planned = [], kept = [], unchanged = 0;
+  // 纯函数（测试直调）：比对清单卡字段 vs 本地值，有差异即进计划（作者赢，无基线概念）。
+  // getField(key) 取本地当前值。返回 {planned:[{key,label,value}], unchanged}。
+  function planCardUpdates(card, getField) {
+    var planned = [], unchanged = 0;
     CARD_GROUPS.forEach(function (g) {
       var remote = groupRemote(card, g);
       if (remote === undefined) return;
-      var cur = getField(g.key);
-      var rh = stableHash(remote), ch = stableHash(cur);
-      if (rh === ch) { unchanged++; return; }
-      if (base[g.key] !== undefined && base[g.key] !== ch) { kept.push({ key: g.key, label: g.label }); return; }
+      if (stableHash(getField(g.key)) === stableHash(remote)) { unchanged++; return; }
       planned.push({ key: g.key, label: g.label, value: remote });
     });
-    return { planned: planned, kept: kept, unchanged: unchanged };
+    return { planned: planned, unchanged: unchanged };
   }
 
   // 卡上下文：沙盒原生注入优先，父页 getContext 兜底（与 engine.openingCtx 同套）
@@ -2819,24 +2813,6 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       .finally(function () { if (timer) clearTimeout(timer); });
   }
 
-  function loadBase() {
-    try { return JSON.parse(localStorage.getItem(BASE_KEY) || '{}') || {}; } catch (e) { return {}; }
-  }
-  // 基线维护：planned 组记「写后值」（on）或「观察值」（dry）；unchanged 组记远端哈希；
-  // kept 组【不动】——动了就再也识别不出「用户改过」。
-  function saveBase(card, plan, applied) {
-    var base = loadBase();
-    plan.planned.forEach(function (p) { base[p.key] = stableHash(applied ? p.value : p._cur); });
-    CARD_GROUPS.forEach(function (g) {
-      var remote = groupRemote(card, g);
-      if (remote === undefined) return;
-      var involved = plan.planned.some(function (p) { return p.key === g.key; }) ||
-        plan.kept.some(function (k) { return k.key === g.key; });
-      if (!involved) base[g.key] = stableHash(remote);   // unchanged
-    });
-    try { localStorage.setItem(BASE_KEY, JSON.stringify(base)); } catch (e) {}
-  }
-
   // 卡同步主流程：差异驱动（不看清单版本号——版本号归世界书），失败静默。
   async function applyCard(mf) {
     var card = mf && mf.card;
@@ -2848,37 +2824,27 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
     var ch = ctx && ctx.characters && ctx.characters[ctx.characterId != null ? ctx.characterId : ctx.this_chid];
     if (!ch || !ch.avatar) return { applied: false, reason: '未打开角色卡' };
 
-    var getField = cardFieldGetter(ch);
-    var plan = planCardUpdates(card, getField, loadBase());
-    plan.planned.forEach(function (p) { p._cur = getField(p.key); });
+    var plan = planCardUpdates(card, cardFieldGetter(ch));
 
-    if (!plan.planned.length) {
-      saveBase(card, plan, true);   // 无差异：基线补齐到远端哈希，之后用户一改就能识别
-      if (plan.kept.length) log('卡字段：保留你改过的 ' + plan.kept.map(function (k) { return k.label; }).join('、'));
-      return { applied: false, reason: '卡字段无差异', kept: plan.kept.length };
-    }
+    if (!plan.planned.length) return { applied: false, reason: '卡字段无差异' };
 
     if (mode === 'dry') {
-      saveBase(card, plan, false);   // 记观察值：之后用户动了就能识别；没动则转 on 时照计划写
-      var msg = '角色卡同步预览：将更新 ' + plan.planned.map(function (p) { return p.label; }).join('、') +
-        (plan.kept.length ? '；保留你改过的 ' + plan.kept.map(function (k) { return k.label; }).join('、') : '');
+      var msg = '角色卡同步预览：将更新 ' + plan.planned.map(function (p) { return p.label; }).join('、');
       log('[干跑] ' + msg + '（localStorage 设 lzjm-cardsync-mode=on 即静默直写）');
       try { toastr.info(msg + '（当前为预览模式，未改动）', '📱 霖州引擎'); } catch (e) {}
-      return { applied: false, dry: true, planned: plan.planned.length, kept: plan.kept.length };
+      return { applied: false, dry: true, planned: plan.planned.length };
     }
 
-    // on：静默直写
+    // on：静默直写（作者赢，与世界书同待遇）
     try {
       var up = buildCardUpdate(ch.avatar, plan.planned);
       var r = await postJson('/api/characters/merge-attributes', up);
       if (!r.ok) throw new Error('HTTP ' + r.status);
       refreshCardMemory(ch, plan.planned);
-      saveBase(card, plan, true);
-      var done = '角色卡已更新到 v' + mf.version + '（' + plan.planned.map(function (p) { return p.label; }).join('、') + '）' +
-        (plan.kept.length ? '；保留了你改过的 ' + plan.kept.map(function (k) { return k.label; }).join('、') : '');
+      var done = '角色卡已更新到 v' + mf.version + '（' + plan.planned.map(function (p) { return p.label; }).join('、') + '）';
       log(done);
       try { toastr.success(done, '📱 霖州引擎'); } catch (e) {}
-      return { applied: true, planned: plan.planned.length, kept: plan.kept.length };
+      return { applied: true, planned: plan.planned.length };
     } catch (e) {
       log('卡字段写入失败：' + (e && e.message || e) + '（本地内容不变，下次打开重试）');
       return { applied: false, reason: '写入失败' };

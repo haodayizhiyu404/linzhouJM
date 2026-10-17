@@ -1023,17 +1023,15 @@ ctx.getWorldbook = async () => [
   eq('卡同步·哈希稳定且归一化换行', SH({ b: 1, a: [2] }) === SH({ a: [2], b: 1 }) && SH('x\r\ny') === SH('x\ny'), true);
   const cardMf = { fields: { first_mes: '新开场', alternate_greetings: ['甲', '乙'], description: '新描述', character_version: '2026.10.17' }, regex: [{ id: 1, find: 'x' }] };
   const gfSame = k => k === 'greetings' ? { first_mes: '新开场', alternate_greetings: ['甲', '乙'] } : k === 'regex' ? cardMf.regex : ({ description: '新描述', character_version: '2026.10.17' })[k];
-  const pSame = LW.Sync.planCardUpdates(cardMf, gfSame, {});
-  eq('卡同步·无差异不出计划', pSame.planned.length === 0 && pSame.kept.length === 0 && pSame.unchanged === 4, true);
+  const pSame = LW.Sync.planCardUpdates(cardMf, gfSame);
+  eq('卡同步·无差异不出计划', pSame.planned.length === 0 && pSame.unchanged === 4, true);
   const gfOld = k => k === 'greetings' ? { first_mes: '旧开场', alternate_greetings: ['旧'] } : k === 'regex' ? [] : ({ description: '旧描述', character_version: '旧版' })[k];
-  const pFirst = LW.Sync.planCardUpdates(cardMf, gfOld, {});
-  eq('卡同步·首同步全部进计划', pFirst.planned.length === 4 && pFirst.kept.length === 0, true);
+  const pFirst = LW.Sync.planCardUpdates(cardMf, gfOld);
+  eq('卡同步·有差异全部进计划', pFirst.planned.length === 4, true);
   const gPlan = pFirst.planned.filter(p => p.key === 'greetings')[0];
   eq('卡同步·开场白整组替换（增删改一次覆盖）', !!gPlan && gPlan.value.first_mes === '新开场' && JSON.stringify(gPlan.value.alternate_greetings) === '["甲","乙"]', true);
-  const pKeep = LW.Sync.planCardUpdates(cardMf, k => k === 'description' ? '用户自己改的描述' : gfSame(k), { description: SH('更早的描述') });
-  eq('卡同步·用户改过的字段保留', pKeep.planned.length === 0 && pKeep.kept.length === 1 && pKeep.kept[0].key === 'description', true);
-  const pBase = LW.Sync.planCardUpdates(cardMf, k => k === 'description' ? '旧描述' : gfSame(k), { description: SH('旧描述') });
-  eq('卡同步·基线匹配按计划更新', pBase.planned.length === 1 && pBase.planned[0].key === 'description' && pBase.kept.length === 0, true);
+  const pUser = LW.Sync.planCardUpdates(cardMf, k => k === 'description' ? '用户自己改的描述' : gfSame(k));
+  eq('卡同步·作者赢（用户改动照计划覆盖，与世界书同哲学）', pUser.planned.length === 1 && pUser.planned[0].key === 'description', true);
   const up = LW.Sync.buildCardUpdate('蒋默.png', [
     { key: 'greetings', label: '开场白', value: { first_mes: '新开场', alternate_greetings: ['甲'] } },
     { key: 'description', label: '角色描述', value: '新描述' },
@@ -1042,7 +1040,7 @@ ctx.getWorldbook = async () => [
   eq('卡同步·写请求顶层与data镜像', up.avatar === '蒋默.png' && up.first_mes === '新开场' && up.data.first_mes === '新开场' && up.description === '新描述' && up.data.description === '新描述' && JSON.stringify(up.data.alternate_greetings) === '["甲"]', true);
   eq('卡同步·正则只动extensions.regex_scripts', JSON.stringify(up.data.extensions) === '{"regex_scripts":[{"id":1}]}', true);
   eq('卡同步·白名单不外溢', Object.keys(up.data).sort().join(','), 'alternate_greetings,description,extensions,first_mes');
-  eq('卡同步·干跑默认与三路保护', ssrc.indexOf("lzjm-cardsync-mode") !== -1 && ssrc.indexOf("lzjm-cardsync-base") !== -1 && ssrc.indexOf("|| 'dry'") !== -1, true);
+  eq('卡同步·干跑默认与作者赢哲学', ssrc.indexOf("lzjm-cardsync-mode") !== -1 && ssrc.indexOf("|| 'dry'") !== -1 && ssrc.indexOf('作者赢') !== -1 && ssrc.indexOf('cardsync-base') === -1, true);
   eq('卡同步·写卡走merge-attributes', ssrc.indexOf('/api/characters/merge-attributes') !== -1, true);
   eq('卡同步·发布抠卡白名单', xsrc.indexOf('CARD_FIELDS') !== -1 && xsrc.indexOf('regex_scripts') !== -1 && xsrc.indexOf('readCardPng') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
