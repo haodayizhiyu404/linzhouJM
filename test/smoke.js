@@ -993,12 +993,14 @@ ctx.getWorldbook = async () => [
   eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
   const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
   const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');
-  const xsrc = fs.readFileSync(path.join(ROOT, 'tools/export-manifest.js'), 'utf8');
+  const xsrc = fs.readFileSync(path.join(ROOT, 'tools/publish.js'), 'utf8');
   const ssrc = fs.readFileSync(path.join(ROOT, 'src/sync.js'), 'utf8');
   eq('同步·装载器暴露ref与branch', lsrc.indexOf('window[NS].ref = ref') !== -1 && lsrc.indexOf('window[NS].branch = BRANCH') !== -1, true);
   eq('同步·构建挂载sync.js', bsrc.indexOf("'src/sync.js'") !== -1, true);
   eq('同步·导出工具排除::条目', xsrc.indexOf("indexOf('::')") !== -1, true);
-  eq('同步·导出工具自动识别下载目录', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
+  eq('同步·发布直读酒馆母本', xsrc.indexOf("SillyTavern', 'data'") !== -1 && xsrc.indexOf('worlds') !== -1 && xsrc.indexOf('st-world.local.txt') !== -1, true);
+  eq('同步·发布精确名优先防同名片', xsrc.indexOf('EXACT') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
+  eq('同步·发布保留下载夹兜底', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1, true);
   eq('同步·发布bat在位', fs.existsSync(path.join(ROOT, '发布设定.bat')), true);
   eq('同步·拉取链同装载器源系', ssrc.indexOf('raw.githubusercontent.com') !== -1 && ssrc.indexOf('fastly.jsdelivr.net') !== -1 && ssrc.indexOf('content/manifest.json') !== -1, true);
   eq('同步·失败静默不抛', ssrc.indexOf('全程失败静默') !== -1, true);
