@@ -1068,8 +1068,10 @@ ctx.getWorldbook = async () => [
   eq('卡同步·设置屏开关与手动兜底', wsrc.indexOf('角色卡自动更新') !== -1 && wsrc.indexOf('data-syncsw') !== -1 && wsrc.indexOf('data-syncnow') !== -1 && wsrc.indexOf('立刻检查更新') !== -1 && ssrc.indexOf('setSyncEnabled') !== -1 && ssrc.indexOf('syncEnabled') !== -1, true);
   eq('设置屏·插件版本页脚', wsrc.indexOf('lzjm-setver') !== -1 && wsrc.indexOf('霖州引擎 v') !== -1 && wsrc.indexOf('W.VERSION') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
-  eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
+  eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1 && wsrc.indexOf("var ICON_MEMO = '<svg width=\"24\" height=\"24\"") !== -1, true);
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);
+  // generate 的终态渲染必须在 busy=false 之后（否则 busy 优先于 failed，「输入中」被钉死在消息末尾）
+  eq('重试·终态渲染先清busy', /this\.busy = false;[\s\S]{0,400}?this\.screen !== 'chat' \|\| this\.chatKey === key\) this\.render\(\);/.test(wsrc), true);
   eq('通话重试双模式', wsrc.indexOf('↻ 充当重试') !== -1 && wsrc.indexOf('var regen = async function') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
