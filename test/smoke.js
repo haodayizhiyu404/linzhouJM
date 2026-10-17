@@ -1050,6 +1050,7 @@ ctx.getWorldbook = async () => [
   eq('卡同步·干跑报告常驻不闪退', ssrc.indexOf('timeOut: 0') !== -1 && ssrc.indexOf('closeButton: true') !== -1, true);
   eq('卡同步·写卡走merge-attributes', ssrc.indexOf('/api/characters/merge-attributes') !== -1, true);
   eq('卡同步·发布抠卡白名单', xsrc.indexOf('CARD_FIELDS') !== -1 && xsrc.indexOf('regex_scripts') !== -1 && xsrc.indexOf('readCardPng') !== -1, true);
+  eq('卡同步·设置屏模式开关接线', wsrc.indexOf('data-csmode') !== -1 && wsrc.indexOf('设定同步 · 角色卡字段') !== -1 && ssrc.indexOf('setCardMode') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
   eq('移植·羽毛笔图标与靠左居中', wsrc.indexOf('M1021.290408') !== -1 && wsrc.indexOf('(vh - h) / 2') !== -1, true);
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);

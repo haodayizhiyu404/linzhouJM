@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-18 00:22
+//  构建时间（本地）：2026-10-18 00:40
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-18 00:22';
+var __LZJM_BUILD__ = '2026-10-18 00:40';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -4462,6 +4462,12 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
             UI.render();
           };
         });
+        ph.querySelectorAll('[data-csmode]').forEach(function (el) {
+          el.onclick = function () {
+            try { if (window.LZJM.Sync) window.LZJM.Sync.setCardMode(el.dataset.csmode); } catch (e) {}
+            UI.render();
+          };
+        });
         ph.querySelectorAll('[data-num]').forEach(function (el) {
           el.onchange = function () {
             var lo = +el.dataset.min, hi = +el.dataset.max;
@@ -5607,6 +5613,19 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
+    // 设定同步·角色卡字段模式（写 localStorage，Sync.cardMode 读取；手机端没有控制台，必须给可点开关）
+    var csMode = 'dry';
+    try { if (W.Sync && W.Sync.cardMode) csMode = W.Sync.cardMode(); } catch (e) {}
+    var csModes = [
+      ['dry', '先预览', '卡字段有更新先弹报告、不改动（核对差异用）'],
+      ['on', '自动更新', '与世界书同待遇：有差异静默更新，toast 统一报告'],
+      ['off', '关闭', '角色卡字段不参与同步（世界书不受影响）']
+    ];
+    var csRows = csModes.map(function (m) {
+      return '<div class="lzjm-setrow' + (csMode === m[0] ? ' on' : '') + '" data-csmode="' + m[0] + '">' +
+        '<div class="lzjm-setmain"><div class="lzjm-setname">' + m[1] + '</div><div class="lzjm-setdesc">' + m[2] + '</div></div>' +
+        '<span class="lzjm-setck">' + ICON_TOK + '</span></div>';
+    }).join('');
     var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
@@ -5614,6 +5633,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
+      '<div class="lzjm-setsec">设定同步 · 角色卡字段</div><div class="lzjm-setcard">' + csRows + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
