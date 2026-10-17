@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "minPlugin": "1.1.0",
   "entries": [
     {
@@ -11,7 +11,8 @@
       "selective": false,
       "order": 150,
       "position": 1,
-      "enabled": true
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "状态栏",
@@ -22,7 +23,9 @@
       "selective": true,
       "order": 100,
       "position": 4,
-      "enabled": true
+      "enabled": true,
+      "depth": 0,
+      "role": 0
     },
     {
       "title": "霖州地理",
@@ -33,7 +36,8 @@
       "selective": false,
       "order": 200,
       "position": 0,
-      "enabled": true
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "NPC",
@@ -44,7 +48,8 @@
       "selective": false,
       "order": 151,
       "position": 1,
-      "enabled": true
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "高中·错位的资助",
@@ -57,7 +62,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": true
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "高中·新城的月亮",
@@ -70,7 +76,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "高中·泥潭与飞鸟",
@@ -83,7 +90,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "DLC·大学",
@@ -94,7 +102,8 @@
       "selective": false,
       "order": 160,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "大学·契约之下",
@@ -107,7 +116,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "DLC·成人",
@@ -118,7 +128,8 @@
       "selective": false,
       "order": 160,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "DLC·高中",
@@ -129,7 +140,8 @@
       "selective": false,
       "order": 160,
       "position": 1,
-      "enabled": true
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "高中·共生的藤蔓",
@@ -142,7 +154,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": false
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "叙事指导",
@@ -155,7 +168,9 @@
       "selective": true,
       "order": 101,
       "position": 4,
-      "enabled": true
+      "enabled": true,
+      "depth": 0,
+      "role": 0
     },
     {
       "title": "情感演化与角色自主性",
@@ -166,7 +181,9 @@
       "selective": false,
       "order": 102,
       "position": 4,
-      "enabled": true
+      "enabled": true,
+      "depth": 0,
+      "role": 0
     }
   ]
 }
