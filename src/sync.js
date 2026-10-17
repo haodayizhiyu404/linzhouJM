@@ -5,9 +5,11 @@
 // 清单值 ≠ 本地值才动笔，全无差异则完全静默——不看清单版本号
 // （版本号只是诊断记录：用户删改了条目无需等新版本，下次打开即复原）。
 //   · 世界书：已存在条目更新 内容/触发键/策略/顺序；【enabled 不动】——开关是运行时状态，归用户与引擎
-//   · 角色卡：白名单字段静默覆盖（开场白整组；on 模式）或只报告（dry 默认，发布验证用）
+//   · 角色卡：白名单字段静默覆盖（开场白整组）
 //   · 标题含「::」的条目（音色/版本/通讯录等用户与运行时数据）一律拒收，清单误带也不收
 // 主权哲学「作者赢」两端一致：设定以作者发布为准；用户空间（自建条目/::条目/其他插件 data）永不触碰。
+// 用户出口：设置屏「角色卡自动更新」可关（整张卡静态，世界书也不更新）；「立刻检查更新」手动兜底，
+// 关闭状态下也能强制对齐最新版。
 // minPlugin 是格式门槛：清单要求比本插件新 → 整体拒收，等插件追上
 // （防 CDN 缓存按文件分别过期造成的「旧插件+新清单」错配）。
 // 全程失败静默：拉不到/读不懂/写不进都只记日志，绝不影响本地既有内容。
@@ -107,10 +109,8 @@
   //   用户自定义走用户空间（自建条目/::条目/自己的正则），设定本身以作者发布为准。
   // 开场白整组处理（first_mes + alternate_greetings 一起比对一起换）：
   //   作者增/删/改开场白都只是「新数组≠旧数组」，一次覆盖全部到位。
-  // 模式（localStorage lzjm-cardsync-mode）：dry（默认）= 干跑只报告不落盘（发布验证用）；
-  //   on = 静默直写（与世界书同待遇）；off = 全关。
   // ─────────────────────────────────────────────
-  var MODE_KEY = 'lzjm-cardsync-mode';
+  var SYNC_KEY = 'lzjm-sync';   // 'off' = 用户关了自动更新（整张卡静态）；缺省/其他 = 开
   var CARD_GROUPS = [
     { key: 'greetings', label: '开场白', fields: ['first_mes', 'alternate_greetings'] },
     { key: 'description', label: '角色描述' },
@@ -242,8 +242,6 @@
   async function applyCard(mf) {
     var card = mf && mf.card;
     if (!card || typeof card !== 'object') return { applied: false, reason: '清单无卡字段' };
-    var mode = Sync.cardMode();
-    if (mode === 'off') return { applied: false, reason: '卡同步已关' };
 
     var ctx = cardCtx();
     var ch = ctx && ctx.characters && ctx.characters[ctx.characterId != null ? ctx.characterId : ctx.this_chid];
@@ -254,12 +252,7 @@
 
     if (!plan.planned.length) return { applied: false, reason: '卡字段无差异' };
 
-    if (mode === 'dry') {
-      log('[干跑] 角色卡将更新：' + labels.join('、') + '（localStorage 设 lzjm-cardsync-mode=on 即静默直写）');
-      return { applied: false, dry: true, labels: labels };
-    }
-
-    // on：静默直写（作者赢，与世界书同待遇）；toast 由 run() 统一发，这里只记日志
+    // 静默直写（作者赢，与世界书同待遇）；toast 由 run() 统一发，这里只记日志
     try {
       var up = buildCardUpdate(ch.avatar, plan.planned);
       var r = await postJson('/api/characters/merge-attributes', up);
@@ -281,24 +274,27 @@
     stableHash: stableHash,
     buildCardUpdate: buildCardUpdate,
     applyCard: applyCard,
-    cardMode: function () {
-      var m = 'dry';
-      try { m = localStorage.getItem(MODE_KEY) || 'dry'; } catch (e) {}
-      return (m === 'on' || m === 'off') ? m : 'dry';
+    // 自动更新总开关（默认开；设置屏「角色卡自动更新」写入）
+    syncEnabled: function () {
+      try { return localStorage.getItem(SYNC_KEY) !== 'off'; } catch (e) { return true; }
     },
-    setCardMode: function (m) {
-      try {
-        if (m === 'on' || m === 'off' || m === 'dry') localStorage.setItem(MODE_KEY, m);
-        else localStorage.removeItem(MODE_KEY);
-      } catch (e) {}
+    setSyncEnabled: function (on) {
+      try { if (on === false) localStorage.setItem(SYNC_KEY, 'off'); else localStorage.removeItem(SYNC_KEY); } catch (e) {}
     },
-    run: async function () {
+    // manual=true：设置屏「立刻检查更新」——强制跑一轮且必有反馈；关闭状态下也可用（兜底恢复通道）
+    run: async function (manual) {
       try {
+        if (!Sync.syncEnabled() && !manual) { log('自动更新已关，跳过'); return; }
         var mf = await fetchManifest();
-        if (!mf) { log('清单拉取失败，跳过（本地内容不变）'); return; }
+        if (!mf) {
+          log('清单拉取失败，跳过（本地内容不变）');
+          if (manual) { try { toastr.warning('检查更新失败：网络异常，稍后再试', '📱 霖州引擎'); } catch (e) {} }
+          return;
+        }
         // minPlugin 门槛不过 = 清单格式可能比本插件新，世界书与卡段都不能碰
         if (!semverLTE(mf.minPlugin || '0.0.0', window.LZJM.VERSION)) {
           log('清单要求插件≥' + mf.minPlugin + '（当前 ' + window.LZJM.VERSION + '），等插件追上');
+          if (manual) { try { toastr.warning('清单要求更新版本的插件，请先更新插件', '📱 霖州引擎'); } catch (e) {} }
           return;
         }
         var r = await apply(mf);
@@ -308,19 +304,22 @@
           try { cr = await applyCard(mf); } catch (e) { log('卡同步异常：' + (e && e.message || e)); }
         }
         // 统一报告：两端差异驱动，任何一处有实际变化 → 一条常驻 toast 说完，用户 × 掉才关；
-        // 全无变化 → 完全静默（不打扰是默认状态）
+        // 全无变化 → 自动模式完全静默；手动模式报「已是最新」给用户一个交代
         var parts = [];
-        if (r.applied) parts.push('世界书 更新' + r.updated + '条' + (r.created ? '·新增' + r.created + '条' : ''));
-        if (cr && cr.applied) parts.push('角色卡 ' + cr.labels.join('、'));
-        if (cr && cr.dry) parts.push('预览（未改动）：角色卡将更新 ' + cr.labels.join('、'));
+        if (r.applied) parts.push('更新' + r.updated + '条' + (r.created ? '·新增' + r.created + '条' : '') + '设定');
+        if (cr && cr.applied) parts.push('更新 ' + cr.labels.join('、'));
         if (parts.length) {
-          var msg = '设定同步：' + parts.join('；');
+          var msg = '设定已同步：' + parts.join('；');
           log(msg);
           try { toastr.success(msg, '📱 霖州引擎', { timeOut: 0, extendedTimeOut: 0, closeButton: true, tapToDismiss: false }); } catch (e) {}
         } else {
           log('无差异，无需更新');
+          if (manual) { try { toastr.info('已是最新，无需更新', '📱 霖州引擎'); } catch (e) {} }
         }
-      } catch (e) { log('同步异常：' + (e && e.message || e)); }
+      } catch (e) {
+        log('同步异常：' + (e && e.message || e));
+        if (manual) { try { toastr.warning('检查更新失败，稍后再试', '📱 霖州引擎'); } catch (e2) {} }
+      }
     }
   };
 

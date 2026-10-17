@@ -1475,10 +1475,15 @@
             UI.render();
           };
         });
-        ph.querySelectorAll('[data-csmode]').forEach(function (el) {
+        ph.querySelectorAll('[data-syncsw]').forEach(function (el) {
           el.onclick = function () {
-            try { if (window.LZJM.Sync) window.LZJM.Sync.setCardMode(el.dataset.csmode); } catch (e) {}
+            try { if (window.LZJM.Sync) window.LZJM.Sync.setSyncEnabled(el.dataset.syncsw === '1'); } catch (e) {}
             UI.render();
+          };
+        });
+        ph.querySelectorAll('[data-syncnow]').forEach(function (el) {
+          el.onclick = function () {
+            try { if (window.LZJM.Sync) window.LZJM.Sync.run(true); } catch (e) {}
           };
         });
         ph.querySelectorAll('[data-num]').forEach(function (el) {
@@ -2626,19 +2631,21 @@
         '<div class="lzjm-setdesc">' + r[0] + ' ~ ' + r[1] + '</div></div>' +
         '<input class="lzjm-setnum" data-num="' + key + '" data-min="' + r[0] + '" data-max="' + r[1] + '" value="' + cfg[key] + '" inputmode="numeric"></div>';
     }
-    // 设定同步·角色卡字段模式（写 localStorage，Sync.cardMode 读取；手机端没有控制台，必须给可点开关）
-    var csMode = 'dry';
-    try { if (W.Sync && W.Sync.cardMode) csMode = W.Sync.cardMode(); } catch (e) {}
-    var csModes = [
-      ['dry', '先预览', '卡字段有更新先弹报告、不改动（核对差异用）'],
-      ['on', '自动更新', '与世界书同待遇：有差异静默更新，toast 统一报告'],
-      ['off', '关闭', '角色卡字段不参与同步（世界书不受影响）']
+    // 角色卡自动更新：开/关 + 手动兜底按钮（写 localStorage，Sync 读取；手机端没有控制台，必须给可点入口）
+    var syncOn = true;
+    try { if (W.Sync && W.Sync.syncEnabled) syncOn = W.Sync.syncEnabled(); } catch (e) {}
+    var swModes = [
+      ['1', '开启', '设定有更新时自动同步进卡，toast 告知更新了什么'],
+      ['0', '关闭', '这张卡保持现状，不再接收任何设定更新']
     ];
-    var csRows = csModes.map(function (m) {
-      return '<div class="lzjm-setrow' + (csMode === m[0] ? ' on' : '') + '" data-csmode="' + m[0] + '">' +
+    var csRows = swModes.map(function (m) {
+      return '<div class="lzjm-setrow' + (syncOn === (m[0] === '1') ? ' on' : '') + '" data-syncsw="' + m[0] + '">' +
         '<div class="lzjm-setmain"><div class="lzjm-setname">' + m[1] + '</div><div class="lzjm-setdesc">' + m[2] + '</div></div>' +
         '<span class="lzjm-setck">' + ICON_TOK + '</span></div>';
-    }).join('');
+    }).join('') +
+      '<div class="lzjm-setrow" data-syncnow="1"><div class="lzjm-setmain"><div class="lzjm-setname">立刻检查更新</div>' +
+      '<div class="lzjm-setdesc">网络异常或长期未更新时点这里，强制与最新版对齐（关闭状态下也可用）</div></div>' +
+      '<span class="lzjm-setck">↻</span></div>';
     var numsMain = numrow('plotFloors', '带几楼正文') + numrow('plotCap', '每楼最多带多少字');
     var numsHist = numrow('histPriv', '私聊记录带几条') + numrow('histGroup', '群聊记录带几条');
     var numsCross = numrow('crossMax', '顺带带几个相关会话') + numrow('crossLines', '每个相关会话带几条');
@@ -2646,7 +2653,7 @@
       numrow('injMax', '一次最多注入几个会话') + numrow('injRounds', '每会话注入最近几条');
     return '<div class="lzjm-body"><div class="lzjm-setwrap">' +
       '<div class="lzjm-setsec">生成 API</div><div class="lzjm-setcard">' + rows + detail + '</div>' + pick +
-      '<div class="lzjm-setsec">设定同步 · 角色卡字段</div><div class="lzjm-setcard">' + csRows + '</div>' +
+      '<div class="lzjm-setsec">角色卡自动更新</div><div class="lzjm-setcard">' + csRows + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 主线正文</div><div class="lzjm-setcard">' + numsMain + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 聊天记录</div><div class="lzjm-setcard">' + numsHist + '</div>' +
       '<div class="lzjm-setsec">手机生成 · 跨会话</div><div class="lzjm-setcard">' + numsCross + '</div>' +
