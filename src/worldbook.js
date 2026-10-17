@@ -473,101 +473,144 @@
       return null;
     },
 
-    // 同步专用 upsert：list = [{title, content, keys?, keysSecondary?, constant?, selective?, order?, position?, enabled?}]
-    // 已存在 → 只改 内容/键/策略/顺序，enabled 保留原值（开关是运行时状态，归用户与引擎）；
+    // 同步专用 upsert：list = [{title, content, keys?, keysSecondary?, constant?, selective?, order?, position?, depth?, role?, enabled?}]
+    // 已存在 → 只改 内容/键/策略/顺序/位置，enabled 保留原值（开关是运行时状态，归用户与引擎）；
     // 不存在 → 按清单整只创建到主书（enabled 缺省 true）。
     // 返回 {updated, created, failed:[标题]}——按书分批写，哪本失败哪批记 failed，幂等，重试安全。
-    upsertManaged: async function (list) {
-      var names = await bookNames();
-      if (!names.length) throw new Error('未找到角色卡世界书');
-      var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
-      var render = { render: 'immediate' };
-      var res = { updated: 0, created: 0, failed: [] };
-      var todo = {};
-      list.forEach(function (e) { if (e && e.title) todo[norm(e.title)] = e; });
+    //
+    // 【字段纪律】酒馆助手条目结构（权威源：JS-Slash-Runner dist/@types.txt 的 WorldbookEntry）：
+    //   标题=name；启用=enabled；触发=strategy{type,keys,keys_secondary{logic,keys}}；
+    //   顺序=position.order（嵌套！顶层没有 order）；位置=position.type（枚举字符串，非数字）。
+    //   写错层级（如顶层 order、comment 当标题）会被静默丢弃或兜底成默认值——一期的教训。
+    upsertManaged: (function () {
+      // ST 数字 position → 助手 position.type（照抄助手 dist 的转换表）
+      var POS_TYPE = { 0: 'before_character_definition', 1: 'after_character_definition', 5: 'before_example_messages', 6: 'after_example_messages', 2: 'before_author_note', 3: 'after_author_note', 4: 'at_depth', 7: 'outlet' };
+      var ROLE_TYPE = { 0: 'system', 1: 'user', 2: 'assistant' };
 
-      // 1) 定位：标题 → 所在书序号（跨书只认第一处命中）
-      var loc = {};
-      var booksCache = [];
-      for (var i = 0; i < names.length; i++) {
-        var es0 = await entriesOf(names[i]);
-        booksCache.push(es0);
-        for (var j0 = 0; j0 < es0.length; j0++) {
-          var t0 = norm(titleOf(es0[j0]));
-          if (todo[t0] && loc[t0] === undefined) loc[t0] = i;
-        }
-      }
-      // 2) 分派：已有 → 所在书更新；没有 → 主书（第一本）新建
-      var updWants = {};   // 书序号 → {normTitle: true}
-      var creates = [];
-      for (var k in todo) {
-        if (loc[k] !== undefined) {
-          (updWants[loc[k]] = updWants[loc[k]] || {})[k] = true;
-        } else {
-          creates.push(todo[k]);
-        }
-      }
-
-      var mkTouch = function (want, doCreate, bag) {
-        return function (entries) {
-          for (var j = 0; j < entries.length; j++) {
-            var en = entries[j];
-            var key = norm(titleOf(en));
-            var src = todo[key];
-            if (!src || !want[key]) continue;
-            if (src.content !== undefined) { en.content = String(src.content); en.text = en.content; }
-            if (src.keys) { en.key = src.keys.slice(); en.keys = src.keys.slice(); }
-            if (src.keysSecondary) { en.keysecondary = src.keysSecondary.slice(); }
-            if (src.constant !== undefined) en.constant = !!src.constant;
-            if (src.selective !== undefined) en.selective = !!src.selective;
-            if (src.order !== undefined) en.order = src.order;
-            if (src.position !== undefined) en.position = src.position;
-            bag.updated++;
-          }
-          if (doCreate) {
-            creates.forEach(function (s2) {
-              var body = String(s2.content || '');
-              entries.push({
-                comment: s2.title, content: body, text: body,
-                key: (s2.keys || []).slice(), keys: (s2.keys || []).slice(),
-                keysecondary: (s2.keysSecondary || []).slice(),
-                constant: !!s2.constant, selective: !!s2.selective,
-                order: s2.order !== undefined ? s2.order : 100,
-                position: s2.position !== undefined ? s2.position : 0,
-                enabled: s2.enabled !== false, disable: s2.enabled === false
-              });
-              bag.created++;
-            });
-          }
-          return entries;
+      // 清单条目 → 助手 PartialDeep<WorldbookEntry>（创建用；缺的字段酒馆补默认值）
+      function toTh(s2) {
+        return {
+          name: s2.title,
+          enabled: s2.enabled !== false,
+          strategy: {
+            type: s2.constant ? 'constant' : 'selective',
+            keys: (s2.keys || []).slice(),
+            keys_secondary: { logic: 'and_any', keys: (s2.keysSecondary || []).slice() },
+            scan_depth: 'same_as_global'
+          },
+          position: {
+            type: POS_TYPE[s2.position] || 'before_character_definition',
+            role: ROLE_TYPE[s2.role] || 'system',
+            depth: typeof s2.depth === 'number' ? s2.depth : 4,
+            order: typeof s2.order === 'number' ? s2.order : 100
+          },
+          content: String(s2.content || ''),
+          probability: 100
         };
-      };
-
-      var jobs = [];
-      for (var bi in updWants) jobs.push({ idx: +bi, want: updWants[bi], create: +bi === 0 && creates.length > 0 });
-      if (creates.length && !updWants[0]) jobs.push({ idx: 0, want: {}, create: true });
-
-      for (var w = 0; w < jobs.length; w++) {
-        var job = jobs[w];
-        var bag = { updated: 0, created: 0 };
-        var titles = Object.keys(job.want).concat(job.create ? creates.map(function (c) { return c.title; }) : []);
-        try {
-          if (typeof updateWorldbookWith === 'function') {
-            await updateWorldbookWith(names[job.idx], mkTouch(job.want, job.create, bag), render);
-          } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
-            var es = booksCache[job.idx] || [];
-            await replaceWorldbook(names[job.idx], mkTouch(job.want, job.create, bag)(es), render);
-          } else {
-            throw new Error('无世界书写入 API');
-          }
-          res.updated += bag.updated;
-          res.created += bag.created;
-        } catch (e) {
-          res.failed = res.failed.concat(titles);
-        }
       }
-      return res;
-    },
+
+      // 原地更新已有条目（TH 格式）：内容/触发键/策略/顺序/位置/深度/身份；enabled、uid 不动
+      function touchEntry(en, src) {
+        if (src.content !== undefined) en.content = String(src.content);
+        en.strategy = en.strategy || {};
+        if (src.keys) en.strategy.keys = src.keys.slice();
+        if (src.keysSecondary) {
+          en.strategy.keys_secondary = en.strategy.keys_secondary || { logic: 'and_any', keys: [] };
+          en.strategy.keys_secondary.keys = src.keysSecondary.slice();
+        }
+        if (src.constant !== undefined && en.strategy.type !== 'vectorized') {
+          en.strategy.type = src.constant ? 'constant' : 'selective';   // 向量化🔗条目的策略类型不动
+        }
+        en.position = en.position || {};
+        if (src.order !== undefined) en.position.order = src.order;
+        if (src.position !== undefined && POS_TYPE[src.position]) en.position.type = POS_TYPE[src.position];
+        if (src.depth !== undefined) en.position.depth = src.depth;
+        if (src.role !== undefined && ROLE_TYPE[src.role]) en.position.role = ROLE_TYPE[src.role];
+      }
+
+      return async function (list) {
+        var names = await bookNames();
+        if (!names.length) throw new Error('未找到角色卡世界书');
+        var norm = function (s) { return String(s || '').replace(/[【】\s]/g, ''); };
+        var render = { render: 'immediate' };
+        var res = { updated: 0, created: 0, failed: [] };
+        var todo = {};
+        list.forEach(function (e) { if (e && e.title) todo[norm(e.title)] = e; });
+
+        // 1) 定位：标题 → 所在书序号（跨书只认第一处命中）
+        var loc = {};
+        var booksCache = [];
+        for (var i = 0; i < names.length; i++) {
+          var es0 = await entriesOf(names[i]);
+          booksCache.push(es0);
+          for (var j0 = 0; j0 < es0.length; j0++) {
+            var t0 = norm(titleOf(es0[j0]));
+            if (todo[t0] && loc[t0] === undefined) loc[t0] = i;
+          }
+        }
+        // 2) 分派：已有 → 所在书更新；没有 → 主书（第一本）新建
+        var updWants = {};   // 书序号 → {normTitle: true}
+        var creates = [];
+        for (var k in todo) {
+          if (loc[k] !== undefined) {
+            (updWants[loc[k]] = updWants[loc[k]] || {})[k] = true;
+          } else {
+            creates.push(todo[k]);
+          }
+        }
+
+        // 3) 更新：按书分批（回调式原地改优先，整本替换兜底）
+        for (var bi in updWants) {
+          var want = updWants[bi];
+          var bag = { updated: 0 };
+          var mkTouch = function (w, bg) {
+            return function (entries) {
+              for (var j = 0; j < entries.length; j++) {
+                var src = todo[norm(titleOf(entries[j]))];
+                if (src && w[norm(titleOf(entries[j]))]) { touchEntry(entries[j], src); bg.updated++; }
+              }
+              return entries;
+            };
+          };
+          try {
+            if (typeof updateWorldbookWith === 'function') {
+              await updateWorldbookWith(names[+bi], mkTouch(want, bag), render);
+            } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+              await replaceWorldbook(names[+bi], mkTouch(want, bag)(booksCache[+bi] || []), render);
+            } else {
+              throw new Error('无世界书写入 API');
+            }
+            res.updated += bag.updated;
+          } catch (e) {
+            res.failed = res.failed.concat(Object.keys(want).map(function (n2) { return todo[n2].title; }));
+          }
+        }
+
+        // 4) 新建：专用创建 API 优先（缺省字段由酒馆补默认），否则往主书推半成品
+        if (creates.length) {
+          try {
+            if (typeof createWorldbookEntries === 'function') {
+              await createWorldbookEntries(names[0], creates.map(toTh), render);
+            } else if (typeof updateWorldbookWith === 'function') {
+              await updateWorldbookWith(names[0], function (entries) {
+                creates.forEach(function (s2) { entries.push(toTh(s2)); });
+                return entries;
+              }, render);
+            } else if (typeof getWorldbook === 'function' && typeof replaceWorldbook === 'function') {
+              var es = booksCache[0] || [];
+              creates.forEach(function (s2) { es.push(toTh(s2)); });
+              await replaceWorldbook(names[0], es, render);
+            } else {
+              throw new Error('无世界书写入 API');
+            }
+            res.created += creates.length;
+          } catch (e) {
+            res.failed = res.failed.concat(creates.map(function (c) { return c.title; }));
+          }
+        }
+        return res;
+      };
+    })(),
 
     imgUrl: function (file) {
       file = String(file || '').trim();

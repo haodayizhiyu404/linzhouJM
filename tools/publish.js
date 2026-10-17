@@ -149,7 +149,7 @@ for (const s of sources) {
     const title = String((e && (e.comment || e.name || e.title)) || '').trim();
     if (!title) continue;
     if (title.indexOf('::') !== -1) { excluded.push(title); continue; }   // 运行时/用户数据永不托管
-    byTitle.set(title, {
+    const ent = {
       title,
       content: String(e.content != null ? e.content : (e.text || '')),
       keys: Array.isArray(e.key) ? e.key : (Array.isArray(e.keys) ? e.keys : []),
@@ -159,7 +159,10 @@ for (const s of sources) {
       order: typeof e.order === 'number' ? e.order : 100,
       position: typeof e.position === 'number' ? e.position : 0,
       enabled: e.disable !== true && e.enabled !== false
-    });
+    };
+    if (typeof e.depth === 'number') ent.depth = e.depth;   // at_depth 条目需要
+    if (typeof e.role === 'number') ent.role = e.role;      // 0 system / 1 user / 2 assistant
+    byTitle.set(title, ent);
   }
 }
 const entries = [...byTitle.values()];

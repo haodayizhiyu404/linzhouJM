@@ -962,29 +962,39 @@ ctx.getWorldbook = async () => [
 
   // ── 设定同步（一期：世界书托管条目）──
   console.log('[同步]');
-  // 可写世界书 mock：一条已有关闭的托管条目 + 一条用户 :: 条目
+  // 可写世界书 mock（酒馆助手 WorldbookEntry 真实结构：name/enabled/strategy{}/position{order嵌套}）
   const syncStore = [
-    { comment: 'NPC（DLC·大学）', enabled: false, content: '旧版大学档案' },
-    { comment: '霖州蒋默::音色', enabled: true, content: '{"voices":{"沈锡元":"uuid-xsy-1"}}' },
+    { uid: 0, name: 'NPC（DLC·大学）', enabled: false, content: '旧版大学档案',
+      strategy: { type: 'vectorized', keys: [], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+      position: { type: 'after_character_definition', role: 'system', depth: 4, order: 151 } },
+    { uid: 1, name: '霖州蒋默::音色', enabled: true, content: '{"voices":{"沈锡元":"uuid-xsy-1"}}',
+      strategy: { type: 'selective', keys: ['音色'], keys_secondary: { logic: 'and_any', keys: [] }, scan_depth: 'same_as_global' },
+      position: { type: 'before_character_definition', role: 'system', depth: 4, order: 100 } },
   ];
   ctx.updateWorldbookWith = async (name, fn) => { fn(syncStore); };
   ctx.getWorldbook = async () => syncStore;
+  // 故意不提供 createWorldbookEntries：创建走 updateWorldbookWith 推送兜底，顺便覆盖这条路径
   eq('同步·semver比较', LW.Sync.semverLTE('1.9.0', '1.10.0') === true && LW.Sync.semverLTE('1.10.0', '1.9.0') === false && LW.Sync.semverLTE('1.1.0', '1.1.0') === true, true);
   const rBad = await LW.Sync.apply({ version: 9, minPlugin: '99.0.0', entries: [{ title: 'NPC（DLC·大学）', content: '不该写入' }] });
   eq('同步·门槛拒收', rBad.applied === false && syncStore[0].content === '旧版大学档案' && syncStore.length === 2, true);
   const rOk = await LW.Sync.apply({ version: 2, minPlugin: '1.0.0', entries: [
-    { title: 'NPC（DLC·大学）', content: '新版大学档案v2', keys: ['大学'] },
+    { title: 'NPC（DLC·大学）', content: '新版大学档案v2', keys: ['大学'], order: 155, position: 0, constant: true },
     { title: '霖州蒋默::音色', content: '{"voices":{}}' },   // 清单误带的运行时条目，必须被拒
-    { title: '新NPC条目', content: '全新内容', enabled: false },
+    { title: '新NPC条目', content: '全新内容', enabled: false, constant: true, keys: ['新'], order: 33, position: 1, depth: 2, role: 1 },
   ] });
   eq('同步·应用成功', rOk.applied === true && rOk.updated === 1 && rOk.created === 1, true);
   eq('同步·内容已更新', syncStore[0].content, '新版大学档案v2');
-  eq('同步·触发键已同步', JSON.stringify(syncStore[0].key || syncStore[0].keys), '["大学"]');
+  eq('同步·触发键已同步', JSON.stringify(syncStore[0].strategy.keys), '["大学"]');
+  eq('同步·顺序写入嵌套position.order', syncStore[0].position.order, 155);
+  eq('同步·位置数字转枚举', syncStore[0].position.type, 'before_character_definition');
+  eq('同步·向量化策略不被压平', syncStore[0].strategy.type, 'vectorized');
   eq('同步·enabled保留原值', syncStore[0].enabled, false);
   eq('同步·::条目不触碰', syncStore[1].content.indexOf('uuid-xsy-1') !== -1, true);
-  const neoEntry = syncStore.filter(e => (e.comment || '') === '新NPC条目')[0];
-  eq('同步·新条目已建且尊重enabled', !!neoEntry && neoEntry.content === '全新内容' && neoEntry.enabled === false && neoEntry.disable === true, true);
-  const verEntry = syncStore.filter(e => (e.comment || '') === '霖州蒋默::版本')[0];
+  const neoEntry = syncStore.filter(e => e.name === '新NPC条目')[0];
+  eq('同步·新条目用name标题且尊重enabled', !!neoEntry && neoEntry.content === '全新内容' && neoEntry.enabled === false, true);
+  eq('同步·新条目策略与顺序', !!neoEntry && neoEntry.strategy.type === 'constant' && JSON.stringify(neoEntry.strategy.keys) === '["新"]' && neoEntry.position.order === 33 && neoEntry.position.type === 'after_character_definition', true);
+  eq('同步·新条目深度与身份', !!neoEntry && neoEntry.position.depth === 2 && neoEntry.position.role === 'user', true);
+  const verEntry = syncStore.filter(e => e.name === '霖州蒋默::版本')[0];
   eq('同步·版本号落库且关闭', !!verEntry && verEntry.content === '2' && verEntry.enabled === false, true);
   const rSame = await LW.Sync.apply({ version: 2, entries: [] });
   eq('同步·同版本跳过', rSame.applied === false, true);
