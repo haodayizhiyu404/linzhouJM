@@ -13,9 +13,18 @@
 //
 // 选项：--detect（只诊断不写盘） / --version N / --minPlugin x.y.z / --from <目录>（换兜底扫描目录）
 // 测试用环境变量：LZJM_ROOTS（分号分隔，替代盘符根列表）
+//
+// 清单同时带「角色卡字段」（二期同步源）：从 data/<user>/characters/蒋默.png 内嵌 JSON 抠白名单字段
+// （开场白组/描述/性格/场景/示例对话/系统提示/后历史指令/作者名/创作者注释/版本号/标签 + 卡面正则），
+// 其他插件挂在 data.extensions 下的数据一律不抠。
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const zlib = require('zlib');
+
+const CARD_FIELDS = ['first_mes', 'alternate_greetings', 'description', 'personality', 'scenario',
+  'mes_example', 'system_prompt', 'post_history_instructions', 'creator', 'creator_notes',
+  'character_version', 'tags'];
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'content', 'manifest.json');
@@ -123,6 +132,52 @@ if (!sources.length && !src) {
     }
   }
 }
+// 从角色卡 PNG 抠内嵌 JSON（tEXt/zTXt 的 chara/ccv3 块，base64）
+function readCardPng(p) {
+  let buf;
+  try { buf = fs.readFileSync(p); } catch (e) { return null; }
+  if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504E47) return null;
+  let off = 8;
+  while (off + 8 <= buf.length) {
+    const len = buf.readUInt32BE(off);
+    const type = buf.toString('ascii', off + 4, off + 8);
+    const data = buf.slice(off + 8, off + 8 + len);
+    if (type === 'tEXt' || type === 'zTXt') {
+      const nul = data.indexOf(0);
+      const kw = data.toString('ascii', 0, nul);
+      if (kw === 'chara' || kw === 'ccv3') {
+        try {
+          const payload = type === 'tEXt' ? data.toString('latin1', nul + 1)
+            : zlib.inflateSync(data.slice(nul + 2)).toString('latin1');   // nul+1 是压缩方式字节
+          return JSON.parse(Buffer.from(payload.trim(), 'base64').toString('utf8'));
+        } catch (e) {}
+      }
+    }
+    off += 8 + len + 4;
+    if (type === 'IEND') break;
+  }
+  return null;
+}
+
+// 找角色卡 PNG：优先世界书母本的兄弟目录（data/<user>/worlds/x → data/<user>/characters/蒋默.png），
+// 其次扫酒馆数据目录
+function findCardPng() {
+  for (const s of sources) {
+    const guess = path.join(path.dirname(path.dirname(s.path)), 'characters', NAMEKEY + '.png');
+    if (fs.existsSync(guess)) return guess;
+  }
+  for (const r of stRoots()) {
+    const data = path.join(r, 'SillyTavern', 'data');
+    let users = [];
+    try { users = fs.readdirSync(data); } catch (e) { continue; }
+    for (const u of users) {
+      const guess = path.join(data, u, 'characters', NAMEKEY + '.png');
+      if (fs.existsSync(guess)) return guess;
+    }
+  }
+  return null;
+}
+
 if (!sources.length) {
   console.error('没找到本卡世界书：酒馆母本没扫到，下载夹里也没有文件名含「' + NAMEKEY + '」的导出。');
   console.error('可以：把世界书 JSON 直接拖到「发布设定.bat」上。');
@@ -167,6 +222,23 @@ for (const s of sources) {
 }
 const entries = [...byTitle.values()];
 
+// ── 角色卡字段（二期同步源）：白名单抠取，其他插件的 data.extensions 数据不碰 ──
+let card = null;
+const cardPng = findCardPng();
+if (cardPng) {
+  const cj = readCardPng(cardPng);
+  const d = (cj && (cj.data || cj)) || {};
+  const fields = {};
+  for (const f of CARD_FIELDS) { if (d[f] !== undefined) fields[f] = d[f]; }
+  card = { fields };
+  const rx = d.extensions && d.extensions.regex_scripts;
+  if (Array.isArray(rx) && rx.length) card.regex = rx;
+  console.log('角色卡（' + path.basename(cardPng) + '）：' + Object.keys(fields).length + ' 个字段' +
+    (card.regex ? ' + ' + card.regex.length + ' 条卡面正则' : '') + '，版本号 ' + (fields.character_version || '（空）'));
+} else {
+  console.log('未找到角色卡 PNG（' + NAMEKEY + '.png），本次清单不含角色卡字段');
+}
+
 let old = { version: 0, minPlugin: '1.1.0' };
 try { old = JSON.parse(fs.readFileSync(OUT, 'utf8')); } catch (e) {}
 const version = opt('--version') ? parseInt(opt('--version'), 10) : (old.version || 0) + 1;
@@ -174,7 +246,9 @@ const minPlugin = opt('--minPlugin') || old.minPlugin || '1.1.0';
 if (!Number.isInteger(version) || version < 0) { console.error('version 必须是非负整数'); process.exit(1); }
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-fs.writeFileSync(OUT, JSON.stringify({ version, minPlugin, entries }, null, 2) + '\n', 'utf8');
+const manifest = { version, minPlugin, entries };
+if (card) manifest.card = card;
+fs.writeFileSync(OUT, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 console.log('manifest v' + version + '（minPlugin ' + minPlugin + '）：托管 ' + entries.length + ' 条，排除 ' + excluded.length + ' 条 :: 条目');
 if (excluded.length) console.log('  排除：' + excluded.join('、'));
 

@@ -2408,7 +2408,7 @@
   };
 
   window.LZJM = window.LZJM || {};
-  window.LZJM.VERSION = '1.1.0';   // 插件版本：同步清单的 minPlugin 与它比较
+  window.LZJM.VERSION = '1.2.0';   // 插件版本：同步清单的 minPlugin 与它比较（1.2.0 起支持角色卡字段同步）
   window.LZJM.Engine = Engine;
 
   // 启动
