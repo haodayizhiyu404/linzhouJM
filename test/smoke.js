@@ -1072,6 +1072,9 @@ ctx.getWorldbook = async () => [
   eq('重试·输入中状态', wsrc.indexOf('对方正在输入中') !== -1 && wsrc.indexOf('立即渲染') !== -1, true);
   // generate 的终态渲染必须在 busy=false 之后（否则 busy 优先于 failed，「输入中」被钉死在消息末尾）
   eq('重试·终态渲染先清busy', /this\.busy = false;[\s\S]{0,400}?this\.screen !== 'chat' \|\| this\.chatKey === key\) this\.render\(\);/.test(wsrc), true);
+  // 主题斜体污染：嘎嘎灰/棉花糖等主题给裸 i/em 套气泡底色，特异性碾压 CSS——结构性小元素禁用 i 标签
+  eq('状态栏·信号格用span免疫主题', wsrc.indexOf('lzjm-sig"><span></span>') !== -1 && wsrc.indexOf('.lzjm-sig i{') === -1 && wsrc.indexOf('.lzjm-sig span{') !== -1, true);
+  eq('通话记录·meta不用i标签', wsrc.indexOf('.lzjm-chist-main i{') === -1 && wsrc.indexOf('<span class="chm">') !== -1, true);
   eq('通话重试双模式', wsrc.indexOf('↻ 充当重试') !== -1 && wsrc.indexOf('var regen = async function') !== -1, true);
   eq('朋友圈·NPC动态评论上限8', psrc.indexOf('每条动态至多 8 条') !== -1, true);
   eq('朋友圈·接话虚构与热度', psrc.indexOf('生成 0~8 条接话评论') !== -1 && psrc.indexOf('别硬拉不熟的人互评') !== -1, true);
