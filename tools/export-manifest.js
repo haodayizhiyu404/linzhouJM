@@ -1,24 +1,62 @@
 // tools/export-manifest.js —— 酒馆世界书导出 JSON → content/manifest.json（设定同步清单）
 //
-// 用法：node tools/export-manifest.js <世界书导出.json> [--version N] [--minPlugin x.y.z]
-//   version   缺省 = 旧清单 version + 1
-//   minPlugin 缺省 = 沿用旧清单（没有则当前引擎版本 1.1.0）
+// 用法（一般不用手动跑，双击仓库根的「发布设定.bat」即可）：
+//   node tools/export-manifest.js                  ← 自动在「下载」里找最新的本卡世界书导出
+//   node tools/export-manifest.js <文件路径>        ← 指定导出文件（拖文件到 bat 上等价于此）
+//   node tools/export-manifest.js --from <目录>     ← 换扫描目录
+//   选项：--version N（缺省旧清单+1） / --minPlugin x.y.z（缺省沿用旧清单）
 //
+// 识别口径：JSON 文本含「霖州蒋默」标记 + 有世界书条目结构；多个命中取修改时间最新，
+// 文件名带不带 (1)(2) 后缀无所谓——不认文件名，认内容。
 // 标题含「::」的条目（音色/版本等运行时与用户数据）自动排除，永不进清单。
-// 工作流：在酒馆里改完世界书 → 导出 JSON → 跑本脚本 → git 推 main → 用户下次开卡自动同步。
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'content', 'manifest.json');
+const SIGN = '霖州蒋默';
 
 const args = process.argv.slice(2);
-const src = args[0];
-if (!src) {
-  console.error('用法：node tools/export-manifest.js <世界书导出.json> [--version N] [--minPlugin x.y.z]');
-  process.exit(1);
-}
 function opt(name) { const i = args.indexOf(name); return i !== -1 ? args[i + 1] : null; }
+let src = null;
+for (let i = 0; i < args.length; i++) {
+  if (args[i].startsWith('--')) { i++; continue; }
+  if (!src) src = args[i];
+}
+
+// 在目录里找本卡世界书导出：含签名标记 + 有条目结构，按修改时间从新到旧
+function findExports(dir) {
+  const cands = [];
+  let files = [];
+  try { files = fs.readdirSync(dir); } catch (e) { return cands; }
+  for (const f of files) {
+    if (!/\.json$/i.test(f)) continue;
+    const p = path.join(dir, f);
+    let txt;
+    try { txt = fs.readFileSync(p, 'utf8'); } catch (e) { continue; }
+    if (txt.indexOf(SIGN) === -1) continue;
+    if (!/"entries"\s*:/.test(txt) && !/"content"\s*:/.test(txt)) continue;
+    try { cands.push({ path: p, mtime: fs.statSync(p).mtimeMs }); } catch (e) {}
+  }
+  cands.sort((a, b) => b.mtime - a.mtime);
+  return cands;
+}
+
+if (!src) {
+  const dir = opt('--from') || path.join(os.homedir(), 'Downloads');
+  const cands = findExports(dir);
+  if (!cands.length) {
+    console.error('在「' + dir + '」没找到含「' + SIGN + '」标记的世界书导出 JSON。');
+    console.error('可以：把导出的 JSON 直接拖到「发布设定.bat」上，或用 --from 指定目录。');
+    process.exit(1);
+  }
+  src = cands[0].path;
+  console.log('自动选中最新导出：' + path.basename(src) + '（' + new Date(cands[0].mtime).toLocaleString() + '）');
+  if (cands.length > 1) {
+    console.log('  其余候选（未选）：' + cands.slice(1, 4).map(c => path.basename(c.path)).join('、') + (cands.length > 4 ? ' …共' + cands.length + '个' : ''));
+  }
+}
 
 const raw = JSON.parse(fs.readFileSync(src, 'utf8'));
 let list = [];
@@ -56,3 +94,4 @@ fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify({ version, minPlugin, entries }, null, 2) + '\n', 'utf8');
 console.log('manifest v' + version + '（minPlugin ' + minPlugin + '）：托管 ' + entries.length + ' 条，排除 ' + excluded.length + ' 条 :: 条目');
 if (excluded.length) console.log('  排除：' + excluded.join('、'));
+console.log('→ 下一步：喊 Claude「发设定」把清单推上 main（或自行提交 content/manifest.json）');

@@ -998,6 +998,8 @@ ctx.getWorldbook = async () => [
   eq('同步·装载器暴露ref与branch', lsrc.indexOf('window[NS].ref = ref') !== -1 && lsrc.indexOf('window[NS].branch = BRANCH') !== -1, true);
   eq('同步·构建挂载sync.js', bsrc.indexOf("'src/sync.js'") !== -1, true);
   eq('同步·导出工具排除::条目', xsrc.indexOf("indexOf('::')") !== -1, true);
+  eq('同步·导出工具自动识别下载目录', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
+  eq('同步·发布bat在位', fs.existsSync(path.join(ROOT, '发布设定.bat')), true);
   eq('同步·拉取链同装载器源系', ssrc.indexOf('raw.githubusercontent.com') !== -1 && ssrc.indexOf('fastly.jsdelivr.net') !== -1 && ssrc.indexOf('content/manifest.json') !== -1, true);
   eq('同步·失败静默不抛', ssrc.indexOf('全程失败静默') !== -1, true);
   eq('音色app图标·用户声波SVG', wsrc.indexOf('M550.4 113.777778') !== -1, true);
