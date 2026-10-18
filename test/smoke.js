@@ -1019,6 +1019,26 @@ ctx.getWorldbook = async () => [
   const voiceRe = syncStore.filter(e => e.name === '霖州蒋默::音色')[0];
   eq('音色·缺失时新建一条', !!voiceRe && syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1, true);
   eq('音色·新建即禁用态', !!voiceRe && voiceRe.enabled === false, true);
+  // defaults 段：:: 条目 0→1 接生。只验「有/无」——已存在的（哪怕被关被改）一字不动
+  voiceRe.content = '用户自改音色';   // 模拟用户改过内容
+  const rBirth = await LW.Sync.apply({ version: 4, entries: [], defaults: [
+    { title: '霖州蒋默::音色', content: '{"voices":{"蒋默":"uuid-def"}}', enabled: false },   // 已存在 → 不动
+    { title: '霖州蒋默::NSFW', content: '默认亲密指引', enabled: false },                      // 缺失 → 接生
+    { title: '霖州蒋默::通讯录', content: '{}', enabled: false },                              // 缺失 → 接生
+    { title: '混进来的普通条目', content: '不该被建', enabled: false },                        // 非 :: → 拒收
+  ] });
+  eq('接生·缺失条目补建两条', rBirth.births === 2 && rBirth.applied === true, true);
+  const nsfwE = syncStore.filter(e => e.name === '霖州蒋默::NSFW')[0];
+  const rosterE = syncStore.filter(e => e.name === '霖州蒋默::通讯录')[0];
+  eq('接生·建出来即禁用且内容照清单', !!nsfwE && nsfwE.enabled === false && nsfwE.content === '默认亲密指引' && !!rosterE && rosterE.enabled === false && rosterE.content === '{}', true);
+  eq('接生·已存在的一字不动（用户改动不被覆盖）', syncStore.filter(e => e.name === '霖州蒋默::音色').length === 1 && voiceRe.content === '用户自改音色', true);
+  eq('接生·非::标题混进defaults拒收', syncStore.filter(e => e.name === '混进来的普通条目').length === 0, true);
+  const rBirth2 = await LW.Sync.apply({ version: 4, entries: [], defaults: [
+    { title: '霖州蒋默::音色', content: '{"voices":{"蒋默":"uuid-def"}}', enabled: false },
+    { title: '霖州蒋默::NSFW', content: '默认亲密指引', enabled: false },
+    { title: '霖州蒋默::通讯录', content: '{}', enabled: false },
+  ] });
+  eq('接生·全都存在则静默不误报', rBirth2.births === 0 && rBirth2.applied === false, true);
   eq('同步·引擎版本号在位', typeof LW.VERSION === 'string' && /^\d+\.\d+\.\d+$/.test(LW.VERSION), true);
   const lsrc = fs.readFileSync(path.join(ROOT, 'loader/lzjm-loader.js'), 'utf8');
   const bsrc = fs.readFileSync(path.join(ROOT, 'build/build.js'), 'utf8');
@@ -1026,7 +1046,8 @@ ctx.getWorldbook = async () => [
   const ssrc = fs.readFileSync(path.join(ROOT, 'src/sync.js'), 'utf8');
   eq('同步·装载器暴露ref与branch', lsrc.indexOf('window[NS].ref = ref') !== -1 && lsrc.indexOf('window[NS].branch = BRANCH') !== -1, true);
   eq('同步·构建挂载sync.js', bsrc.indexOf("'src/sync.js'") !== -1, true);
-  eq('同步·导出工具排除::条目', xsrc.indexOf("indexOf('::')") !== -1, true);
+  eq('同步·导出工具::条目进defaults接生段', xsrc.indexOf('byDef') !== -1 && xsrc.indexOf('manifest.defaults = defaults') !== -1 && xsrc.indexOf('MARK_VERSION') !== -1, true);
+  eq('同步·发布差异报告而非堆列表', xsrc.indexOf('本次更新（对照') !== -1 && xsrc.indexOf('diffEntries') !== -1 && xsrc.indexOf('FIELD_LABEL') !== -1 && xsrc.indexOf('只是不再托管') !== -1, true);
   eq('同步·发布直读酒馆母本', xsrc.indexOf("SillyTavern', 'data'") !== -1 && xsrc.indexOf('worlds') !== -1 && xsrc.indexOf('st-world.local.txt') !== -1, true);
   eq('同步·发布精确名优先防同名片', xsrc.indexOf('EXACT') !== -1 && xsrc.indexOf("SIGN = '霖州蒋默'") !== -1, true);
   eq('同步·发布保留下载夹兜底', xsrc.indexOf('Downloads') !== -1 && xsrc.indexOf('findExports') !== -1, true);

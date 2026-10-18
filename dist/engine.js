@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════
 //  霖州蒋默 · 数字世界引擎（构建产物，勿手改）
 //  源码见 src/ · 构建：node build/build.js
-//  构建时间（本地）：2026-10-18 02:53
+//  构建时间（本地）：2026-10-19 04:24
 // ═══════════════════════════════════════════════════════════
-var __LZJM_BUILD__ = '2026-10-18 02:53';
+var __LZJM_BUILD__ = '2026-10-19 04:24';
 try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } catch (e) {}
 
 // ── src/store.js ──
@@ -2635,7 +2635,8 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 // （版本号只是诊断记录：用户删改了条目无需等新版本，下次打开即复原）。
 //   · 世界书：已存在条目更新 内容/触发键/策略/顺序；【enabled 不动】——开关是运行时状态，归用户与引擎
 //   · 角色卡：白名单字段静默覆盖（开场白整组）
-//   · 标题含「::」的条目（音色/版本/通讯录等用户与运行时数据）一律拒收，清单误带也不收
+//   · 标题含「::」的条目（音色/版本/通讯录等用户与运行时数据）一律不进托管 entries，清单误带也不收；
+//     清单 defaults 段的 :: 条目只做「整条缺失」接生——存在（哪怕被关被改）即一字不动，内容永不同步
 // 主权哲学「作者赢」两端一致：设定以作者发布为准；用户空间（自建条目/::条目/其他插件 data）永不触碰。
 // 用户出口：设置屏「角色卡自动更新」可关（整张卡静态，世界书也不更新）；「立刻检查更新」手动兜底，
 // 关闭状态下也能强制对齐最新版。
@@ -2706,7 +2707,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
 
   // 应用清单（拉取之外的全部逻辑，测试直调这里）。差异驱动：逐条目比对，有差异才写——
   // 不看清单版本号（用户删改了条目无需等新版本，下次打开即复原）。
-  // 返回 {applied, updated, created, from, to} 或 {applied:false, reason}。
+  // 返回 {applied, updated, created, births, from, to} 或 {applied:false, reason}。
   async function apply(mf) {
     var W = window.LZJM;
     if (!semverLTE(mf.minPlugin || '0.0.0', W.VERSION)) {
@@ -2720,13 +2721,39 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
       return { applied: false, reason: '部分条目写入失败：' + res.failed.join('、') + '（下次打开重试）' };
     }
 
+    // defaults 段：:: 条目的 0→1 接生。只验「有/无」——整条缺失才按清单默认版补建
+    // （建出来即禁用，与母本一致；读取不依赖勾选）。已存在的一字不动：
+    // 被关闭/被改内容都是用户主权，同步永不托管 :: 内容。非 :: 标题混进 defaults 拒收。
+    var births = 0;
+    if (Array.isArray(mf.defaults) && mf.defaults.length) {
+      var missing = [];
+      for (var i = 0; i < mf.defaults.length; i++) {
+        var d = mf.defaults[i];
+        if (!d || !d.title || String(d.title).indexOf('::') === -1) continue;
+        var exist = await W.Worldbook.getEntry(d.title);
+        if (!exist) missing.push(d);
+      }
+      if (missing.length) {
+        var bres = await W.Worldbook.upsertManaged(missing.map(function (d) {
+          var e = {};
+          for (var k in d) { if (Object.prototype.hasOwnProperty.call(d, k)) e[k] = d[k]; }
+          e.enabled = false;   // 接生即禁用态，与母本全部 :: 条目一致
+          return e;
+        }));
+        if (bres.failed.length) {
+          return { applied: false, reason: '接生条目写入失败：' + bres.failed.join('、') + '（下次打开重试）' };
+        }
+        births = bres.created;
+      }
+    }
+
     // 版本号标记退化为纯诊断：记录「本地见过的最新清单版本」，不再是触发开关
     var cur = await W.Worldbook.getEntry(MARK_VERSION);
     var local = cur ? (parseInt(cur.content, 10) || 0) : 0;
     if (mf.version > local) {
       await W.Worldbook.upsertManaged([{ title: MARK_VERSION, content: String(mf.version), enabled: false }]);
     }
-    return { applied: (res.updated + res.created) > 0, updated: res.updated, created: res.created, from: local, to: mf.version };
+    return { applied: (res.updated + res.created + births) > 0, updated: res.updated, created: res.created, births: births, from: local, to: mf.version };
   }
 
   // ─────────────────────────────────────────────
@@ -2968,7 +2995,13 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
         // 统一报告：两端差异驱动，任何一处有实际变化 → 一条常驻 toast 说完，点一下即关（不自动消失）；
         // 全无变化 → 自动模式完全静默；手动模式报「已是最新」给用户一个交代
         var parts = [];
-        if (r.applied) parts.push('更新' + r.updated + '条' + (r.created ? '·新增' + r.created + '条' : '') + '设定');
+        if (r.applied) {
+          var w = [];
+          if (r.updated) w.push('更新' + r.updated + '条');
+          if (r.created) w.push('新增' + r.created + '条');
+          if (r.births) w.push('补齐' + r.births + '条缺失');
+          parts.push(w.join('·') + '设定');
+        }
         if (cr && cr.applied) parts.push('更新 ' + cr.labels.join('、'));
         if (parts.length) {
           var msg = '设定已同步：' + parts.join('；');
@@ -8484,7 +8517,7 @@ try { console.log('[霖州引擎] 构建 ' + __LZJM_BUILD__ + ' · 启动'); } c
   };
 
   window.LZJM = window.LZJM || {};
-  window.LZJM.VERSION = '1.2.0';   // 插件版本：同步清单的 minPlugin 与它比较（1.2.0 起支持角色卡字段同步）
+  window.LZJM.VERSION = '1.3.0';   // 插件版本：同步清单的 minPlugin 与它比较（1.2.0 起支持角色卡字段同步；1.3.0 起支持 defaults 段 :: 条目缺失接生）
   window.LZJM.Engine = Engine;
 
   // 启动
