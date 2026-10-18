@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "minPlugin": "1.1.0",
   "entries": [
     {
@@ -12,8 +12,7 @@
       "order": 150,
       "position": 1,
       "enabled": true,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "状态栏",
@@ -38,8 +37,7 @@
       "order": 200,
       "position": 0,
       "enabled": true,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "NPC",
@@ -51,8 +49,7 @@
       "order": 151,
       "position": 1,
       "enabled": true,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "高中·错位的资助",
@@ -65,9 +62,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": false,
-      "depth": 4,
-      "role": 0
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "高中·新城的月亮",
@@ -81,8 +77,7 @@
       "order": 170,
       "position": 1,
       "enabled": false,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "高中·泥潭与飞鸟",
@@ -96,8 +91,7 @@
       "order": 170,
       "position": 1,
       "enabled": false,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "DLC·大学",
@@ -108,9 +102,8 @@
       "selective": false,
       "order": 160,
       "position": 1,
-      "enabled": true,
-      "depth": 4,
-      "role": 0
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "大学·契约之下",
@@ -123,9 +116,8 @@
       "selective": true,
       "order": 170,
       "position": 1,
-      "enabled": true,
-      "depth": 4,
-      "role": 0
+      "enabled": false,
+      "depth": 4
     },
     {
       "title": "DLC·成人",
@@ -137,8 +129,7 @@
       "order": 160,
       "position": 1,
       "enabled": false,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "DLC·高中",
@@ -149,9 +140,8 @@
       "selective": false,
       "order": 160,
       "position": 1,
-      "enabled": false,
-      "depth": 4,
-      "role": 0
+      "enabled": true,
+      "depth": 4
     },
     {
       "title": "高中·共生的藤蔓",
@@ -165,8 +155,7 @@
       "order": 170,
       "position": 1,
       "enabled": false,
-      "depth": 4,
-      "role": 0
+      "depth": 4
     },
     {
       "title": "叙事指导",
@@ -193,6 +182,92 @@
       "order": 102,
       "position": 4,
       "enabled": true,
+      "depth": 0,
+      "role": 0
+    }
+  ],
+  "defaults": [
+    {
+      "title": "霖州蒋默::通讯录",
+      "content": "{\n  \"DLC·高中\": {\n    \"contacts\": [\n      {\n        \"name\": \"蒋默\",\n        \"avatar\": \"yv5y4t.jpg\",\n        \"cover\": \"zcitv9.jpg\"\n      },\n      {\n        \"name\": \"沈锡元\",\n        \"avatar\": \"jnjhio.png\",\n        \"cover\": \"318naq.jpeg\"\n      },\n      {\n        \"name\": \"陈越\",\n        \"avatar\": \"zi5mod.jpg\",\n        \"cover\": \"c76vgi.jpg\"\n      }\n    ],\n    \"groups\": [],\n    \"moments\": {\n      \"cover\": \"s3zl79.jpg\"\n    }\n  },\n  \"DLC·大学\": {\n    \"contacts\": [\n      {\n        \"name\": \"蒋默\",\n        \"avatar\": \"yv5y4t.jpg\",\n        \"cover\": \"zcitv9.jpg\"\n      },\n      {\n        \"name\": \"沈锡元\",\n        \"avatar\": \"jnjhio.png\",\n        \"cover\": \"318naq.jpeg\"\n      },\n      {\n        \"name\": \"陈越\",\n        \"avatar\": \"zi5mod.jpg\",\n        \"cover\": \"c76vgi.jpg\"\n      },\n      {\n        \"name\": \"姚彬\",\n        \"avatar\": \"4dt4ab.jpg\",\n        \"cover\": \"bx4b4h.png\"\n      },\n      {\n        \"name\": \"梁颂\",\n        \"avatar\": \"pl69vx.jpg\",\n        \"cover\": \"jyj3nl.jpg\"\n      }\n    ],\n    \"groups\": [\n      {\n        \"name\": \"青苗计划专项基金\",\n        \"avatar\": \"3183k5.jpg\",\n        \"open\": false,\n        \"style\": \"三人群，话题大多关于蒋默的专项资助与突发事宜，比较公事公办。\",\n        \"members\": [\n          \"蒋默\",\n          \"梁颂\"\n        ]\n      }\n    ],\n    \"moments\": {\n      \"cover\": \"s3zl79.jpg\"\n    }\n  },\n  \"DLC·成人\": {\n    \"contacts\": [\n      {\n        \"name\": \"蒋默\",\n        \"avatar\": \"yv5y4t.jpg\",\n        \"cover\": \"zcitv9.jpg\"\n      },\n      {\n        \"name\": \"沈锡元\",\n        \"avatar\": \"jnjhio.png\",\n        \"cover\": \"318naq.jpeg\"\n      },\n      {\n        \"name\": \"陈越\",\n        \"avatar\": \"zi5mod.jpg\",\n        \"cover\": \"c76vgi.jpg\"\n      },\n      {\n        \"name\": \"白应深\",\n        \"avatar\": \"s7zfqr.jpg\",\n        \"cover\": \"oigf0i.jpg\"\n      }\n    ],\n    \"groups\": [],\n    \"moments\": {\n      \"cover\": \"s3zl79.jpg\"\n    }\n  }\n}",
+      "keys": [],
+      "keysSecondary": [],
+      "constant": false,
+      "selective": true,
+      "order": 100,
+      "position": 4,
+      "enabled": false,
+      "depth": 0,
+      "role": 0
+    },
+    {
+      "title": "霖州蒋默::表情包",
+      "content": "{\n  \"偷看\": \"s9v34y.jpeg\",\n  \"你好呀\": \"sm67i1.jpeg\",\n  \"摆烂\": \"z4tnmw.jpeg\",\n  \"不爽\": \"s38nln.jpeg\",\n  \"不行\": \"1hapz4.gif\",\n  \"可怜兮兮\": \"7d82g1.jpg\",\n  \"你爹来咯\": \"hppo99.jpg\",\n  \"无语\": \"ok9xm5.gif\",\n  \"别不识好歹\": \"gum33t.jpg\",\n  \"回老子消息\": \"gy1hs6.gif\",\n  \"不找我是害羞？\": \"5xt73w.jpeg\",\n  \"小子有种报段位\": \"1n2kps.gif\",\n  \"【委屈】垮起个小猫批脸\": \"aaz2qw.jpg\",\n  \"蛙蛙哭泣\": \"81la40.gif\",\n  \"妈的\": \"w26osr.jpeg\",\n  \"你他妈的\": \"ilyo3o.jpeg\",\n  \"杰瑞生气叉腰\": \"fnjbj6.gif\",\n  \"你很牛吗\": \"usg5yj.jpeg\",\n  \"让姐品品这什么货色\": \"7kaqyx.gif\",\n  \"赔偿我精神损失费\": \"kxowcj.jpeg\",\n  \"杀了你\": \"93cwle.jpeg\",\n  \"算了\": \"b9uzio.jpeg\",\n  \"所以呢\": \"g0vvp4.jpeg\",\n  \"亲亲\": \"ghjaxl.gif\",\n  \"听不懂想亲嘴\": \"2b8fj2.jpeg\",\n  \"做姐姐的舔狗\": \"y7nrxm.gif\",\n  \"跟我约会\": \"pcgy43.jpg\",\n  \"老公抱抱\": \"u6tph8.gif\",\n  \"想老婆了\": \"zh2plc.gif\",\n  \"你不爱我了\": \"6ekg1y.gif\",\n  \"恋爱脑清醒清醒\": \"wun9dh.gif\",\n  \"我疯了\": \"a1oiuu.jpeg\",\n  \"有品位\": \"rvak3o.jpeg\",\n  \"猪头问号\": \"bshhsw.jpeg\",\n  \"满屏问号\": \"frtizf.gif\",\n  \"杰瑞生气问号\": \"64jb35.jpg\",\n  \"猫咪问号\": \"75cjiq.gif\",\n  \"开始摆烂\": \"5pcxo1.jpeg\",\n  \"躺平别卷了\": \"f043ww.gif\",\n  \"卷死你们\": \"1jazgl.gif\",\n  \"卷起来了\": \"18dxxh.gif\",\n  \"来不及了快快学习\": \"cgtdb5.gif\",\n  \"没脸见人了\": \"hh1qcp.gif\",\n  \"磕头\": \"596zav.jpeg\",\n  \"哦嚯\": \"ns4c7w.gif\",\n  \"瞪大眼睛\": \"5a8su3.gif\",\n  \"来了\": \"dcooze.gif\",\n  \"死了\": \"h97356.gif\",\n  \"已老实\": \"gza0yc.gif\",\n  \"急急急\": \"ssm222.gif\",\n  \"那我走\": \"5anbfb.gif\",\n  \"好热啊\": \"7lcgld.jpg\",\n  \"太有实力了\": \"kujto0.gif\",\n  \"竖起耳朵听\": \"m8b5lo.jpeg\",\n  \"看戏吃瓜\": \"cr6ydz.gif\",\n  \"姐妹有八卦吗\": \"t75i48.gif\",\n  \"假装没在听八卦\": \"lanin5.gif\",\n  \"说八卦请大点声\": \"9ixmip.gif\",\n  \"有什么八卦让我听听\": \"y7n0js.jpeg\",\n  \"乡下人的目光\": \"2d88v1.jpeg\",\n  \"吃瓜群众已就位\": \"rxgo8j.gif\",\n  \"睡了拜拜\": \"eufams.gif\",\n  \"有一丁点害羞\": \"sto3ob.gif\",\n  \"撸袖子冲\": \"igsolv.jpeg\",\n  \"拜托拜托\": \"yns5x8.jpg\",\n  \"我要当废物\": \"ypphrr.jpeg\",\n  \"我投降\": \"uaseh3.jpeg\",\n  \"等我有钱了\": \"3pie3n.png\",\n  \"滑跪道歉\": \"aw00em.jpeg\",\n  \"大脑宕机\": \"3se803.jpg\",\n  \"我不困还能熬\": \"h5m8j7.jpg\",\n  \"爱会消失对吗\": \"lk8n16.jpg\",\n  \"去你妈的\": \"l9nhdn.jpg\",\n  \"急了\": \"90pzin.jpg\",\n  \"比心\": \"a1yiwu.jpg\",\n  \"我找人弄你\": \"k4ajm6.jpg\",\n  \"啊啊啊\": \"6pl15d.jpg\",\n  \"我同意\": \"q460aj.jpg\",\n  \"女人收下我的花\": \"83h0fs.jpg\",\n  \"没钱了\": \"8iuu2j.jpg\",\n  \"老实巴交\": \"g7nrx8.jpg\",\n  \"绝不认输\": \"rpq2pe.jpg\",\n  \"我铲死你\": \"cilgy5.jpg\",\n  \"【可爱小狗】我来咯\": \"cjq0ng.jpeg\",\n  \"【可爱】好的呀\": \"8iixex.gif\",\n  \"【可爱】大笑\": \"b7ib9u.gif\",\n  \"【可爱】道歉\": \"dwvb5k.gif\",\n  \"【可爱】给你我的心\": \"ouvm3g.gif\",\n  \"【可爱】呐\": \"9j1gia.gif\",\n  \"【可爱】嗯嗯\": \"92ffxx.gif\",\n  \"【可爱】生气\": \"hwznad.gif\",\n  \"【可爱】委屈\": \"kdlm6b.gif\",\n  \"【可爱】谢谢\": \"o3caur.gif\",\n  \"【可爱】心碎\": \"rhawk1.gif\",\n  \"【可爱】兴奋\": \"fcw3mi.gif\",\n  \"【可爱】爱你\": \"lv4svp.jpeg\",\n  \"【可爱】鞠躬\": \"p8wg65.gif\",\n  \"【可爱】哇喔\": \"snpmwq.gif\",\n  \"【可爱】阴影\": \"5cjkx3.gif\",\n  \"【可爱】震惊\": \"d6rmkp.gif\",\n  \"暗中观察\": \"my92nd.gif\",\n  \"翻滚\": \"55p5hs.gif\"\n}",
+      "keys": [],
+      "keysSecondary": [],
+      "constant": false,
+      "selective": true,
+      "order": 100,
+      "position": 4,
+      "enabled": false,
+      "depth": 0,
+      "role": 0
+    },
+    {
+      "title": "霖州蒋默::主动发消息",
+      "content": "[NPC主动发送手机消息规则]\n\n正文中NPC（绝对不包含{{user}}本人）可主动通过手机联系{{user}}。默认不发——多数生成里没有消息才是常态。以下判断链全部通过才可输出消息块：\n\n一、场景闸（铁律，无条件）\n若{{user}}处于亲密/私密/高张力场景（从状态栏的着装、姿态、位置判断）：\n  仅\"生死病危\"级别可发，其余一律忍住，等场景自然结束后再补。\nNPC有自己的分寸，不该撞破的事不撞破。\n\n二、动机分级（随关系阶段浮动，参照状态栏关系总览）\n消息必须是这个人在这段关系里\"此刻会发的\"：\n- 亲密关系（恋人/死党/家人）：琐事可发。分享日常本身就是亲密的体现——恋人分享喜悦、死党发废话和表情包、家人问吃了吗。但琐碎也要有这个人自己的味道，不写无信息量的寒暄，不要事事汇报。\n- 暧昧/试探期：瞎聊是常态，每条带一点试探或靠近，不是纯灌水。进度由状态栏关系阶段锚定，表达不得越阶段。\n- 有距离的关系（合作伙伴、分手的恋人、不熟的同学）：琐事突兀，只发强动机——紧急求助、突发意外、约定节点已到、失控时刻（醉酒/崩溃）。\n拿不准时想一个问题：这个人敢不敢、该不该给{{user}}发这条？不敢，就别发。\n\n三、节奏闸（铁律）\n- 上一条主动消息{{user}}还没回 → 不准发新的（连环催促不符合任何正常人），除非过了很久，但这种往往可以通过线下剧情当面质问\n- 同一NPC，一段连续剧情里主动来消息至多一次\n- 5轮正文内最多只触发一次该规则，不要信息轰炸\n- 正文写到关键张力处（告白/对峙/亲密）→ 天大的事先憋着\n\n\n输出遵循以下格式：\n\n<!--phone\n{角色名}：{内容}\n{角色名}：{内容}\n-->\n\n内容规则：\n1. 遵循人物性格设定：沉稳的人不会频繁催促，敏感的人不会大胆试探——除非特殊情况或人设已演变。发的消息要像这个人在那个时刻会发的，不像编剧想让他发的。\n2. 消息类型：\n- 普通文字，无特殊格式\n- [语音:说的话]\n- [图片:画面描述]\n- [戳一戳]\n- [定位:地点名]\n- [撤回] 单独成行：撤回刚发的上一条（打错字、冲动后悔，罕用）\n3. 每条≤35字，一次至多3条，禁止开场寒暄。\n\n---",
+      "keys": [],
+      "keysSecondary": [],
+      "constant": true,
+      "selective": false,
+      "order": 110,
+      "position": 4,
+      "enabled": false,
+      "depth": 0,
+      "role": 0
+    },
+    {
+      "title": "霖州蒋默::NSFW",
+      "content": "[亲密场合叙事风格指引]\n当故事步入私密、暧昧、亲密的场景时，需遵循以下指导，来确保一切描写富有文学性的美感。\n\n1.措辞直白\n- 使用准确的生理词汇：阴茎、阴道、阴蒂、乳头、精液、爱液、龟头等。用词可以粗俗、粗糙——取决于不同人物性格和口癖，采纳不同等级用词。禁止用\"肉刃\"\"硬物\"\"花蕊\"等代称遮掩。直白不等于粗俗，坦诚地描写器官的形态、颜色、状态（如龟头充血、阴蒂勃起、阴道口收缩），比遮遮掩掩更有张力。\n- 不厌其烦地调用这些词汇。当手指进入时，写\"手指插入阴道\"，不要写\"探入那片湿润\"；当射精时，写\"精液射入子宫\"，不要写\"释放出来\"。让生理名词在文本中显性存在。\n\n2.爱意打底\n欲望不是悬空的，它长在感情里。即使是最激烈的场景，底层也应该有情感在流动——占有欲、依赖、心疼、不舍、信任。但记住：用身体反应来承载情感，而非用内心独白解释情感。\n\n3.前戏与铺垫\n不要跳过前戏直奔插入。裸体的刻画、手指的探入与搅弄、唇舌沿着身体的游走、啃咬锁骨和大腿内侧——这些本身就是最有张力的部分。当手指进入阴道，描写指节弯曲勾搔阴道壁的触感；当阴茎插入，描写龟头撑开阴唇、刮过阴道褶皱的具体感受。节奏从慢到快，不要永远\"停在那里等\"。\n\n4.感官刻画\n调动全部感官：手指陷入皮肤的触感、舌尖尝到的咸味、耳边湿热的喘息、身体相撞的声响、爱液黏稠的质地、精液滑腻的温度。不要只靠视觉和对话推进，让身体的每一寸都参与叙事。\n\n5.生理反应\n真实地描写身体在亲密中的反应：阴道的收缩与痉挛、阴茎的跳动与硬度变化、呼吸节奏的改变、瞳孔的涣散、不自觉的声音（呻吟或呜咽）、高潮时肌肉的抽搐。这些细节比任何对话都更诚实。高潮不是终点，事后的余韵、脱力、黏腻的体液混在一起、不想分开的拥抱同样值得书写。\n\n6.情欲语言\n不同角色在性爱中的语言风格是不同的。有些人沉默寡言，有些人碎嘴、散漫，有些人会调情——但调情是有来有回的逗弄，不是单方面宣示。突出不同人的性格本色，而不是一味的套用廉价男性色情模板。\n例如蒋默：\n- 话极少，情动时更短——失控边缘才漏出的低哑短句，字越少越真。\n- 占有欲全走动作与沉默：扣紧的手、压低的呼吸、不肯移开的视线。他不说\"你是我的\"，只会把人按得更近。\n- 他的情欲底色是禁忌与自尊的错位：羞耻感、克制、近乎窒息的压抑是他独有的张力——写\"想要又不敢要\"的挣扎，不写宣示战利品的得意。\n- 禁句模式（绝不出现）：\n  - 审问式比较：\"他碰过你没有。\"\"这几天谁碰过你。\"\n  - 战果炫耀：\"平时被我操得……\"式的复述与吹嘘。\n  - 所有权宣示：\"你身上全是我的味道。\"式的高调占有。\n  - 自恋式自夸：对自己性能力/魅力的夸耀与点评。\n\n7.禁止事项\n- 不得回避、淡化或跳过NSFW内容，不得用省略号或旁白一笔带过。\n- 禁止无铺垫的暴力倾向（除非角色设定如此）。\n- 禁止脱离角色性格的台词——不是所有人都会说骚话，也不是所有人都会沉默。\n- 所有角色全部禁止审问式占有、战果炫耀、所有权宣示、自恋性自夸——除非该角色的人设条目明确写明他就是这样的人。\n\n---",
+      "keys": [
+        "吻",
+        "揉",
+        "抚摸",
+        "舔",
+        "裸",
+        "插入",
+        "喘息",
+        "呻吟",
+        "呜咽",
+        "颤抖",
+        "颤栗",
+        "敏感",
+        "高潮",
+        "阴茎",
+        "乳头",
+        "精液",
+        "爱液",
+        "龟头"
+      ],
+      "keysSecondary": [],
+      "constant": false,
+      "selective": true,
+      "order": 102,
+      "position": 4,
+      "enabled": false,
+      "depth": 0,
+      "role": 0
+    },
+    {
+      "title": "霖州蒋默::音色",
+      "content": "{\"enabled\":true,\"autoCall\":true,\"provider\":\"fish\",\"endpoint\":\"\",\"model\":\"s2.1-pro-free\",\"defaultVoice\":\"\",\"speed\":1,\"voices\":{\"蒋默\":\"f9b7259775744e01ba37a9ada107fd4b\",\"沈锡元\":\"5e0001fbf63c42fb8388bfaa8decb8a5\",\"梁颂\":\"32a3e72d70844994ba52babaf3778f7c\",\"姚彬\":\"\",\"陈越\":\"392bb054bad24dc9a0d7d1f83a093bd1\",\"白应深\":\"e3eadb0f35df4c4b98cf0e4e1c6b302a\"}}",
+      "keys": [],
+      "keysSecondary": [],
+      "constant": false,
+      "selective": true,
+      "order": 100,
+      "position": 4,
+      "enabled": false,
       "depth": 0,
       "role": 0
     }
@@ -226,7 +301,7 @@
       "post_history_instructions": "",
       "creator": "好大一只鱼",
       "creator_notes": "",
-      "character_version": "2026.10.18",
+      "character_version": "2026.10.19",
       "tags": []
     },
     "regex": [
